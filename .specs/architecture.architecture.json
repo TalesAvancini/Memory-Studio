@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Memory Studio — Camada A (Farol Arquitetural)",
+    "subtitle": "Produto, orquestração e integrações externas — referência cross-phase",
+    "output": ".specs/architecture.html",
+    "visual_preset": "blueprint",
+    "animation": "trace",
+    "quality_profile": "standard",
+    "views": [
+      {
+        "id": "request-flow",
+        "label": "Fluxo do augment request",
+        "focus": ["llm-provider", "agents", "server", "augmenter", "search", "cache", "social-detector"],
+        "note": "Do LLM provider até a injeção no system message — passa pelo proxy/hook/MCP adapter."
+      },
+      {
+        "id": "ingest-flow",
+        "label": "Catálogo e embeddings",
+        "focus": ["catalog", "catalog-yaml-files", "embedding-model", "sqlite"],
+        "note": "YAML versionado vira SQLite + vetores ONNX. Cold path."
+      },
+      {
+        "id": "loop-control",
+        "label": "Loop de fases",
+        "focus": ["tlc-roadmap-loop", "tlc-spec-driven", "planner-subagent", "implementer-subagent", "verifier-subagent", "discoveries-log", "architecture-md"],
+        "note": "Como o farol governa a execução das phases do roadmap."
+      }
+    ]
+  },
+  "components": [
+    { "id": "llm-provider", "type": "external", "label": "LLM Provider", "sublabel": "Claude Code / Cursor / Aider", "pos": [80, 60], "size": [200, 60], "tag": "consumer" },
+    { "id": "catalog-yaml-files", "type": "external", "label": "Catalog YAML", "sublabel": "config/skills/*.yaml", "pos": [380, 60], "size": [200, 60], "tag": "versioned" },
+    { "id": "archify", "type": "external", "label": "Archify", "sublabel": "renderer do farol", "pos": [680, 60], "size": [200, 60], "tag": "render" },
+    { "id": "tlc-roadmap-loop", "type": "backend", "label": "tlc-roadmap-loop", "sublabel": "loop orchestrator", "pos": [980, 60], "size": [200, 60], "tag": "driver" },
+    { "id": "tlc-spec-driven", "type": "backend", "label": "tlc-spec-driven", "sublabel": "base skill", "pos": [1280, 60], "size": [200, 60], "tag": "compose" },
+
+    { "id": "agents", "type": "backend", "label": "Agents", "sublabel": "proxy / hook / MCP", "pos": [80, 240], "size": [200, 60], "tag": "adapter" },
+    { "id": "server", "type": "backend", "label": "Server", "sublabel": "Fastify HTTP", "pos": [380, 240], "size": [200, 60], "tag": "edge" },
+    { "id": "planner-subagent", "type": "backend", "label": "Planner", "sublabel": "spec + design + tasks", "pos": [680, 240], "size": [200, 60], "tag": "subagent" },
+    { "id": "implementer-subagent", "type": "backend", "label": "Implementer", "sublabel": "execute tasks", "pos": [980, 240], "size": [200, 60], "tag": "subagent" },
+    { "id": "verifier-subagent", "type": "backend", "label": "Verifier", "sublabel": "validate + discriminate", "pos": [1280, 240], "size": [200, 60], "tag": "subagent" },
+
+    { "id": "augmenter", "type": "backend", "label": "Augmenter", "sublabel": "prompt → system msg", "pos": [80, 420], "size": [200, 60], "tag": "core" },
+    { "id": "search", "type": "backend", "label": "Search", "sublabel": "FTS5 + vec + rerank", "pos": [380, 420], "size": [200, 60], "tag": "core" },
+    { "id": "catalog", "type": "backend", "label": "Catalog", "sublabel": "YAML → SQLite + embed", "pos": [680, 420], "size": [200, 60], "tag": "ingest" },
+    { "id": "social-detector", "type": "backend", "label": "Social Detector", "sublabel": "regex de bypass", "pos": [980, 420], "size": [200, 60], "tag": "guard" },
+    { "id": "cache", "type": "backend", "label": "Cache", "sublabel": "byte-string + sha256", "pos": [1280, 420], "size": [200, 60], "tag": "hot" },
+
+    { "id": "embedding-model", "type": "backend", "label": "Embedding Model", "sublabel": "multilingual-e5-small", "pos": [80, 600], "size": [200, 60], "tag": "ONNX" },
+    { "id": "sqlite", "type": "database", "label": "SQLite", "sublabel": "in-process", "pos": [380, 600], "size": [200, 60], "tag": "data" },
+    { "id": "sqlite-fts5", "type": "database", "label": "SQLite FTS5", "sublabel": "full-text engine", "pos": [680, 600], "size": [200, 60], "tag": "engine" },
+    { "id": "sqlite-vec", "type": "database", "label": "sqlite-vec", "sublabel": "vector engine", "pos": [980, 600], "size": [200, 60], "tag": "engine" },
+    { "id": "architecture-md", "type": "database", "label": "ARCHITECTURE.md", "sublabel": "farol em texto", "pos": [1280, 600], "size": [200, 60], "tag": "stable IDs" },
+
+    { "id": "discoveries-log", "type": "database", "label": "DISCOVERIES.md", "sublabel": "drift log", "pos": [80, 780], "size": [200, 60], "tag": "append-only" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Camada produto", "wraps": ["agents", "server", "augmenter", "search", "catalog", "social-detector", "cache", "embedding-model", "sqlite"] },
+    { "kind": "region", "label": "Camada orquestração", "wraps": ["tlc-roadmap-loop", "tlc-spec-driven", "planner-subagent", "implementer-subagent", "verifier-subagent", "discoveries-log", "architecture-md"] },
+    { "kind": "region", "label": "Camada externa", "wraps": ["llm-provider", "catalog-yaml-files", "archify", "sqlite-fts5", "sqlite-vec"] }
+  ],
+  "connections": [
+    { "from": "llm-provider", "to": "agents", "label": "prompt", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [180, 178] },
+    { "from": "agents", "to": "server", "label": "augment req", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "from": "server", "to": "augmenter", "label": "delegate", "variant": "default", "route": "orthogonal-v", "via": [[480, 330], [180, 330]] },
+    { "from": "augmenter", "to": "search", "label": "retrieve", "variant": "default", "fromSide": "right", "toSide": "left" },
+    { "from": "augmenter", "to": "cache", "label": "lookup/store", "variant": "default", "route": "orthogonal-v", "via": [[180, 540], [1380, 540]] },
+    { "from": "augmenter", "to": "social-detector", "label": "scan", "variant": "security", "fromSide": "bottom", "toSide": "bottom", "route": "orthogonal-v", "via": [[180, 540], [1080, 540]] },
+    { "from": "catalog", "to": "catalog-yaml-files", "label": "load", "variant": "default", "route": "orthogonal-v", "via": [[780, 540], [340, 540], [340, 90]] },
+    { "from": "catalog", "to": "embedding-model", "label": "encode", "variant": "default", "route": "orthogonal-v", "via": [[780, 540], [180, 540], [180, 660]] },
+    { "from": "catalog", "to": "sqlite", "label": "write", "variant": "default", "route": "orthogonal-v", "via": [[780, 540], [480, 540]] },
+    { "from": "search", "to": "sqlite", "label": "query", "variant": "default", "fromSide": "bottom", "toSide": "top", "labelAt": [480, 530] },
+    { "from": "search", "to": "sqlite-fts5", "label": "FTS", "variant": "default", "route": "orthogonal-v", "via": [[480, 540], [780, 540]] },
+    { "from": "search", "to": "sqlite-vec", "label": "k-NN", "variant": "default", "route": "orthogonal-v", "via": [[480, 540], [1080, 540]] },
+    { "from": "tlc-roadmap-loop", "to": "tlc-spec-driven", "label": "compose", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+    { "from": "tlc-roadmap-loop", "to": "planner-subagent", "label": "dispatch planner", "variant": "emphasis", "route": "orthogonal-v", "via": [[1080, 180], [780, 180]] },
+    { "from": "tlc-roadmap-loop", "to": "implementer-subagent", "label": "dispatch impl", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelAt": [1080, 178] },
+    { "from": "tlc-roadmap-loop", "to": "verifier-subagent", "label": "dispatch verify", "variant": "emphasis", "route": "orthogonal-v", "via": [[1080, 180], [1380, 180]] },
+    { "from": "tlc-roadmap-loop", "to": "discoveries-log", "label": "writes drift", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "route": "orthogonal-v", "via": [[1080, 150], [1500, 150], [1500, 870], [180, 870]], "labelAt": [1500, 130] },
+    { "from": "planner-subagent", "to": "architecture-md", "label": "read farol", "variant": "default", "fromSide": "bottom", "toSide": "bottom", "route": "orthogonal-v", "via": [[600, 330], [600, 690], [1380, 690]], "labelAt": [610, 510] },
+    { "from": "archify", "to": "architecture-md", "label": "renders", "variant": "dashed", "fromSide": "bottom", "toSide": "bottom", "route": "orthogonal-v", "via": [[600, 150], [600, 690], [1380, 690]], "labelAt": [610, 680] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Stable IDs", "items": ["Todos os IDs são kebab-case, imutáveis", "Label pode mudar; ID não", "Referência cross-phase sempre por ID"] },
+    { "dot": "emerald", "title": "Dual consumption", "items": ["LLM/sub-agent lê ARCHITECTURE.md como texto", "Humano lê architecture.html com semantic lens, pan/zoom, dark/light"] },
+    { "dot": "amber", "title": "Drift handling", "items": ["Mudança de fronteira → DISCOVERIES.md (critical)", "Novo componente → DISCOVERIES.md (structural)", "Rename/label → DISCOVERIES.md (cosmetic)"] }
+  ]
+}
