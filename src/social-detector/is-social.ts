@@ -1,0 +1,36 @@
+const SOCIAL_PATTERNS: readonly RegExp[] = Object.freeze([
+  /^oi$/u,
+  /^olá$/u,
+  /^bom dia$/u,
+  /^boa tarde$/u,
+  /^boa noite$/u,
+  /^e aí$/u,
+  /^valeu$/u,
+  /^obrigado$/u,
+  /^obrigada$/u,
+  /^muito obrigado$/u,
+  /^tchau$/u,
+  /^até logo$/u,
+  /^até mais$/u,
+  /^tudo bem\?$/u,
+  /^como vai\?$/u,
+  /^hi$/u,
+  /^hello$/u,
+  /^hey$/u,
+  /^good morning$/u,
+  /^good afternoon$/u,
+  /^good evening$/u,
+  /^thanks$/u,
+  /^thank you$/u,
+  /^many thanks$/u,
+  /^thx$/u,
+  /^bye$/u,
+  /^goodbye$/u,
+  /^see you$/u,
+  /^how are you\?$/u,
+  /^what's up\?$/u,
+]);
+
+export function isSocial(prompt: string): boolean {
+  return SOCIAL_PATTERNS.some((pattern) => pattern.test(prompt));
+}
