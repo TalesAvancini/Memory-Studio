@@ -22,7 +22,6 @@
  */
 
 import type { Database } from 'better-sqlite3';
-import { EmbedderError } from '../catalog/errors.ts';
 import {
   asSearchError,
   SearchError,
@@ -216,21 +215,15 @@ export function createSearch(options: SearchOptions): SearchFunction {
     const depth = computeCandidateDepth(k);
 
     // Embed the query exactly once. Errors are wrapped as EMBEDDING_FAILED
-    // and the wrapped message does NOT echo the query text. The original
-    // error is preserved on `cause` so operators can debug without leaking
-    // the prompt.
+    // with query-independent text — we NEVER copy the inner error's message
+    // (it can carry caller-supplied strings that may include the prompt).
+    // The original error is preserved on `cause` so operators can debug
+    // without leaking the prompt.
     let embedding: Float32Array;
     try {
       embedding = await embedder.embed(query);
     } catch (err) {
-      const wrapped = new SearchError(
-        err instanceof EmbedderError
-          ? err.message
-          : 'embedder failed (cause attached; query text withheld)',
-        'EMBEDDING_FAILED',
-        err,
-      );
-      throw wrapped;
+      throw new SearchError('embedding failed', 'EMBEDDING_FAILED', err);
     }
     // Defensive: re-validate in case the embedder lies about its contract.
     try {

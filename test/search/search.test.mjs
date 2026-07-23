@@ -444,6 +444,47 @@ test('T-ORCH-13: embedder failure wraps as SearchError(EMBEDDING_FAILED) without
   }
 });
 
+test('T-ORCH-13b: EmbedderError message must never leak into SearchError (SEARCH-13 privacy regression)', async () => {
+  const { EmbedderError } = await import('../../src/catalog/errors.ts');
+  const db = freshDb();
+  try {
+    acceptanceCorpus(db);
+    const secretQuery = 'super-secret-prompt-must-NEVER-leak-9f8e7d';
+    const embedder = {
+      dimensions: EMBEDDING_DIMENSIONS,
+      async embed() {
+        // Real EmbedderError whose message carries the query text in clear.
+        // Privacy contract: SearchError.message must not echo this; cause
+        // retains it for operator debugging.
+        throw new EmbedderError(`backend saw ${secretQuery}`, 'ENCODING_FAILED');
+      },
+    };
+    const search = createSearch({ db, embedder });
+    let caught = null;
+    try { await search(secretQuery, 5); } catch (err) { caught = err; }
+    assert.ok(caught instanceof SearchError);
+    assert.equal(caught.code, 'EMBEDDING_FAILED');
+    // The public SearchError message must be query-independent.
+    assert.equal(
+      caught.message,
+      'embedding failed',
+      'SearchError message must be the fixed query-independent text',
+    );
+    assert.ok(
+      !caught.message.includes(secretQuery),
+      'SearchError message must not contain the query text even when the inner error did',
+    );
+    // The original EmbedderError is preserved on cause for debugging.
+    assert.ok(caught.cause instanceof Error);
+    assert.ok(
+      /** @type {Error} */ (caught.cause).message.includes(secretQuery),
+      'cause retains the original error message for operator inspection',
+    );
+  } finally {
+    db.close();
+  }
+});
+
 test('T-ORCH-14: invalid embedding returned by the embedder raises SearchError(INVALID_EMBEDDING)', async () => {
   const db = freshDb();
   try {
