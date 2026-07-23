@@ -132,3 +132,16 @@ test('T-EMBED-11: cosineSimilarity throws on length mismatch', () => {
     assert.ok(err instanceof EmbedderError);
   }
 });
+
+test('T-EMBED-12: non-string input to embed() throws EmbedderError', async () => {
+  const e = new DeterministicStubEmbedder();
+  // The signature is `embed(text: string)`, but at runtime we still defend
+  // against bad callers (the type contract alone is not enough).
+  try {
+    await e.embed(/** @type {any} */ (42));
+    assert.fail('should have thrown');
+  } catch (err) {
+    assert.ok(err instanceof EmbedderError);
+    assert.equal(err.code, 'ENCODING_FAILED');
+  }
+});

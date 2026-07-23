@@ -235,3 +235,24 @@ test('T-WRITER-09: WriterError surfaces SQL failures from the underlying driver'
     // ignore the close-on-close
   }
 });
+
+test('T-WRITER-10: inserting two records with the same slug but different hash hits UNIQUE constraint', async () => {
+  // The writer's idempotency key is `hash`, not `slug`. Two records that share
+  // a slug but differ in content (=> different hash) will trip the slug
+  // UNIQUE constraint on the second insert.
+  const db = freshDb();
+  try {
+    const a = await makeRecordAndEmbedding('shared-slug', 'first content');
+    const b = await makeRecordAndEmbedding('shared-slug', 'second content');
+    upsertSkill(db, a.record, a.embedding);
+    try {
+      upsertSkill(db, b.record, b.embedding);
+      assert.fail('second insert with same slug should fail UNIQUE');
+    } catch (err) {
+      assert.ok(err instanceof WriterError);
+      assert.equal(err.code, 'DB_ERROR');
+    }
+  } finally {
+    db.close();
+  }
+});

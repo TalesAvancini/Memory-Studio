@@ -66,10 +66,10 @@ export async function main(argvIn: readonly string[]): Promise<number> {
   const log = pino({ level: quiet ? 'silent' : 'info' });
 
   const dbPath = resolve(process.env.CATALOG_DB_PATH ?? DEFAULT_DB_PATH);
-  mkdirSync(dirname(dbPath), { recursive: true });
-  const db = new Database(dbPath);
-
+  let db: Database.Database | null = null;
   try {
+    mkdirSync(dirname(dbPath), { recursive: true });
+    db = new Database(dbPath);
     createSchema(db);
 
     const record = loadSkillFromFile(yamlPath);
@@ -107,7 +107,7 @@ export async function main(argvIn: readonly string[]): Promise<number> {
     );
     return 1;
   } finally {
-    db.close();
+    if (db) db.close();
   }
 }
 
@@ -117,12 +117,18 @@ void existsSync;
 void readFileSync;
 
 // Auto-run when invoked directly (not when imported for tests).
-// We compare the absolute file URL of this module against the resolved URL
-// of `process.argv[1]` (the script tsx launched).
-const scriptUrl = process.argv[1] ? pathToFileURL(resolve(process.argv[1])).href : '';
-const isDirectInvocation = import.meta.url === scriptUrl;
-if (isDirectInvocation) {
-  main(argv)
+// `import.meta.url` always points at the absolute URL of this module; we
+// compare it against the resolved file URL of `process.argv[1]`. When tsx
+// invokes this file, argv[1] is its absolute path, so the comparison is
+// true. When another module imports `cli.ts`, argv[1] is the importer and
+// the comparison is false, so main() is not auto-invoked.
+const invokedDirectly = (() => {
+  if (!process.argv[1]) return false;
+  return import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+})();
+
+if (invokedDirectly) {
+  void main(argv)
     .then((code) => exit(code))
     .catch((err) => {
       stderr.write(`fatal: ${err instanceof Error ? err.message : String(err)}\n`);

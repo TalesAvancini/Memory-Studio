@@ -60,9 +60,13 @@ export function computeStubEmbedding(text: string): Float32Array {
   // Each byte is in [0, 255]; we map it to [-1, 1] by subtracting 128 and
   // dividing by 128. That gives a uniform distribution with mean ~0 and a
   // small dynamic range suitable for cosine similarity.
+  //
+  // Non-null assertions (`!`) below are safe: `bytes` is a Buffer of length
+  // TARGET_BYTES = 1536 >= 384, and `floats` is a fresh Float32Array of
+  // length EMBEDDING_DIMENSIONS = 384. Every index is defined.
   const floats = new Float32Array(EMBEDDING_DIMENSIONS);
   for (let i = 0; i < EMBEDDING_DIMENSIONS; i += 1) {
-    const b = bytes[i] ?? 0;
+    const b = bytes[i]!;
     floats[i] = (b - 128) / 128;
   }
 
@@ -73,21 +77,22 @@ export function computeStubEmbedding(text: string): Float32Array {
 }
 
 function normalizeInPlace(arr: Float32Array): void {
+  const len = arr.length;
   let sum = 0;
-  for (let i = 0; i < arr.length; i += 1) {
-    sum += arr[i] ?? 0;
+  for (let i = 0; i < len; i += 1) {
+    sum += arr[i]!;
   }
-  const mean = sum / arr.length;
+  const mean = sum / len;
 
   let sqSum = 0;
-  for (let i = 0; i < arr.length; i += 1) {
-    const diff = (arr[i] ?? 0) - mean;
+  for (let i = 0; i < len; i += 1) {
+    const diff = arr[i]! - mean;
     sqSum += diff * diff;
   }
-  const std = Math.sqrt(sqSum / arr.length) || 1; // avoid div-by-zero
+  const std = Math.sqrt(sqSum / len) || 1; // avoid div-by-zero
 
-  for (let i = 0; i < arr.length; i += 1) {
-    arr[i] = ((arr[i] ?? 0) - mean) / std;
+  for (let i = 0; i < len; i += 1) {
+    arr[i] = (arr[i]! - mean) / std;
   }
 }
 
@@ -124,12 +129,13 @@ export function cosineSimilarity(a: Float32Array, b: Float32Array): number {
       'ENCODING_FAILED',
     );
   }
+  const len = a.length;
   let dot = 0;
   let normA = 0;
   let normB = 0;
-  for (let i = 0; i < a.length; i += 1) {
-    const av = a[i] ?? 0;
-    const bv = b[i] ?? 0;
+  for (let i = 0; i < len; i += 1) {
+    const av = a[i]!;
+    const bv = b[i]!;
     dot += av * bv;
     normA += av * av;
     normB += bv * bv;

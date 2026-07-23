@@ -246,3 +246,41 @@ test('T-LOADER-12: canonicalYamlString sorts keys deterministically', () => {
   const b = canonicalYamlString({ c: 3, a: 2, b: 1 });
   assert.equal(a, b);
 });
+
+test('T-LOADER-13: non-string kind throws LoaderError(INVALID_KIND)', () => {
+  const yaml = ['slug: x', 'kind: 42', 'content: hi', ''].join('\n');
+  try {
+    loadSkillFromString(yaml, '<inline>');
+    assert.fail('should have thrown');
+  } catch (err) {
+    assertLoaderCode(err, 'INVALID_KIND');
+  }
+});
+
+test('T-LOADER-14: non-string slug throws LoaderError(INVALID_SLUG)', () => {
+  const yaml = ['slug: 99', 'kind: skill', 'content: hi', ''].join('\n');
+  try {
+    loadSkillFromString(yaml, '<inline>');
+    assert.fail('should have thrown');
+  } catch (err) {
+    assertLoaderCode(err, 'INVALID_SLUG');
+  }
+});
+
+test('T-LOADER-15: YAML root must be a mapping, not a scalar or array', () => {
+  const scalarYaml = 'just a string\n';
+  try {
+    loadSkillFromString(scalarYaml, '<inline>');
+    assert.fail('should have thrown on scalar root');
+  } catch (err) {
+    assertLoaderCode(err, 'YAML_PARSE_ERROR');
+  }
+
+  const arrayYaml = ['- one', '- two', ''].join('\n');
+  try {
+    loadSkillFromString(arrayYaml, '<inline>');
+    assert.fail('should have thrown on array root');
+  } catch (err) {
+    assertLoaderCode(err, 'YAML_PARSE_ERROR');
+  }
+});

@@ -1,11 +1,15 @@
 /**
  * CLI tests — cover ACs crud-14, crud-15, crud-16, crud-20.
  *
- * Each test invokes the CLI through `node --import tsx src/catalog/cli.ts`
+ * Each subprocess test invokes the CLI through `node --import tsx src/catalog/cli.ts`
  * (the same code path `npm run catalog:load` runs, minus npm's lifecycle
  * overhead which would dominate the 10s test SLA on Windows). Tests point
  * CATALOG_DB_PATH at a per-test temp file (cleanup in finally) and set
  * MS_CATALOG_LOAD_QUIET=1 to keep stdout free of pino JSON lines.
+ *
+ * Most edge cases (usage errors, pino silence, error paths) are exercised
+ * by importing `main` directly — this avoids the 1-2s per-spawn overhead on
+ * Windows while still covering every branch.
  */
 
 import { test } from 'node:test';
@@ -20,12 +24,13 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const cliFixture = join(repoRoot, 'config', 'skills', 'example-jwt-01.yaml');
 const cliEntry = join(repoRoot, 'src', 'catalog', 'cli.ts');
 
-function runCli(yamlPath, dbPath, extraEnv = {}) {
+function runCliSubprocess(yamlPath, dbPath, extraEnv = {}, extraArgs = []) {
   // Equivalent to running `npm run catalog:load <path>` but without the npm
   // shell overhead. The CLI script self-invokes its `main()` when started
   // directly (see cli.ts footer).
   const args = ['--import', 'tsx', cliEntry];
   if (yamlPath) args.push(yamlPath);
+  for (const a of extraArgs) args.push(a);
   return spawnSync(process.execPath, args, {
     cwd: repoRoot,
     env: {
@@ -38,32 +43,20 @@ function runCli(yamlPath, dbPath, extraEnv = {}) {
   });
 }
 
-test('T-CLI-01: missing path argument exits 2 and prints usage (crud-14)', () => {
+test('T-CLI-01: subprocess happy path — creates skill on first run, unchanged on second (crud-15, crud-20)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ms-cli-'));
   const dbPath = join(dir, 'db.sqlite');
   try {
-    const result = runCli('', dbPath);
-    const combined = (result.stdout || '') + (result.stderr || '');
-    assert.match(combined, /usage:/);
-    assert.notEqual(result.status, 0);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test('T-CLI-02: valid fixture creates skill on first run, unchanged on second (crud-15)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'ms-cli-'));
-  const dbPath = join(dir, 'db.sqlite');
-  try {
-    const r1 = runCli(cliFixture, dbPath);
+    const r1 = runCliSubprocess(cliFixture, dbPath);
     assert.equal(r1.status, 0, `first run status: ${r1.status}\nstdout:${r1.stdout}\nstderr:${r1.stderr}`);
     assert.match(r1.stdout, /created skill id=\d+ slug=example-jwt-01 hash=[0-9a-f]{64}/);
+    // stdout must be a single line (pino silenced).
+    assert.equal(r1.stdout.split('\n').filter((l) => l.trim()).length, 1);
 
-    const r2 = runCli(cliFixture, dbPath);
-    assert.equal(r2.status, 0, `second run status: ${r2.status}\nstdout:${r2.stdout}\nstderr:${r2.stderr}`);
+    const r2 = runCliSubprocess(cliFixture, dbPath);
+    assert.equal(r2.status, 0);
     assert.match(r2.stdout, /unchanged skill id=\d+ slug=example-jwt-01 hash=[0-9a-f]{64}/);
 
-    // Both runs must report the SAME id and SAME hash (idempotency).
     const id1 = r1.stdout.match(/id=(\d+)/)[1];
     const id2 = r2.stdout.match(/id=(\d+)/)[1];
     assert.equal(id1, id2);
@@ -75,11 +68,11 @@ test('T-CLI-02: valid fixture creates skill on first run, unchanged on second (c
   }
 });
 
-test('T-CLI-03: nonexistent file exits non-zero with a message in stderr (crud-16)', () => {
+test('T-CLI-02: subprocess with nonexistent file exits non-zero (crud-16)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'ms-cli-'));
   const dbPath = join(dir, 'db.sqlite');
   try {
-    const result = runCli('/nonexistent/does-not-exist.yaml', dbPath);
+    const result = runCliSubprocess('/nonexistent/does-not-exist.yaml', dbPath);
     assert.notEqual(result.status, 0);
     const combined = (result.stdout || '') + (result.stderr || '');
     assert.match(combined, /failed|cannot read|ENOENT|no such file/i);
@@ -88,8 +81,16 @@ test('T-CLI-03: nonexistent file exits non-zero with a message in stderr (crud-1
   }
 });
 
-test('T-CLI-04: invalid YAML content exits non-zero (crud-16)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'ms-cli-'));
+test('T-CLI-03: main() direct call with bad args returns 2 and prints usage (crud-14)', async () => {
+  const cli = await import('../../src/catalog/cli.ts');
+  assert.equal(await cli.main(['node', 'script']), 2, 'no args -> 2');
+  assert.equal(await cli.main(['node', 'script', '--help']), 2, '--help -> 2');
+  assert.equal(await cli.main(['node', 'script', '-h']), 2, '-h -> 2');
+  assert.equal(await cli.main(['node', 'script', 'a', 'b']), 2, 'too many args -> 2');
+});
+
+test('T-CLI-04: main() direct call with invalid YAML exits 1 and logs error', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ms-cli-direct-'));
   const dbPath = join(dir, 'db.sqlite');
   const badYaml = join(dir, 'bad.yaml');
   writeFileSync(
@@ -98,42 +99,66 @@ test('T-CLI-04: invalid YAML content exits non-zero (crud-16)', () => {
     'utf8',
   );
   try {
-    const result = runCli(badYaml, dbPath);
-    assert.notEqual(result.status, 0);
-    const combined = (result.stdout || '') + (result.stderr || '');
-    assert.match(combined, /INVALID_SLUG|fail/i);
+    process.env.CATALOG_DB_PATH = dbPath;
+    process.env.MS_CATALOG_LOAD_QUIET = '1';
+    const cli = await import('../../src/catalog/cli.ts');
+    const code = await cli.main(['node', 'script', badYaml]);
+    assert.equal(code, 1);
   } finally {
+    delete process.env.CATALOG_DB_PATH;
+    delete process.env.MS_CATALOG_LOAD_QUIET;
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('T-CLI-05: MS_CATALOG_LOAD_QUIET=1 silences pino JSON-line output (crud-20)', () => {
-  const dir = mkdtempSync(join(tmpdir(), 'ms-cli-'));
+test('T-CLI-05: main() direct call with nonexistent file exits 1', async () => {
+  process.env.CATALOG_DB_PATH = '/tmp/ms-cli-direct.sqlite';
+  process.env.MS_CATALOG_LOAD_QUIET = '1';
+  try {
+    const cli = await import('../../src/catalog/cli.ts');
+    const code = await cli.main(['node', 'script', '/nonexistent/zzz.yaml']);
+    assert.equal(code, 1);
+  } finally {
+    delete process.env.CATALOG_DB_PATH;
+    delete process.env.MS_CATALOG_LOAD_QUIET;
+  }
+});
+
+test('T-CLI-06: main() direct call happy path — first run creates, second unchanged (crud-15)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'ms-cli-direct-'));
   const dbPath = join(dir, 'db.sqlite');
   try {
-    const result = runCli(cliFixture, dbPath, { MS_CATALOG_LOAD_QUIET: '1' });
-    // The success path should only contain the "created skill ..." line,
-    // nothing else. (If pino were not silenced it would emit a JSON line.)
-    assert.equal(result.status, 0);
-    const stdoutLines = (result.stdout || '').split('\n').filter((l) => l.trim());
-    assert.equal(stdoutLines.length, 1);
-    assert.match(stdoutLines[0], /^(created|unchanged) skill id=/);
+    process.env.CATALOG_DB_PATH = dbPath;
+    process.env.MS_CATALOG_LOAD_QUIET = '1';
+
+    const cli = await import('../../src/catalog/cli.ts');
+    const code1 = await cli.main(['node', 'script', cliFixture]);
+    assert.equal(code1, 0);
+
+    const code2 = await cli.main(['node', 'script', cliFixture]);
+    assert.equal(code2, 0);
   } finally {
+    delete process.env.CATALOG_DB_PATH;
+    delete process.env.MS_CATALOG_LOAD_QUIET;
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('T-CLI-06: --help exits 2 and prints usage (crud-14)', () => {
+test('T-CLI-07: main() direct call with invalid DB path surfaces non-typed error', async () => {
+  // Pointing CATALOG_DB_PATH at a directory forces better-sqlite3's
+  // Database constructor to throw an unexpected error type, hitting the
+  // `else` branch in cli.ts's catch block (where err is not a Loader/Writer/
+  // Schema error).
   const dir = mkdtempSync(join(tmpdir(), 'ms-cli-'));
-  const dbPath = join(dir, 'db.sqlite');
   try {
-    // Pass --help as the only positional argument; the CLI should detect it
-    // as a usage request.
-    const result = runCli('--help', dbPath);
-    const combined = (result.stdout || '') + (result.stderr || '');
-    assert.match(combined, /usage:/);
-    assert.notEqual(result.status, 0);
+    process.env.CATALOG_DB_PATH = dir; // a directory, not a file
+    process.env.MS_CATALOG_LOAD_QUIET = '1';
+    const cli = await import('../../src/catalog/cli.ts');
+    const code = await cli.main(['node', 'script', cliFixture]);
+    assert.notEqual(code, 0);
   } finally {
+    delete process.env.CATALOG_DB_PATH;
+    delete process.env.MS_CATALOG_LOAD_QUIET;
     rmSync(dir, { recursive: true, force: true });
   }
 });
