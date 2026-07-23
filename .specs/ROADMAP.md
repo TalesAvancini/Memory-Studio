@@ -42,18 +42,18 @@ Follow the `Depends on:` lists below. Phases sem dependência rodam primeiro; ph
 
 ---
 
-#### Phase 3 — Detector social [ ]
+#### Phase 3 — Detector social [x]
 
 **Phase slug:** `social-detector`
 **Done when:** Função `isSocial(prompt)` retorna `true` para "oi", "valeu", "obrigado", "thanks", "bye"; retorna `false` para prompts técnicos. Testes cobrem ≥ 20 padrões regex.
 
 **Depends on:** Phase 1
 
-- [ ] Regex de bypass social (saudação, agradecimento, despedida, smalltalk)
-- [ ] Função `isSocial(prompt: string): boolean` em `src/social-detector/`
-- [ ] Whitelist de "false positives" (ex: "thanks" como verbo em contexto técnico)
-- [ ] Testes: ≥ 20 casos cobrindo PT-BR + EN + edge cases
-- [ ] Integração com hook do augmenter (interface limpa, sem side-effects)
+- [x] Regex de bypass social (saudação, agradecimento, despedida, smalltalk)
+- [x] Função `isSocial(prompt: string): boolean` em `src/social-detector/`
+- [x] Whitelist de "false positives" (ex: "thanks" como verbo em contexto técnico)
+- [x] Testes: ≥ 20 casos cobrindo PT-BR + EN + edge cases
+- [x] Integração com hook do augmenter (interface limpa, sem side-effects)
 
 ---
 
