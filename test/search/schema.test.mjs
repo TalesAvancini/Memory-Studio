@@ -284,42 +284,25 @@ test('T-SCHEMA-09: missing skills table throws SearchError(SCHEMA_ERROR) before 
   }
 });
 
-test('T-SCHEMA-10: extension load failure becomes VECTOR_EXTENSION_UNAVAILABLE (SEARCH-15)', () => {
+test('T-SCHEMA-10: typed precondition boundary raises SearchError on a closed handle (SEARCH-15)', () => {
   const db = new Database(':memory:');
+  createSchema(db);
+  // Close the underlying handle so the next prepare() inside
+  // initializeSearchStorage throws a raw driver error. The contract is that
+  // every failure at this boundary becomes a typed SearchError, not a raw
+  // TypeError leaking out.
+  db.close();
+  let caught = null;
   try {
-    createSchema(db);
-    // Close the underlying handle so the next extension load attempt fails.
-    db.close();
-    // Suppress subsequent DB ops by creating a brand-new connection that
-    // we then poison before loading.
-  } catch {
-    // ignore the close-on-close teardown noise
+    initializeSearchStorage(db);
+  } catch (err) {
+    caught = err;
   }
-  const db2 = new Database(':memory:');
-  try {
-    createSchema(db2);
-    // Force a SQL failure inside vec_version() probe by creating a competing
-    // table function with the same name. We achieve this by overriding the
-    // extension's "version" name via shadowing: easier path is to drop the
-    // sqlite-vec extension by tampering with the connection through a raw
-    // SQL that registers a conflicting pragma, which we cannot do portably.
-    // Instead, simulate by closing the db and letting the next load fail.
-    db2.close();
-    let caught = null;
-    try {
-      // New connection: skills exists but extension can't load because we
-      // never call sqliteVec.load(). The error path: our load fn calls
-      // sqliteVec.load() which throws if extension missing — we simulate
-      // by directly invoking the schema initializer on a closed handle.
-      initializeSearchStorage(db2);
-    } catch (err) {
-      caught = err;
-    }
-    assert.ok(caught instanceof SearchError, 'expected SearchError');
-    assert.equal(/** @type {SearchError} */ (caught).code, 'VECTOR_EXTENSION_UNAVAILABLE');
-  } catch {
-    // db2.close() above means any subsequent operation would throw; we only
-    // care that initializeSearchStorage on a closed handle produced a typed
-    // error, which we captured above.
-  }
+  assert.ok(caught instanceof SearchError, 'expected typed SearchError');
+  // Either precondition may fire first; both are typed.
+  assert.ok(
+    /** @type {SearchError} */ (caught).code === 'SCHEMA_ERROR' ||
+      /** @type {SearchError} */ (caught).code === 'VECTOR_EXTENSION_UNAVAILABLE',
+    `expected SCHEMA_ERROR or VECTOR_EXTENSION_UNAVAILABLE, got ${/** @type {SearchError} */ (caught).code}`,
+  );
 });

@@ -46,20 +46,35 @@ interface ExtractedFtsRow {
  * Validate that `skills` exists with the expected columns. Throws a typed
  * `SearchError(SCHEMA_ERROR)` if the catalog is missing or has a different
  * shape; the schema initializer must not run on top of an unknown table.
+ *
+ * Any raw driver failure (e.g. a closed connection) is also wrapped as
+ * `SearchError(SCHEMA_ERROR)` so callers always see a typed boundary.
  */
 function verifySkillsTable(db: Database): void {
-  const row = db
-    .prepare<[], { name: string }>(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name='skills'",
-    )
-    .get();
+  let row: { name: string } | undefined;
+  try {
+    row = db
+      .prepare<[], { name: string }>(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='skills'",
+      )
+      .get();
+  } catch (err) {
+    if (err instanceof SearchError) throw err;
+    throw asSearchError(err, 'SCHEMA_ERROR', 'skills table verification failed');
+  }
   if (!row) {
     throw new SearchError(
       'skills table is required before search schema initialization',
       'SCHEMA_ERROR',
     );
   }
-  const cols = db.prepare<[], { name: string }>('PRAGMA table_info(skills)').all();
+  let cols: Array<{ name: string }>;
+  try {
+    cols = db.prepare<[], { name: string }>('PRAGMA table_info(skills)').all();
+  } catch (err) {
+    if (err instanceof SearchError) throw err;
+    throw asSearchError(err, 'SCHEMA_ERROR', 'skills column verification failed');
+  }
   const names = new Set(cols.map((c) => c.name));
   const required = ['id', 'slug', 'kind', 'content_yaml', 'embedding', 'hash'];
   const missing = required.filter((n) => !names.has(n));
