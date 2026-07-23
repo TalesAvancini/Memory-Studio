@@ -20,7 +20,6 @@ import { initializeSearchStorage } from '../../src/search/schema.ts';
 import {
   buildFtsQuery,
   queryFts,
-  wrapFtsError,
 } from '../../src/search/fts.ts';
 import { SearchError } from '../../src/search/errors.ts';
 import { SEARCH_EMBEDDING_DIMENSIONS } from '../../src/search/types.ts';
@@ -145,32 +144,36 @@ test('T-FTS-07: queryFts on punctuation-only returns zero hits without throwing'
   }
 });
 
-test('T-FTS-08: queryFts SQL failure becomes SearchError(QUERY_ERROR); query text is never echoed', () => {
+test('T-FTS-08: queryFts SQL/precondition failure becomes SearchError(QUERY_ERROR); query text is never echoed', () => {
   const db = freshSearchDb();
   const secret = 'user-prompt-text-must-NEVER-leak-9f8e7d';
   try {
-    db.close();
-  } catch {
-    // ignore close noise
+    seedRows(db, [
+      { slug: 'a', content: 'react hooks' },
+    ]);
+    // Control: queryFts on the open connection must succeed.
+    const ok = queryFts(db, 'react', 10);
+    assert.equal(ok.totalHits, 1);
+  } finally {
+    // Close the underlying handle so the next prepare() inside queryFts
+    // throws a real driver error — exercise the typed boundary.
+    try { db.close(); } catch { /* ignore close noise */ }
   }
-  // Simulate the inner failure path by wrapping a generic driver error.
-  // The point is to confirm wrapFtsError exposes a typed SearchError and
-  // that the test infrastructure can call it without surprises.
   let caught = null;
   try {
-    wrapFtsError(new Error('disk full while running FTS MATCH'));
+    queryFts(db, secret, 10);
   } catch (err) {
     caught = err;
   }
-  assert.ok(caught instanceof SearchError);
+  assert.ok(caught instanceof SearchError, 'expected typed SearchError');
   assert.equal(/** @type {SearchError} */ (caught).code, 'QUERY_ERROR');
-  // Wrap helper echoes the driver message — confirm the secret query text
-  // is NOT in any error path triggered by the adapter (the wrap helper
-  // accepts an arbitrary driver error for testing only).
+  // The wrapped message must not contain any caller-provided query text.
   assert.ok(
     !caught.message.includes(secret),
-    'wrap helper must not synthesize query text into the error message',
+    'queryFts failure must not include the query text',
   );
+  // The original driver error is preserved on cause for debugging.
+  assert.ok(caught.cause instanceof Error);
 });
 
 test('T-FTS-09: real FTS5 search over the corpus picks react-debug-01 first (SEARCH-03 acceptance)', () => {

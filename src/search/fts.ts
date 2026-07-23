@@ -75,6 +75,10 @@ interface FtsCountRow {
  * Run the FTS5 channel: count distinct hits, then return BM25-ranked
  * candidates up to `limit`. Empty/undefined expression → zero results
  * without raising an error.
+ *
+ * SQL or precondition failures are wrapped as `SearchError(QUERY_ERROR)`
+ * so callers can rely on a typed failure surface. The wrapped message is
+ * query-independent; the original error is attached on `cause`.
  */
 export function queryFts(
   db: Database,
@@ -86,42 +90,38 @@ export function queryFts(
     return { totalHits: 0, candidates: [] };
   }
 
-  // 1. Total distinct hits before applying the candidate limit.
-  const countRows = db
-    .prepare<[string], FtsCountRow>(
-      `SELECT COUNT(*) AS n FROM ${FTS_TABLE} WHERE ${FTS_TABLE} MATCH ?`,
-    )
-    .all(expression);
-  const totalHits = countRows[0]?.n ?? 0;
+  try {
+    // 1. Total distinct hits before applying the candidate limit.
+    const countRows = db
+      .prepare<[string], FtsCountRow>(
+        `SELECT COUNT(*) AS n FROM ${FTS_TABLE} WHERE ${FTS_TABLE} MATCH ?`,
+      )
+      .all(expression);
+    const totalHits = countRows[0]?.n ?? 0;
 
-  if (totalHits === 0) {
-    return { totalHits: 0, candidates: [] };
+    if (totalHits === 0) {
+      return { totalHits: 0, candidates: [] };
+    }
+
+    // 2. Candidate rows ordered by bm25 ASC then rowid ASC for stability.
+    const rows = db
+      .prepare<[string, number], FtsRow>(
+        `SELECT rowid AS rowid, bm25(${FTS_TABLE}) AS bm25
+         FROM ${FTS_TABLE}
+         WHERE ${FTS_TABLE} MATCH ?
+         ORDER BY bm25 ASC, rowid ASC
+         LIMIT ?`,
+      )
+      .all(expression, limit);
+
+    const candidates: FtsCandidate[] = rows.map((row, idx) => ({
+      id: row.rowid,
+      bm25: row.bm25,
+      rank: idx + 1,
+    }));
+
+    return { totalHits, candidates };
+  } catch (err) {
+    throw asSearchError(err, 'QUERY_ERROR', 'FTS MATCH failed');
   }
-
-  // 2. Candidate rows ordered by bm25 ASC then rowid ASC for stability.
-  const rows = db
-    .prepare<[string, number], FtsRow>(
-      `SELECT rowid AS rowid, bm25(${FTS_TABLE}) AS bm25
-       FROM ${FTS_TABLE}
-       WHERE ${FTS_TABLE} MATCH ?
-       ORDER BY bm25 ASC, rowid ASC
-       LIMIT ?`,
-    )
-    .all(expression, limit);
-
-  const candidates: FtsCandidate[] = rows.map((row, idx) => ({
-    id: row.rowid,
-    bm25: row.bm25,
-    rank: idx + 1,
-  }));
-
-  return { totalHits, candidates };
-}
-
-/**
- * Wrap a thrown SQL error from the FTS adapter as a typed SearchError.
- * Re-exported so test files can simulate failure paths cleanly.
- */
-export function wrapFtsError(err: unknown): never {
-  throw asSearchError(err, 'QUERY_ERROR', 'FTS MATCH failed');
 }
