@@ -25,20 +25,20 @@ Follow the `Depends on:` lists below. Phases sem dependência rodam primeiro; ph
 
 ---
 
-#### Phase 2 — Schema + CRUD de skill [ ]
+#### Phase 2 — Schema + CRUD de skill [x]
 
 **Phase slug:** `schema-and-crud`
 **Done when:** CLI `npm run catalog:load <file.yaml>` lê um YAML de skill, persiste no `skills.sqlite`, gera embedding via ONNX, retorna ID da skill criada. Suite de testes do CRUD passa.
 
 **Depends on:** Phase 1
 
-- [ ] Schema SQLite: tabela `skills` (id, slug, kind, content_yaml, embedding BLOB, hash, created_at, updated_at)
-- [ ] Schema SQLite: tabela `audit_events` (id, ts, tenant_hash, event_type, payload)
-- [ ] Loader YAML com validação (kind ∈ {skill, rule, persona})
-- [ ] Writer SQLite (insert/update idempotente por hash do YAML)
-- [ ] Embedder ONNX via `embedding-model` (multilingual-e5-small, 384d)
-- [ ] CLI `npm run catalog:load <path>` funcional
-- [ ] Testes unitários: schema, loader, writer, embedder (≥ 4 testes, coverage 80%)
+- [x] Schema SQLite: tabela `skills` (id, slug, kind, content_yaml, embedding BLOB, hash, created_at, updated_at)
+- [x] Schema SQLite: tabela `audit_events` (id, ts, tenant_hash, event_type, payload)
+- [x] Loader YAML com validação (kind ∈ {skill, rule, persona})
+- [x] Writer SQLite (insert/update idempotente por hash do YAML)
+- [x] Embedder ONNX via `embedding-model` (multilingual-e5-small, 384d) — stub determinístico (real ONNX Phase 9)
+- [x] CLI `npm run catalog:load <path>` funcional
+- [x] Testes unitários: schema, loader, writer, embedder (≥ 4 testes, coverage 80%)
 
 ---
 
