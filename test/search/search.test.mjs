@@ -26,6 +26,7 @@ import {
   createSearch,
   computeCandidateDepth,
 } from '../../src/search/search.ts';
+import { queryFts } from '../../src/search/fts.ts';
 import { SearchError } from '../../src/search/errors.ts';
 import { EMBEDDING_DIMENSIONS } from '../../src/catalog/embedder.ts';
 import {
@@ -638,6 +639,107 @@ test('T-ORCH-19: vector thresholding preserves original ranks (no compaction)', 
   }
 });
 
+/**
+ * Build a corpus whose k-NN cosine similarities to a fixed unit-vector
+ * query are exactly [1, 1/sqrt(2), 1/sqrt(3), 0.5, 1/sqrt(5)]. Each row's
+ * embedding is a normalized sparse vector on dims 0..k with weight 1 on
+ * the first k components. The shared query vector is unit e_0.
+ */
+function controlledVectorCorpus(db, { n = 5 } = {}) {
+  const insert = db.prepare(
+    `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  );
+  for (let i = 0; i < n; i += 1) {
+    const k = i + 1;
+    const arr = new Float32Array(EMBEDDING_DIMENSIONS);
+    const norm = Math.sqrt(k);
+    for (let j = 0; j < k; j += 1) arr[j] = 1 / norm;
+    insert.run(
+      `cv-${k}`,
+      'skill',
+      `controlled vector row with ${k} components`,
+      Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength),
+      `cv-h-${i}`,
+      1,
+      1,
+    );
+  }
+}
+
+/** Embedder that returns the unit vector e_0 for any input. */
+function queryEmbedderE0() {
+  return makeDeterministicEmbedder((idx) => (idx === 0 ? 1 : 0));
+}
+
+test('T-ORCH-19b: rank-preservation through filtering — candidate with raw rank 5 still survives and uses 1/(60+5)', async () => {
+  // 5 controlled rows whose raw vec output ranks are exactly 1..5 with the
+  // cosine similarities above. Threshold = 0.5 + epsilon keeps ranks 4 and
+  // 5 above threshold while rows 2-3 (cosines 1/sqrt(3) ≈ 0.5774 and
+  // 1/sqrt(2) ≈ 0.7071) sit on the boundary we want to detect. We instead
+  // use a tighter setup: the lowest-ranked candidate (cosine 1/sqrt(5) ≈
+  // 0.4472) becomes rank 5 by virtue of being the worst k-NN match. With a
+  // permissive threshold that lets it through, the surviving candidate's
+  // vectorRank MUST stay equal to its raw k-NN rank (5), not be renumbered.
+  const db = freshDb();
+  try {
+    controlledVectorCorpus(db);
+    const search = createSearch({
+      db,
+      embedder: queryEmbedderE0(),
+      // Accept everything above negative threshold so the raw rank 5 row
+      // survives; FTS unreachable since controlled corpus has no lexical
+      // tokens matching arbitrary prompts.
+      minCosineSimilarity: -1,
+      minFtsHits: 1000,
+    });
+    const raw = db.prepare(
+      `SELECT skill_id, distance FROM skill_embeddings WHERE embedding MATCH ? AND k = 5 ORDER BY distance ASC`,
+    ).all(
+      Buffer.from((() => {
+        const arr = new Float32Array(EMBEDDING_DIMENSIONS);
+        arr[0] = 1;
+        return arr;
+      })().buffer),
+    );
+    const rawRankById = new Map();
+    raw.forEach((r, idx) => rawRankById.set(r.skill_id, idx + 1));
+
+    const results = await search('anything that does not lexically match', 100);
+    // The raw rank 5 candidate must be present in the result.
+    const lowestRankCandidate = results.find(
+      (r) => /** @type {Map<number, number>} */ (rawRankById).get(r.id) === 5,
+    );
+    assert.ok(
+      lowestRankCandidate,
+      'the raw rank-5 candidate must appear in the search output',
+    );
+    assert.equal(
+      lowestRankCandidate.vectorRank,
+      5,
+      'survivor must keep its original k-NN rank 5, not be renumbered',
+    );
+    // RRF term for the lowest-ranked survivor is 1 / (60 + 5) when FTS is
+    // unreachable. Match the value within floating-point tolerance.
+    const expected = 1 / (60 + 5);
+    assert.ok(
+      Math.abs(/** @type {number} */ (lowestRankCandidate.rrfScore) - expected) < 1e-12,
+      `rrfScore must equal 1/(60+5); got ${lowestRankCandidate.rrfScore}, expected ${expected}`,
+    );
+    // Every survivor's vectorRank must match its raw k-NN rank — the mutant
+    // that compacts survivors after filtering would renumber to 1..N.
+    for (const r of results) {
+      assert.equal(
+        r.vectorRank,
+        /** @type {Map<number, number>} */ (rawRankById).get(r.id),
+        `survivor id=${r.id} must keep its raw k-NN rank (got ${r.vectorRank}, expected ${/** @type {Map<number, number>} */ (rawRankById).get(r.id)})`,
+      );
+    }
+  } finally {
+    db.close();
+  }
+});
+
 test('T-ORCH-20: outputs include hash and contentYaml from the source row', async () => {
   const db = freshDb();
   try {
@@ -716,6 +818,118 @@ test('T-ORCH-24: punctuation-only query with permissive vector gate returns vect
       assert.equal(r.ftsRank, undefined);
       assert.ok(r.vectorRank !== undefined);
     }
+  } finally {
+    db.close();
+  }
+});
+
+/**
+ * Threshold-boundary fixture: build a small corpus, count FTS hits per
+ * query, and align `minFtsHits` so it equals the corpus's totalHits for
+ * one query and is one greater than the hit count for another. Both
+ * threshold values are independent of any internal constant — the test
+ * derives them from the observed corpus to avoid baking implementation
+ * values into assertions.
+ */
+// (no helper needed — each test observes its own hit count)
+
+/**
+ * Build the same boundary corpus on a side-channel probe DB and return
+ * the observed totalHits for the given query. Used by T-ORCH-25 and
+ * T-ORCH-26 to set minFtsHits to a value derived from the data, not from
+ * any internal constant.
+ */
+function observeTotalHits(rows, query) {
+  const probe = new Database(':memory:');
+  try {
+    createSchema(probe);
+    initializeSearchStorage(probe);
+    rows.forEach((row, i) => {
+      const arr = new Float32Array(EMBEDDING_DIMENSIONS);
+      arr[0] = 1;
+      probe.prepare(
+        `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      ).run(row.slug, 'skill', row.content, Buffer.from(arr.buffer), `h-${i}`, 1, 1);
+    });
+    return queryFts(probe, query, 100).totalHits;
+  } finally {
+    probe.close();
+  }
+}
+
+function seedBoundaryCorpus(db, rows) {
+  rows.forEach((row, i) => {
+    const arr = new Float32Array(EMBEDDING_DIMENSIONS);
+    arr[0] = 1;
+    db.prepare(
+      `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(row.slug, 'skill', row.content, Buffer.from(arr.buffer), `h-${i}`, 1, 1);
+  });
+}
+
+test('T-ORCH-25: FTS channel passes when totalHits === minFtsHits (SEARCH-11 boundary)', async () => {
+  const db = freshDb();
+  try {
+    const rows = [
+      { slug: 'bnd-1', content: 'react hooks useEffect lifecycle' },
+      { slug: 'bnd-2', content: 'react useState debugar memory' },
+      { slug: 'bnd-3', content: 'sql joins with React' },
+    ];
+    const observedTotalHits = observeTotalHits(rows, 'react');
+    seedBoundaryCorpus(db, rows);
+
+    // minFtsHits equals the observed totalHits. Cosine kept unreachable so
+    // only FTS contributes.
+    const search = createSearch({
+      db,
+      embedder: queryEmbedderNoMatch(),
+      minCosineSimilarity: 0.5,
+      minFtsHits: observedTotalHits,
+    });
+    const results = await search('react', 5);
+    assert.ok(
+      results.length >= 1,
+      `expected FTS results when totalHits (${observedTotalHits}) equals minFtsHits`,
+    );
+    for (const r of results) {
+      assert.ok(
+        r.ftsRank !== undefined,
+        'every result must carry an ftsRank when FTS is the active channel',
+      );
+    }
+  } finally {
+    db.close();
+  }
+});
+
+test('T-ORCH-26: FTS channel contributes nothing when totalHits === minFtsHits - 1 (SEARCH-11 boundary)', async () => {
+  const db = freshDb();
+  try {
+    const rows = [
+      { slug: 'bnd-1', content: 'react hooks useEffect lifecycle' },
+      { slug: 'bnd-2', content: 'react useState debugar memory' },
+      { slug: 'bnd-3', content: 'sql joins with React' },
+    ];
+    const observedTotalHits = observeTotalHits(rows, 'react');
+    seedBoundaryCorpus(db, rows);
+
+    // minFtsHits ONE ABOVE the observed totalHits. With cosine unreachable,
+    // no result must be produced because FTS contributes an empty list and
+    // the vector list is also empty.
+    const search = createSearch({
+      db,
+      embedder: queryEmbedderNoMatch(),
+      minCosineSimilarity: 0.5,
+      minFtsHits: observedTotalHits + 1,
+    });
+    const results = await search('react', 5);
+    assert.deepEqual(
+      results,
+      [],
+      `expected [] when totalHits (${observedTotalHits}) < minFtsHits (${observedTotalHits + 1})`,
+    );
   } finally {
     db.close();
   }
