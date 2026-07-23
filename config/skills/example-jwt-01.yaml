@@ -1,0 +1,9 @@
+slug: example-jwt-01
+kind: skill
+content: How to validate JWT tokens in TypeScript with the jose library.
+extra:
+  tags:
+    - auth
+    - jwt
+  references:
+    - https://datatracker.ietf.org/doc/html/rfc7519
