@@ -16,12 +16,16 @@
  *   - Typed errors are thrown via `SearchError`. Query content is never
  *     included in messages (only types/identifiers).
  *
- * sqlite-vec 0.1.9 quirk:
- *   - better-sqlite3 binding from JS Number to a vec0 PK column is rejected
- *     ("Only integers are allows"). Triggers reading `new.id` work because
- *     SQLite passes the rowid as a proper INTEGER. We therefore use the
- *     implicit rowid (= skills.id) for the vec0 table and bind BigInt only
- *     during the JavaScript backfill loop.
+ * sqlite-vec 0.1.9 quirks:
+ *   - JS Number binding for the vec0 PK column is rejected with the
+ *     "Only integers are allows for primary key values" error. We bind
+ *     BigInt() during the JavaScript backfill loop and from JS-prepared
+ *     INSERT statements. Triggers reading `new.id` pass INTEGER through
+ *     SQLite's own column-reference path so they accept regular SQL
+ *     values directly.
+ *   - With an explicit `skill_id INTEGER PRIMARY KEY`, sqlite-vec no
+ *     longer exposes the implicit `rowid` column. All adapter SQL must
+ *     reference `skill_id` explicitly.
  */
 
 import type { Database } from 'better-sqlite3';
@@ -128,11 +132,17 @@ function createVirtualTablesAndTriggers(db: Database): void {
   );
   createFts.run();
 
-  // sqlite-vec 0.1.9 quirk: explicit non-rowid INTEGER PRIMARY KEY columns
-  // are rejected by the JS binding path. We rely on the implicit rowid
-  // (= skills.id) and store only the vector column.
+  // vec0 declared with an explicit `skill_id INTEGER PRIMARY KEY` so
+  // PRAGMA table_info() exposes the contract the design demands (an
+  // INTEGER-PK linked to skills.id). The implicit rowid is no longer
+  // accessible; downstream SQL must reference `skill_id` directly.
+  // The JS-side backfill binds BigInt() for this column because the
+  // sqlite-vec 0.1.9 binding path rejects plain Number PK values;
+  // trigger-side references to new.id / old.id continue to work because
+  // SQLite passes the column reference as a true INTEGER.
   const createVec = db.prepare(
     `CREATE VIRTUAL TABLE IF NOT EXISTS ${VEC_TABLE} USING vec0(
+       skill_id INTEGER PRIMARY KEY,
        embedding float[${SEARCH_EMBEDDING_DIMENSIONS}] distance_metric=cosine
      )`,
   );
@@ -159,24 +169,24 @@ function createVirtualTablesAndTriggers(db: Database): void {
     END;
   `);
 
-  // Vec sync triggers — sqlite-vec 0.1.9 accepts INTEGER values passed by
-  // SQLite itself (e.g. new.id / old.id inside triggers); only the JS
-  // binding path rejects plain Number primary keys.
+  // Vec sync triggers — new.id / old.id are SQLite column references
+  // (true INTEGERs), which sqlite-vec accepts even though the JS binding
+  // path requires BigInt() for the same column.
   db.exec(`
     CREATE TRIGGER IF NOT EXISTS skills_ai_vec
     AFTER INSERT ON skills BEGIN
-      INSERT INTO ${VEC_TABLE}(rowid, embedding) VALUES (new.id, new.embedding);
+      INSERT INTO ${VEC_TABLE}(skill_id, embedding) VALUES (new.id, new.embedding);
     END;
 
     CREATE TRIGGER IF NOT EXISTS skills_au_embedding_vec
     AFTER UPDATE OF embedding ON skills BEGIN
-      DELETE FROM ${VEC_TABLE} WHERE rowid = old.id;
-      INSERT INTO ${VEC_TABLE}(rowid, embedding) VALUES (new.id, new.embedding);
+      DELETE FROM ${VEC_TABLE} WHERE skill_id = old.id;
+      INSERT INTO ${VEC_TABLE}(skill_id, embedding) VALUES (new.id, new.embedding);
     END;
 
     CREATE TRIGGER IF NOT EXISTS skills_ad_vec
     AFTER DELETE ON skills BEGIN
-      DELETE FROM ${VEC_TABLE} WHERE rowid = old.id;
+      DELETE FROM ${VEC_TABLE} WHERE skill_id = old.id;
     END;
   `);
 }
@@ -186,8 +196,9 @@ function createVirtualTablesAndTriggers(db: Database): void {
  * initialization. Removes stale FTS rows and rebuilds the vec table from
  * scratch so a second call leaves exactly one row per skill in each index.
  *
- * Uses BigInt for the rowid bind because sqlite-vec's vec0 binding path
- * rejects plain Number primary keys when called from JS.
+ * Uses BigInt for the vec PK bind because sqlite-vec's vec0 0.1.9 binding
+ * path rejects plain Number primary keys when called from JS. The FTS
+ * rowid column is unrelated to this quirk and uses plain Number.
  */
 function reconcileIndexes(db: Database): void {
   // 1. Drop FTS rows whose underlying skill no longer exists.
@@ -214,8 +225,11 @@ function reconcileIndexes(db: Database): void {
   const insertFts = db.prepare(
     `INSERT INTO ${FTS_TABLE}(rowid, content_yaml) VALUES (?, ?)`,
   );
+  // skill_id is INTEGER PRIMARY KEY in vec0; sqlite-vec 0.1.9's JS binding
+  // path requires BigInt() for this column, while trigger-side references
+  // (new.id) work without the conversion.
   const insertVec = db.prepare(
-    `INSERT INTO ${VEC_TABLE}(rowid, embedding) VALUES (?, ?)`,
+    `INSERT INTO ${VEC_TABLE}(skill_id, embedding) VALUES (?, ?)`,
   );
   for (const row of allSkills) {
     insertFts.run(row.id, row.content_yaml);

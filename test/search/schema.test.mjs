@@ -103,6 +103,41 @@ test('T-SCHEMA-03: skill_embeddings is a vec0 virtual table with float[384] cosi
   }
 });
 
+test('T-SCHEMA-03b: skill_embeddings declares skill_id INTEGER PRIMARY KEY (SEARCH-02)', () => {
+  const db = freshDbWithOneSkill();
+  try {
+    const cols = /** @type {Array<{ name: string; pk: number }>} */ (
+      db.prepare(`PRAGMA table_info(${SEARCH_TABLES.vec})`).all()
+    );
+    // The design contract requires an INTEGER PRIMARY KEY column tied to
+    // skills.id. sqlite-vec 0.1.9 reports the column's `type` as empty
+    // (vec0 is a virtual table with custom storage) but the `pk` flag is
+    // the authoritative INTEGER PRIMARY KEY marker.
+    const pk = cols.find((c) => c.name === 'skill_id');
+    assert.ok(pk, 'skill_id column must exist on skill_embeddings');
+    assert.equal(
+      /** @type {{ name: string; pk: number }} */ (pk).pk,
+      1,
+      'skill_id must be the INTEGER PRIMARY KEY column (pk=1)',
+    );
+    // Only one column can claim pk=1 — embedding must be pk=0.
+    const emb = cols.find((c) => c.name === 'embedding');
+    assert.ok(emb, 'embedding column must exist on skill_embeddings');
+    assert.equal(
+      /** @type {{ name: string; pk: number }} */ (emb).pk,
+      0,
+      'embedding cannot be a primary key column',
+    );
+    // The vec DDL SQL in sqlite_master must show the explicit PK clause.
+    const row = /** @type {{ sql: string }} */ (
+      db.prepare("SELECT sql FROM sqlite_master WHERE name = ?").get(SEARCH_TABLES.vec)
+    );
+    assert.match(row.sql, /skill_id\s+INTEGER\s+PRIMARY\s+KEY/i);
+  } finally {
+    db.close();
+  }
+});
+
 test('T-SCHEMA-04: existing rows backfill into both indexes; second init is idempotent (SEARCH-01/02)', () => {
   const db = new Database(':memory:');
   try {
@@ -137,10 +172,11 @@ test('T-SCHEMA-04: existing rows backfill into both indexes; second init is idem
     ).map((r) => r.rowid);
     assert.deepEqual(ftsIds, [1, 2, 3]);
 
-    // Vec: each rowid exists exactly once (sqlite-vec exposes rowid).
-    const vecIds = /** @type {Array<{ rowid: number }>} */ (
-      db.prepare(`SELECT rowid FROM ${SEARCH_TABLES.vec} ORDER BY rowid`).all()
-    ).map((r) => r.rowid);
+    // Vec: each skill_id exists exactly once (sqlite-vec 0.1.9 exposes
+    // an explicit INTEGER PRIMARY KEY column, not the implicit rowid).
+    const vecIds = /** @type {Array<{ skill_id: number }>} */ (
+      db.prepare(`SELECT skill_id FROM ${SEARCH_TABLES.vec} ORDER BY skill_id`).all()
+    ).map((r) => r.skill_id);
     assert.deepEqual(vecIds, [1, 2, 3]);
 
     // Re-init again — counts must remain identical.
@@ -234,7 +270,7 @@ test('T-SCHEMA-07: UPDATE of embedding on skills replaces the vec row (SEARCH-02
 
     const row = db
       .prepare(
-        `SELECT rowid FROM ${SEARCH_TABLES.vec} WHERE rowid = ?`,
+        `SELECT skill_id FROM ${SEARCH_TABLES.vec} WHERE skill_id = ?`,
       )
       .get(1);
     assert.ok(row, 'vec row must still exist after update');

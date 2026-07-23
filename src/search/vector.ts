@@ -22,7 +22,7 @@ import { SEARCH_TABLES } from './schema.ts';
 const VEC_TABLE = SEARCH_TABLES.vec;
 
 interface VecRow {
-  rowid: number;
+  skill_id: number;
   distance: number;
 }
 
@@ -71,28 +71,28 @@ export function queryVector(
   try {
     // sqlite-vec 0.1.9 rejects any ORDER BY other than `ORDER BY distance`
     // on KNN queries, so the SQL side guarantees only distance ASC. We
-    // apply a JavaScript-side tie-break on `id` ASC so two rows whose
-    // embeddings sit at exactly the same cosine distance come out in a
-    // deterministic id order across repeated calls.
+    // apply a JavaScript-side tie-break on `skill_id` ASC so two rows
+    // whose embeddings sit at exactly the same cosine distance come out
+    // in a deterministic id order across repeated calls.
     const rows = db
       .prepare<[Float32Array, number], VecRow>(
-        `SELECT rowid AS rowid, distance
+        `SELECT skill_id, distance
          FROM ${VEC_TABLE}
          WHERE embedding MATCH ? AND k = ?
          ORDER BY distance ASC`,
       )
       .all(embedding, limit);
 
-    // Stable sort: distance ASC first, then id ASC as a deterministic
+    // Stable sort: distance ASC first, then skill_id ASC as a deterministic
     // tie-break. Sort returns a fresh array; we then assign 1-based
     // ranks in this stable order.
     const sorted = [...rows].sort((a, b) => {
       if (a.distance !== b.distance) return a.distance - b.distance;
-      return a.rowid - b.rowid;
+      return a.skill_id - b.skill_id;
     });
 
     return sorted.map((row, idx) => ({
-      id: row.rowid,
+      id: row.skill_id,
       distance: row.distance,
       cosineSimilarity: 1 - row.distance,
       rank: idx + 1,
