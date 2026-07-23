@@ -23,4 +23,5 @@ models/
 
 # Claude Code local-only files
 /.claude/settings.local.json
+/.claude/settings.json
 /CLAUDE.local.md
