@@ -78,3 +78,24 @@ test('equal inputs return the same primitive boolean', () => {
 test('100,000 unmatched characters return false without throwing', () => {
   assert.equal(isSocial('x'.repeat(100_000)), false);
 });
+
+const falsePositiveFixtures = [
+  ['FP-01', 'thanks to memoization, this function is fast'],
+  ['FP-02', 'the method thanks the user after saving'],
+  ['FP-03', 'write a function that returns "thanks"'],
+  ['FP-04', 'create a regex that matches hello'],
+  ['FP-05', 'why does the bye command close the socket?'],
+  ['FP-06', 'obrigado is Portuguese for thank you'],
+  ['FP-07', 'thanks, now refactor the parser'],
+  ['FP-08', 'oi, corrija o bug no parser'],
+  ['FP-09', 'bom dia, implemente um endpoint'],
+  ['FP-10', 'how are you handling database retries?'],
+  ['FP-11', 'como vai funcionar o cache?'],
+  ['FP-12', 'good morning jobs fail in CI'],
+];
+
+for (const [caseId, prompt] of falsePositiveFixtures) {
+  test(`${caseId}: preserves retrieval for specified technical context`, () => {
+    assert.equal(isSocial(prompt), false);
+  });
+}

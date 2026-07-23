@@ -1,3 +1,16 @@
+const FALSE_POSITIVE_PATTERNS: readonly RegExp[] = Object.freeze([
+  /^thanks to\b/u,
+  /\bthanks the user\b/u,
+  /["'`]thanks["'`]/u,
+  /\b(?:regex|pattern)\b.*\bmatches?\s+hello\b/u,
+  /\bbye command\b/u,
+  /^obrigado is\b.*\bthank you$/u,
+  /^(?:thanks|oi|bom dia),\s+\S/u,
+  /^how are you handling\b/u,
+  /^como vai funcionar\b/u,
+  /^good morning jobs\b/u,
+]);
+
 const SOCIAL_PATTERNS: readonly RegExp[] = Object.freeze([
   /^oi$/u,
   /^ol[áa]$/u,
@@ -44,7 +57,10 @@ function normalizePrompt(prompt: string): string {
 export function isSocial(prompt: string): boolean {
   const normalizedPrompt = normalizePrompt(prompt);
 
-  if (normalizedPrompt.length === 0) {
+  if (
+    normalizedPrompt.length === 0 ||
+    FALSE_POSITIVE_PATTERNS.some((pattern) => pattern.test(normalizedPrompt))
+  ) {
     return false;
   }
 
