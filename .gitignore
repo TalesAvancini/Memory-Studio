@@ -1,0 +1,26 @@
+# Node / TypeScript
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data + models (per CLAUDE.md — SQLite + ONNX ~1GB)
+data/
+models/
+
+# Claude Code local-only files
+/.claude/settings.local.json
+/CLAUDE.local.md
