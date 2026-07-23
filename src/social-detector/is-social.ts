@@ -1,6 +1,6 @@
 const SOCIAL_PATTERNS: readonly RegExp[] = Object.freeze([
   /^oi$/u,
-  /^olá$/u,
+  /^ol[áa]$/u,
   /^bom dia$/u,
   /^boa tarde$/u,
   /^boa noite$/u,
@@ -11,9 +11,9 @@ const SOCIAL_PATTERNS: readonly RegExp[] = Object.freeze([
   /^muito obrigado$/u,
   /^tchau$/u,
   /^até logo$/u,
-  /^até mais$/u,
-  /^tudo bem\?$/u,
-  /^como vai\?$/u,
+  /^(?:até|ate) mais$/u,
+  /^tudo bem$/u,
+  /^como vai$/u,
   /^hi$/u,
   /^hello$/u,
   /^hey$/u,
@@ -27,10 +27,26 @@ const SOCIAL_PATTERNS: readonly RegExp[] = Object.freeze([
   /^bye$/u,
   /^goodbye$/u,
   /^see you$/u,
-  /^how are you\?$/u,
-  /^what's up\?$/u,
+  /^how are you$/u,
+  /^what's up$/u,
 ]);
 
+function normalizePrompt(prompt: string): string {
+  return prompt
+    .normalize('NFC')
+    .trim()
+    .replace(/\s+/gu, ' ')
+    .toLowerCase()
+    .replace(/[.!?…]+$/u, '')
+    .trim();
+}
+
 export function isSocial(prompt: string): boolean {
-  return SOCIAL_PATTERNS.some((pattern) => pattern.test(prompt));
+  const normalizedPrompt = normalizePrompt(prompt);
+
+  if (normalizedPrompt.length === 0) {
+    return false;
+  }
+
+  return SOCIAL_PATTERNS.some((pattern) => pattern.test(normalizedPrompt));
 }

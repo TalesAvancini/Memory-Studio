@@ -48,3 +48,33 @@ test('unmatched implementation request continues technical retrieval', () => {
 test('unmatched SQL question continues technical retrieval', () => {
   assert.equal(isSocial('Explain why this SQL query is slow'), false);
 });
+
+const normalizationFixtures = [
+  ['NORM-01', '  OI  ', true],
+  ['NORM-02', 'THANKS!!!', true],
+  ['NORM-03', 'Bom   dia.', true],
+  ['NORM-04', '\nbye\t', true],
+  ['NORM-05', 'ola', true],
+  ['NORM-06', 'ate mais', true],
+  ['NORM-07', '', false],
+  ['NORM-08', '   \n\t  ', false],
+  ['NORM-09', '!!!', false],
+];
+
+for (const [caseId, prompt, expected] of normalizationFixtures) {
+  test(`${caseId}: applies the specified normalization outcome`, () => {
+    assert.equal(isSocial(prompt), expected);
+  });
+}
+
+test('equal inputs return the same primitive boolean', () => {
+  const firstResult = isSocial('thanks');
+  const secondResult = isSocial('thanks');
+
+  assert.equal(typeof firstResult, 'boolean');
+  assert.equal(secondResult, firstResult);
+});
+
+test('100,000 unmatched characters return false without throwing', () => {
+  assert.equal(isSocial('x'.repeat(100_000)), false);
+});
