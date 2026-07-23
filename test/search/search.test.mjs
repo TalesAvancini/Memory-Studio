@@ -401,7 +401,7 @@ test('T-ORCH-11: punctuation-only query yields zero lexical hits but vector chan
   }
 });
 
-test('T-ORCH-12: deterministic output across repeated calls (SEARCH-09)', async () => {
+test('T-ORCH-12: deterministic output across repeated calls, asserting every RankedSkill field (SEARCH-09)', async () => {
   const db = freshDb();
   try {
     acceptanceCorpus(db);
@@ -410,10 +410,26 @@ test('T-ORCH-12: deterministic output across repeated calls (SEARCH-09)', async 
     const b = await search('como debugar React', 5);
     assert.equal(a.length, b.length);
     for (let i = 0; i < a.length; i += 1) {
+      // Every public field must match across calls — discriminates
+      // against rank/score/content drift that the previous variant
+      // accepted silently.
       assert.equal(a[i].id, b[i].id);
-      assert.equal(a[i].rrfScore, b[i].rrfScore);
       assert.equal(a[i].slug, b[i].slug);
+      assert.equal(a[i].kind, b[i].kind);
+      assert.equal(a[i].contentYaml, b[i].contentYaml);
+      assert.equal(a[i].hash, b[i].hash);
+      assert.equal(a[i].rrfScore, b[i].rrfScore);
+      assert.equal(a[i].ftsRank, b[i].ftsRank);
+      assert.equal(a[i].vectorRank, b[i].vectorRank);
+      assert.equal(a[i].bm25, b[i].bm25);
+      assert.equal(a[i].cosineSimilarity, b[i].cosineSimilarity);
+      assert.deepEqual(a[i], b[i]);
     }
+    // Also assert identical result order across calls.
+    assert.deepEqual(
+      a.map((r) => r.id),
+      b.map((r) => r.id),
+    );
   } finally {
     db.close();
   }

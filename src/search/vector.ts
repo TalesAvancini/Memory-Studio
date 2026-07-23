@@ -69,6 +69,11 @@ export function queryVector(
   validateEmbedding(embedding);
 
   try {
+    // sqlite-vec 0.1.9 rejects any ORDER BY other than `ORDER BY distance`
+    // on KNN queries, so the SQL side guarantees only distance ASC. We
+    // apply a JavaScript-side tie-break on `id` ASC so two rows whose
+    // embeddings sit at exactly the same cosine distance come out in a
+    // deterministic id order across repeated calls.
     const rows = db
       .prepare<[Float32Array, number], VecRow>(
         `SELECT rowid AS rowid, distance
@@ -78,7 +83,15 @@ export function queryVector(
       )
       .all(embedding, limit);
 
-    return rows.map((row, idx) => ({
+    // Stable sort: distance ASC first, then id ASC as a deterministic
+    // tie-break. Sort returns a fresh array; we then assign 1-based
+    // ranks in this stable order.
+    const sorted = [...rows].sort((a, b) => {
+      if (a.distance !== b.distance) return a.distance - b.distance;
+      return a.rowid - b.rowid;
+    });
+
+    return sorted.map((row, idx) => ({
       id: row.rowid,
       distance: row.distance,
       cosineSimilarity: 1 - row.distance,
