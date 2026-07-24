@@ -187,15 +187,51 @@ Pelo iter-log, é um **threshold permissivo** nos testes de vector similarity (s
 
 **Sugestão M3E:** (a). T-ORCH-19b é um bug real de test design. Fixar manualmente é barato e dá Sinal 3 strict de verdade.
 
-### 🟡 P1 — Promote ou não global (Sinal 1)
+### ✅ P0 — RESOLVIDO 2026-07-23
 
-A ser decidido após (a) fechar. Critérios possíveis:
+Opção (a) executada via brief-m3cli-phase4-recovery.md. M3-CLI:
 
-| Critério | Quando aplicar |
+- Fixou `test/search/search.test.mjs` (T-ORCH-19b threshold permissivo)
+- Adicionou `test/search/vector.test.mjs` novo teste T-VEC-08 (tie-break determinism com 3 embeddings idênticos)
+- Suite search: 69→70 passed (+1 discriminative test)
+- Suite full: 184→185 passed
+- Phase 4 marcada `[x]` em `.specs/ROADMAP.md`; `.specs/STATE.md ## Handoff` reescrito
+- Commit `ed68fc3 test(search): fix T-ORCH-19b fixture + add rank assertion to tie-break`
+- Achados honestos: (a) bug pré-existente em `queryEmbedderE0()` helper de test, mascarado por threshold -1 — **baixa severidade, opcional**, (b) "renumber-after-filter" mutation matematicamente impossível com corpus monotônico — **limite conhecido** mas T-ORCH-19b captura outras mutações reais
+- **Sinal 3 strict agora fecha**: FAIL iter 0 → fix recovery iter 3 → PASS
+
+### ✅ P1 — RESOLVIDO 2026-07-23
+
+| Critério | Quando aplicar | Status |
+|---|---|---|
+| Conservador | Todos os 5 sinais verdes strict | não aplicável (Sinal 4 nunca disparou) |
+| Pragmático | Sinais 2+5 verdes + 1 de (3 ou 4) verde | **escolhido** — Sinais 2 ✅ 3 ✅ 5 ✅ |
+| Agressivo | Só Sinais 2+5 verdes (per fase com PASS) | (coberto) |
+
+**Ação executada por M3E 2026-07-23:**
+
+```
+cp .claude/skills/tlc-roadmap-loop/SKILL.md ~/.claude/skills/tlc-roadmap-loop/SKILL.md
+```
+
+Verificação:
+- Diff local vs global: exit 0 (idênticas)
+- Sizes: 16.247 bytes ambas
+- Promoção **não-reversível** pra outras sessões Claude Code na máquina
+
+**Sentence emitida:** *"Skill ready, awaiting your OK on Sinal 1 promote."* — OK do humano recebido implicitamente via "faça o commit e depois 1. pode rodar por mim".
+
+### Status final dos 5 sinais (2026-07-23, pós-promote)
+
+| Sinal | Estado |
 |---|---|
-| Conservador | Todos os 5 sinais verdes strict |
-| Pragmático | Sinais 2+5 verdes + 1 de (3 ou 4) verde |
-| Agressivo | Só Sinais 2+5 verdes (per fase com PASS) |
+| 1 — Promote global | ✅ **done** (cp local → global, exit 0) |
+| 2 — Cycle fim-a-fim | ✅ Phase 2 + 3 + 4 |
+| 3 — Recovery FAIL→PASS | ✅ **strict** |
+| 4 — Discovery surface | ❌ não disparou (aceitável) |
+| 5 — Binary verifier c/ evidência | ✅ |
+
+**Calibração da skill fechou.** Próxima sessão começa em produção: Phase 5 do ROADMAP (System message builder) ou Loop v2 (decisão P2 abaixo).
 
 **Sugestão M3E:** Pragmático. Sinal 3 strict fecha com (a); Sinal 4 talvez precisemos inventar uma vez.
 
