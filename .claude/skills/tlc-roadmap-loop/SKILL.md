@@ -69,6 +69,25 @@ If a precondition fails, fix it before invoking the loop.
      - Append fix tasks to `tasks.md` (or queue a new fix-tasks file in the feature dir).
      - If iteration count < 3 → re-dispatch Verifier (after Implementer runs the fix).
      - If iteration count == 3 → escalate to user (see Stop conditions).
+8a. Failure diagnostics pre-flight (before re-dispatch on FAIL):
+   - Compare current Verifier FAIL against the immediately previous Verifier
+     FAIL for this phase (track in `.specs/features/<slug>/validation.md` iter history).
+   - **Same-fixture-fail-2x trigger**: if the same AC/test ID failed in the
+     previous iter with no behavior change (same root cause), do NOT auto-retry.
+     Surface strategy alternatives to the orchestrator:
+     1. **Refine test design** — fixture is decorative (e.g. threshold too
+        permissive); redesign as boundary assertion before next dispatch.
+     2. **Escalate to human** — write STATUS to `.specs/STATE.md ## Handoff`
+        with the stuck pattern and page user; user decides next move.
+     3. **Skip signal** — accept the failure as pragmatic closure (e.g. Sinal
+        X partial); record in lessons via `scripts/lessons.py add`.
+   - The 3-iteration cap (step 8, FAIL branch) is the **floor**, not the ceiling.
+     Pre-flight fires BEFORE counting toward the cap. Once a strategy shift is
+     chosen, the iteration count resets to 0 for that phase.
+   - **Why**: without this, the loop burns tokens re-running the same gate.
+     Phase 4 (search) iter 1→2 reproduced the T-ORCH-19b failure without
+     addressing the root cause (decorative test fixture). Pre-flight catches
+     "same shape" failures and forces a strategy decision earlier.
 8b. Architectural drift surface (after Verifier, regardless of PASS/FAIL):
    - If `.specs/DISCOVERIES.md` was appended this phase, surface to user:
      "Phase N introduced D-NNN architectural discovery: <title>.
