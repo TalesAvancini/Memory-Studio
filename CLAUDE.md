@@ -255,3 +255,18 @@ memory-studio/
 - `tlc-spec-driven` (skill global) — base do ciclo Specify→Design→Tasks→Execute→Verify
 - `tlc-roadmap-loop` (skill global) — orquestrador que compõe as 3 camadas (patches pendentes — ver conversa-loop.md)
 - `archify` (skill instalada em `.agents/skills/archify/`) — renderer do farol da Camada 0
+- `mattpocock/skills` (plugin) — engineering skills (code-review, tdd, research, domain-modeling, etc.). Configuração em `docs/agents/*.md` (ver `## Agent skills` abaixo).
+
+---
+
+## Agent skills
+
+Configuração para engineering skills externas (mattpocock/skills).
+
+### Issue tracker
+
+Issues e specs vivem como arquivos markdown em `.scratch/<feature>/` (local-only, solo work, sem GitHub Issues). See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Layout single-context: `CONTEXT.md` + `docs/adr/` na raiz quando criados. Currently o conteúdo de glossary/domain context mora em `CLAUDE.md` (sections Glossary / Stack conventions / Authority boundaries / Cross-references) — não duplicar até `/domain-modeling` materializar. See `docs/agents/domain.md`.
