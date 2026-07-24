@@ -672,25 +672,43 @@ function queryEmbedderE0() {
   return makeDeterministicEmbedder((idx) => (idx === 0 ? 1 : 0));
 }
 
-test('T-ORCH-19b: rank-preservation through filtering — candidate with raw rank 5 still survives and uses 1/(60+5)', async () => {
-  // 5 controlled rows whose raw vec output ranks are exactly 1..5 with the
-  // cosine similarities above. Threshold = 0.5 + epsilon keeps ranks 4 and
-  // 5 above threshold while rows 2-3 (cosines 1/sqrt(3) ≈ 0.5774 and
-  // 1/sqrt(2) ≈ 0.7071) sit on the boundary we want to detect. We instead
-  // use a tighter setup: the lowest-ranked candidate (cosine 1/sqrt(5) ≈
-  // 0.4472) becomes rank 5 by virtue of being the worst k-NN match. With a
-  // permissive threshold that lets it through, the surviving candidate's
-  // vectorRank MUST stay equal to its raw k-NN rank (5), not be renumbered.
+test('T-ORCH-19b: rank-preservation through filtering — boundary row at exactly cosine 0.5 keeps original rank 4 (no compaction, no >= → > mutation)', async () => {
+  // 5 controlled rows whose raw vec output ranks are exactly 1..5 with
+  // cosine similarities [1, 1/√2, 1/√3, 1/√4, 1/√5] ≈ [1.0, 0.7071, 0.5774,
+  // 0.5, 0.4472]. A threshold of 0.5 (inclusive `>=`) is the tightest setup
+  // that actually discriminates: rank-5 (cosine 0.4472 < 0.5) MUST be
+  // filtered out while rank-4 (cosine exactly 0.5) MUST survive with its
+  // original k-NN rank 4. The rank-4 row is the boundary case — flipping
+  // `>=` to `>` at the implementation would wrongly drop it; bumping the
+  // threshold value to anything > 0.5 would do the same. With the correct
+  // implementation, rank-4 also keeps its original vectorRank (no compaction
+  // by a renumber-after-filter mutation) and its rrfScore = 1/(60+4).
+  //
+  // Local e_0 embedder: returns the unit vector on dimension 0 for any
+  // input. We don't reuse the shared `queryEmbedderE0()` helper because
+  // it currently returns the constant 0 for every input (the inner map
+  // checks `idx === 0` against the query text, which is always a non-zero
+  // string), which would give cosine=1 for every row and defeat the
+  // threshold filter.
+  const e0Embedder = {
+    dimensions: EMBEDDING_DIMENSIONS,
+    async embed(_text) {
+      const arr = new Float32Array(EMBEDDING_DIMENSIONS);
+      arr[0] = 1;
+      return arr;
+    },
+  };
   const db = freshDb();
   try {
     controlledVectorCorpus(db);
     const search = createSearch({
       db,
-      embedder: queryEmbedderE0(),
-      // Accept everything above negative threshold so the raw rank 5 row
-      // survives; FTS unreachable since controlled corpus has no lexical
-      // tokens matching arbitrary prompts.
-      minCosineSimilarity: -1,
+      embedder: e0Embedder,
+      // Tightest non-trivial threshold: inclusive of 0.5 so the boundary
+      // row (cv-4, cosine = 1/√4 = 0.5) survives; cv-5 (cosine 0.4472) is
+      // dropped. FTS unreachable since the controlled corpus has no
+      // lexical tokens matching arbitrary prompts.
+      minCosineSimilarity: 0.5,
       minFtsHits: 1000,
     });
     const raw = db.prepare(
@@ -706,28 +724,41 @@ test('T-ORCH-19b: rank-preservation through filtering — candidate with raw ran
     raw.forEach((r, idx) => rawRankById.set(r.skill_id, idx + 1));
 
     const results = await search('anything that does not lexically match', 100);
-    // The raw rank 5 candidate must be present in the result.
-    const lowestRankCandidate = results.find(
-      (r) => /** @type {Map<number, number>} */ (rawRankById).get(r.id) === 5,
+    // Rank-4 boundary candidate MUST survive with its original rank.
+    const boundaryCandidate = results.find(
+      (r) => /** @type {Map<number, number>} */ (rawRankById).get(r.id) === 4,
     );
     assert.ok(
-      lowestRankCandidate,
-      'the raw rank-5 candidate must appear in the search output',
+      boundaryCandidate,
+      'boundary rank-4 candidate (cosine exactly 0.5) must survive threshold >= 0.5',
     );
     assert.equal(
-      lowestRankCandidate.vectorRank,
-      5,
-      'survivor must keep its original k-NN rank 5, not be renumbered',
+      boundaryCandidate.vectorRank,
+      4,
+      'boundary survivor must keep its original k-NN rank 4, not be renumbered',
     );
-    // RRF term for the lowest-ranked survivor is 1 / (60 + 5) when FTS is
-    // unreachable. Match the value within floating-point tolerance.
-    const expected = 1 / (60 + 5);
+    // RRF term for the boundary survivor is 1 / (60 + 4) when FTS is
+    // unreachable. Match the value within floating-point tolerance — a
+    // renumber-after-filter mutation that moves rank-4 to rank-1 would
+    // change this to 1/61 and break the assertion.
+    const expected = 1 / (60 + 4);
     assert.ok(
-      Math.abs(/** @type {number} */ (lowestRankCandidate.rrfScore) - expected) < 1e-12,
-      `rrfScore must equal 1/(60+5); got ${lowestRankCandidate.rrfScore}, expected ${expected}`,
+      Math.abs(/** @type {number} */ (boundaryCandidate.rrfScore) - expected) < 1e-12,
+      `rrfScore must equal 1/(60+4); got ${boundaryCandidate.rrfScore}, expected ${expected}`,
     );
-    // Every survivor's vectorRank must match its raw k-NN rank — the mutant
-    // that compacts survivors after filtering would renumber to 1..N.
+    // Rank-5 (cosine 0.4472 < 0.5) MUST be filtered out — proves the
+    // threshold is doing real work and not silently passing everything.
+    const droppedCandidate = results.find(
+      (r) => /** @type {Map<number, number>} */ (rawRankById).get(r.id) === 5,
+    );
+    assert.equal(
+      droppedCandidate,
+      undefined,
+      'rank-5 candidate (cosine 0.4472 < 0.5) must be filtered out',
+    );
+    // Every survivor's vectorRank must match its raw k-NN rank — guards
+    // against a renumber-after-filter mutation (would assign 1..N based
+    // on filtered position instead of original k-NN rank).
     for (const r of results) {
       assert.equal(
         r.vectorRank,

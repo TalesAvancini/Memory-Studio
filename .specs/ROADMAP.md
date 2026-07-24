@@ -57,22 +57,22 @@ Follow the `Depends on:` lists below. Phases sem dependência rodam primeiro; ph
 
 ---
 
-#### Phase 4 — Search / retrieval [ ]
+#### Phase 4 — Search / retrieval [x]
 
 **Phase slug:** `search`
 **Done when:** `POST /search {q: "como debugar React", k: 5}` retorna até 5 skills rankeadas por RRF (combina FTS5 + sqlite-vec). Threshold duplo respeitado.
 
 **Depends on:** Phase 2
 
-- [ ] Schema FTS5 virtual table indexando `content_yaml`
-- [ ] Schema sqlite-vec para embeddings (384d)
-- [ ] Query FTS5 com `bm25(content_fts)`
-- [ ] Query vec com `sqlite-vec` (k-NN)
-- [ ] Fusão RRF (Reciprocal Rank Fusion) combinando os dois rankings
-- [ ] Threshold duplo: `min_cosine_similarity` (vector) + `min_fts_hits` (FTS5)
-- [ ] Função `search(query: string, k: number): RankedSkill[]` em `src/search/`
-- [ ] Testes: corpus seed (≥ 10 skills), asserts de ranking, asserts de threshold
-- [ ] Cross-encoder local opcional pra rerank (v0 do MVP)
+- [x] Schema FTS5 virtual table indexando `content_yaml`
+- [x] Schema sqlite-vec para embeddings (384d)
+- [x] Query FTS5 com `bm25(content_fts)`
+- [x] Query vec com `sqlite-vec` (k-NN)
+- [x] Fusão RRF (Reciprocal Rank Fusion) combinando os dois rankings
+- [x] Threshold duplo: `min_cosine_similarity` (vector) + `min_fts_hits` (FTS5)
+- [x] Função `search(query: string, k: number): RankedSkill[]` em `src/search/`
+- [x] Testes: corpus seed (≥ 10 skills), asserts de ranking, asserts de threshold
+- [x] Cross-encoder local opcional pra rerank (v0 do MVP)
 
 ---
 
