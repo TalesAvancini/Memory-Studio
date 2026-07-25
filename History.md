@@ -208,3 +208,66 @@ related:
 7. **Frontmatter em TUDO.** Sem exceção. User odeia esquecer metadata
 8. **Em dúvida, pergunte ANTES** de agir em código de produto. Briefs (.md) são OK; código (.ts/.mjs) precisa autorização
 9. **Skill `tlc-roadmap-loop` v0.2** tem step 8a (failure diagnostics) ativo. Se vir same-fixture-fail-2x, pre-flight dispara — NUNCA retry cego
+
+---
+
+## Discussão: grill-with-docs como entrevistador do PRD (2026-07-24)
+
+> **Status:** registro neutro do que foi discutido. Nenhuma proposta foi **encerrada** como decisão final. Cada item abaixo é uma direção que apareceu, com a leitura do usuário no fim.
+
+### Contexto
+
+`.specs/ROADMAP.md` foi simplificado para placeholder único: `Phase — PRD via grill-with-docs [ ]`. Artefatos pré-existentes para usar como base:
+
+- `PLAN.md` — PRD/spec original do MVP Memory Studio (9787 B)
+- `proposal-memory-studio-v2.md` — evolução v2 (draft baseado em 41 rounds NotebookLM com Matt Pocock Interrogador, 25305 B)
+- `Memory-Studio-Discuss.md` — fonte da proposal v2
+- `History.md` (este doc) + `handoff-session.md` + `archive_handoff/`
+
+Próximo passo conceitual: rodar `grill-with-docs` (skill `mattpocock/skills`) sobre esses artefatos pra chegar num PRD final.
+
+### O que foi levantado na conversa
+
+**SSOT consultada (NotebookLM `f235cc21-...`, "MattPocock"):** `grill-with-docs` é "grilling session that also builds project's domain model, sharpening terminology and updating CONTEXT.md and ADRs inline". Combina `/grilling` + `/domain-modeling`. Stateful no repo. 6 passos: explore → interview relentlessly → uma pergunta por vez → recommended answer → decision tree → confirmation gate.
+
+**Sobre "A2A" / transformar skill em agent standalone:** a SSOT não usa o termo "A2A". Pocock diz literalmente: *"agents are just like new context window plus skill — that's all they are. So there's no reason to use agents when you can just manage that yourself with skills."* Patterns próximos que aparecem: (a) subagent wrappers, (b) MCP, (c) shared state tipo Wayfinder, (d) context pointers.
+
+**Intenção do usuário (relatada na conversa, não editada):**
+- Ser **entrevistado** por outro agente (não ser o interrogador).
+- **Ficar fora do loop de Q&A** — quer revisar o resultado, não responder 50 perguntas.
+- O **PRD já existe** (com brainstorms prévios) e "está bom" segundo ele — quer que **passe por interrogatório/grill**, não que seja criado do zero.
+- Vai **contar livremente** a intenção do produto na visão dele (o que faz, o que queria que fizesse, wishful thinking) — isso seria a **base** pras decisões que o agente tomaria no lugar dele.
+
+**Quem responde no lugar do humano:** o agente AI (eu, nesta sessão, ou um sub-agent Claude equivalente) usando como input:
+1. PRD existente (`PLAN.md` e/ou `proposal-memory-studio-v2.md`)
+2. Narrativa livre de visão/intent do humano
+3. Artefatos do repo (`CLAUDE.md`, `History.md`, handoffs, `.specs/`)
+
+**Observação do usuário sobre cansaço:** grilling cansativo para humanos não-especialistas porque assumem domínio técnico que a pessoa não tem. Possíveis mitigantes mencionados: perguntas acompanhadas de metáfora/ELI5; persona pack com PRD anterior + intent + human-intent + vocabulário; guardrails anti-hallucination (fonte + confiança + override).
+
+### Direções que apareceram (não-decisões)
+
+Cada item é uma **direção proposta durante a conversa** — nenhuma foi marcada como escolhida pelo usuário. Listadas pra referência futura, não como commitment.
+
+1. **Pattern "inline"**: rodar `/grill-with-docs` na sessão, com persona inline (não agente separado).
+2. **Pattern "user-proxy subagent"**: spawnar 2 agents — griller (subagent fork) + user-proxy (subagent fork com contexto de leitura) — bridgeando via SendMessage.
+3. **Pattern "MCP wrapper"**: expor grill-with-docs como tool MCP server (`mcp__grill__interrogate(...)`) pra cross-runtime.
+4. **Pattern "Wayfinder shared state"**: agente A bota issue em `.scratch/<effort>/issues/`, agente B (grill) lê e escreve `## Answer`.
+5. **Persona pack** (4 docs): `prd-anterior.md`, `project-intent.md`, `human-intent.md`, `vocabulary.md`.
+6. **Metáfora/ELI5 layer**: cada pergunta com analogia concreta + recomendação em 1 linha.
+7. **Anti-hallucination guardrail**: toda decisão auto-inferida carrega Fonte + Confiança + Override humano.
+8. **Pattern "Discover → Synthesize → Decide → Record"**: alternativa ao grill, mais design-thinking, menos pressão.
+9. **Skill nova proposta** (não-materializada): `discover-and-decide` ou `interrogate-for-product` em `.claude/skills/`.
+10. **Brief `agents/grill-pair.ts`**: wrapper reutilizável para o pattern 2.
+
+### Autocrítica registrada
+
+O agente (eu) extrapolou na última resposta: apresentou 3 patterns (A/B/C) + 4 personas insights + 5 dicas + oferta de brief, antes de confirmar com o usuário o setup real. O usuário chamou a extrapolação de "cansaço" e pediu registro neutro das propostas **gerais discutidas**, não da que o agente acha que foi encerrada. Lição: **confirmar setup antes de oferecer arquitetura**.
+
+### Próximo passo (a definir pelo usuário)
+
+- [ ] Definir qual(is) pattern(s) das direções acima aplicar (ou outro ainda não listado)
+- [ ] Definir se PRD base é `PLAN.md`, `proposal-memory-studio-v2.md`, ou merge dos dois
+- [ ] Narrativa livre de visão/intent do humano (a ser fornecida na próxima sessão, ou inline)
+- [ ] Decidir se vira brief de skill nova, brief de feature do `tlc-spec-driven`, ou só setup manual
+- [ ] Após PRD fechado: criar era `2026-07-prd-ready/` (per `.specs/ROADMAP.md` placeholder)

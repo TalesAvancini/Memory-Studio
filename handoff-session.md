@@ -1,125 +1,144 @@
 ---
-session_end: 2026-07-23
+session_end: 2026-07-24
 author: M3E
-audience: agentes futuros (sessões frescas, sem contexto prévio)
+audience: agentes futuros (sessão fresca, contexto compactado)
+type: compression-handoff
 ---
 
-# Handoff de sessão — 2026-07-23 (skill v0.2 + Phase 5 ready)
+# Handoff de sessão — 2026-07-24 (era foundation-complete)
 
 ## TL;DR
 
-Skill `tlc-roadmap-loop` está em **v0.2** (promovida pra global). Calibration fechou com **4 dos 5 sinais de readiness verdes** (Sinal 4 ainda não disparou, mas é aceitável — farol cobre as components atuais). **Próximo passo: Phase 5 do ROADMAP (System message builder)** — primeira feature de produção usando a skill v0.2.
+Calibração da skill `tlc-roadmap-loop` **fechou** (v0.2, promovida global). Reframing arquitetural FEITO: skill é fundação, Memory Studio é objetivo final. Próximo passo: `grill-with-docs` (Matt Pocock, adaptada autonomous) → PRD final do MVP → produção SÓ após autorização humana.
 
-Histórico detalhado da calibração arquivado em [archive_handoff/handoff-session-2026-07-23.md](archive_handoff/handoff-session-2026-07-23.md).
-
----
-
-## Onde estamos (estado consolidado)
-
-| Phase | Status | Sinais fechados | Notas |
-|---|---|---|---|
-| Phase 1 — Scaffold | `[x]` PASS | Waldemar #1 (fast feedback <10s) | `package.json`, `tsconfig.json`, smoke test |
-| Phase 2 — Schema + CRUD | `[x]` PASS | Sinais 2 + 5 | `src/catalog/` |
-| Phase 3 — Social detector | `[x]` PASS | Sinais 2 + 5 (mais 4 não exercido) | `src/social-detector/` |
-| Phase 4 — Search/retrieval | `[x]` PASS recovery | **Sinal 3 strict** | `src/search/` — iter 0 FAIL → iter 3 fix → PASS |
-| Phase 5 — System message builder | `[ ]` pending | — | **próxima** |
-| Phases 6-9 | `[ ]` pending | — | server, cache, agents, E2E |
-
-5-sinal framework completo em `.specs/STATE.md ## Handoff` seção `skill-readiness-final`.
+Estado consolidado: era `2026-07-foundation-complete`. Specs de calibração arquivadas. Documentação reorganizada (History.md com north star, CLAUDE.md lean, 4 docs canônicos com papéis distintos).
 
 ---
 
-## O que é failure diagnostics (skill v0.2, step 8a)
+## Onde estamos (era vigente)
 
-**Problema resolvido:** loop re-rodando mesma fixture sem atacar root cause (Phase 4 iter 1→2 reproduziu T-ORCH-19b).
-
-**Mecanismo:** antes de re-dispatch em `FAIL`, orchestrator compara Verifier FAIL atual vs anterior. Se mesma fixture/AC falhou em ambos, **NÃO** auto-retry. Em vez disso, surface 3 alternativas:
-
-1. **Refine test design** — fixture é decorative (ex: threshold permissivo). Redesenhar como boundary assertion antes do próximo dispatch.
-2. **Escalate to human** — escrever STATUS em `STATE.md ## Handoff` com pattern stuck + escalar.
-3. **Skip signal** — aceitar failure como closure pragmático; registrar em lessons.
-
-Após strategy shift, iter count reseta pra 0 (pre-flight não conta contra o cap de 3 iterações).
-
-**Onde está documentado:** `.claude/skills/tlc-roadmap-loop/SKILL.md` (LOCAL + GLOBAL — parity confirmada 2026-07-23).
-
-**Quando dispara:** mesma AC/test ID falhou em iters consecutivos, sem mudança de comportamento observada entre eles.
-
-**Quem decide:** o próprio orchestrator (não é prompt ao humano). Humano só é pagerado se orchestrator escolhe opção 2.
-
----
-
-## Por que outros 4 candidatos NÃO entraram em v0.2
-
-Decisão registrada em `.specs/STATE.md ## Decisions` como **AD-001**. Resumo:
-
-| Candidato | Status | Trigger pra reativar |
+| Componente | Estado | Detalhe |
 |---|---|---|
-| B3 — Discovery contributions de todos sub-agents | deferred | Quando 5+ phases acumularem e quisermos retroativa estruturada |
-| Sub-agent context awareness | deferred | Quando sub-agent falhar por mal-entendido de contexto (não técnico) |
-| Sticky context entre phases | deferred | Quando brief > 300 linhas e sub-agent ignorar seções |
-| Branch-aware fingerprinting (worktrees) | YAGNI | Quando 2+ phases paralelas |
-| Handoff auto-generation | YAGNI | Quando phase cruzar sessão 2+ vezes consecutivas |
-
-**Princípio:** "implementar quando evidência aparecer, não quando hipótese surgir". Failure diagnostics ganhou v0.2 porque tinha failure concreto (T-ORCH-19b). Os outros não têm.
-
----
-
-## Caminho concreto pra Phase 5 (próxima sessão)
-
-**Objetivo:** implementar `src/augmenter/` — função que pega um prompt + matched skills do catálogo e constrói o augmented system message (injetar sem quebrar cache do provedor).
-
-**Brief template** (a ser criado: `brief-m3cli-phase5.md` na raiz):
-- **Phase slug:** `system-message-builder` ou `augmenter`
-- **Depends on:** Phase 2 (schema) + Phase 4 (search) — ambos `[x]`, OK
-- **Scope:** `src/augmenter/**`, `test/augmenter*.test.mjs`
-- **Architecture ref:** `augmenter`, `cache`, `catalog`, `search` (4 stable IDs do farol)
-- **Key constraint:** preservar provider cache — byte-string determinístico do augmented message (mesmo input → mesmo byte). Validar com teste explícito de determinismo.
-- **Sinais-alvo:** Sinal 4 (discovery surface fires) tem chance real de disparar aqui — Phase 5 é a primeira a tocar 4 components do farol juntos, drift é provável.
-
-**Stop conditions** (além das padrão do skill):
-- Implementer/Verifier tentar usar LLM no hot path (PROIBIDO — `tenant_id` hasheado sha256[0:16], sem chamada externa no MVP)
-- Cache determinístico falhar (mesmo input → byte diferente)
-
-**Estimate:** 30-60 min se tudo correr limpo. Mais se Sinal 4 dispara e força re-render do farol.
+| **Skill `tlc-roadmap-loop`** | v0.2 ✅ global | LOCAL + GLOBAL parity (17.675 bytes) |
+| **Skill architecture map** | ✅ canonical | README + 9 diagramas Mermaid em `~/.claude/skills/tlc-roadmap-loop/` |
+| **Calibração Phases 0-4** | ✅ closed | arquivadas em `.specs/archive/2026-07-calibration/` |
+| **5 sinais readiness** | 4/5 verde | Sinal 4 mechanism in place, não disparou organicamente |
+| **Memory Studio** | ⛔ não autorizada | PRD não fechado; produção bloqueada |
+| **Próxima phase** | `prd-via-grill-with-docs` | única phase vigente no ROADMAP.md |
 
 ---
 
-## Decisões abertas (low priority, podem esperar)
+## O que aconteceu hoje (2026-07-24) — 4 marcos
 
-### P3 — Hygiene dos arquivos de nota do humano
-Arquivos não-rastreados na raiz:
-- `Memory-Studio-Discuss.md`
-- `interrogado-content.txt`
-- `proposal-memory-studio-v2.md`
+### Marco 1 — Incidente de confusão arquitetural
+Confundi Memory Studio como alvo imediato (não é — é objetivo final). Tratei Phase 5 como produção. Spawnar sub-agent e chamar de "M3-CLI" (sub-agent meu ≠ instância separada). Usuário fúria. **Correções gravadas em memory `m3e-vs-m3cli-architecture.md` (clarifica padrão geral: 1 orchestrator + sub-agents dispatched)**.
 
-**Decisão do humano pendente:** rastrear (commit) ou deixar untracked? Não bloqueia Phase 5.
+### Marco 2 — Skill architecture map (README + 9 Mermaid)
+Brief escrito (`brief-m3cli-skill-architecture-map.md`), M3-CLI executou via CLI. 1 README + 9 diagramas (`flowchart TB`, `stateDiagram-v2`, `flowchart LR`, `sequenceDiagram`) — global primeiro, mirror local. Frontmatter em todos. `diff -r` exit 0. Commit `1b0998e`.
 
-### P4 — Memory entries adicionais
-Candidatos a registrar em `MEMORY.md`:
-- `phase4-search-blocked-pattern.md` (T-ORCH-19b como exemplo de fixture decorativa)
-- `loop-v2-failure-diagnostics.md` (mecanismo v0.2)
+### Marco 3 — Reframing arquitetural + reorganização documental
+- History.md: adicionada seção "A história que norteia este repo" (north star) no topo
+- CLAUDE.md: lean cleanup (282 → 117 linhas, -58%). Removidas seções de produto (Operational rules, Testing contract, Stack conventions, Glossary de produto, Authority boundaries do produto). Foundation-only agora.
+- STATE.md: reescrito pra era `2026-07-foundation-complete`. AD-002 (próxima fase = grill-with-docs).
+- ROADMAP.md: placeholder. Única phase `prd-via-grill-with-docs [ ]`.
+- Specs antigas: `git mv .specs/STATE.md` + `.specs/ROADMAP.md` → `.specs/archive/2026-07-calibration/`
 
-Não bloqueia Phase 5.
+### Marco 4 — Memórias e documentation lifecycle
+- 4 memory entries novas: `north-star-memory-studio`, `document-roles`, `end-of-session-handoff`, `grill-with-docs-approach`, `feedback-rapido-sla`
+- CLAUDE.md ganhou seção `## Documentation lifecycle` (regra dos 4 docs canônicos)
+- Regra gravada: "TODA sessão termina com handoff atualizado" (Matt Pocock skill preferida; template manual em archive como fallback)
+
+---
+
+## Estrutura documental vigente (4 docs canônicos)
+
+| Doc | Papel | Mutação |
+|---|---|---|
+| **History.md** | Passado cronológico + north star | Append-only (marcos) |
+| **handoff-session.md** | Presente executivo | Overwrite por sessão (este arquivo) |
+| **MEMORY.md** | Patterns de processo | Append-only (1 fato por arquivo) |
+| **STATE.md** | Spec state vigente | `## Decisions` append-only, `## Handoff` overwrite |
+
+**Convenção archive:**
+- Handoffs antigos → `archive_handoff/handoff-session-YYYY-MM-DD.md`
+- Specs de eras → `.specs/archive/<era>/` (e.g., `.specs/archive/2026-07-calibration/`)
+
+---
+
+## Próximo passo concreto (única coisa pendente)
+
+**Rodar `grill-with-docs` (Matt Pocock, plugin `mattpocock/skills`) adaptada pra autonomous.**
+
+Inputs:
+- `PLAN.md` (product spec)
+- `CLAUDE.md` (project glue lean)
+- `History.md` (narrativa + north star)
+- `archive_handoff/handoff-session-2026-07-23.md` (calibração inteira)
+
+Output esperado: PRD final do MVP Memory Studio commitado em `.specs/PRD.md` (ou nome similar).
+
+**Regra de adaptação:** decisões reversíveis (lib, naming, estrutura) autonomous resolve. Decisões irreversíveis (escopo MVP, exclusões, authority) escala humano.
+
+**Autorização de produção do Memory Studio:** SÓ após PRD fechado + aprovação humana explícita.
+
+---
+
+## Working tree state
+
+- **Branch:** main, ahead of origin/main by 0 (todos commits pushed)
+- **Last commit:** `2650648` — CLAUDE.md lean cleanup
+- **Untracked (decidir):**
+  - `Memory-Studio-Discuss.md`, `interrogado-content.txt`, `proposal-memory-studio-v2.md` — arquivos do humano, NÃO meus
+  - `meu_CLAUDE.md` — cópia antiga do CLAUDE.md que o humano abriu no IDE
+  - `.specs/features/system-message-builder/` — resíduo do sub-agent errado que matei (calibration artifact, NÃO relacionado ao próximo passo)
+- **Modified:** `History.md` (intencional, ver nota do linter)
+
+---
+
+## Lições de hoje (consolidadas em MEMORY.md)
+
+| Memory | Por quê |
+|---|---|
+| `north-star-memory-studio` | Meta-narrativa: foundation ≠ produto. Crítico pra agente novo. |
+| `m3e-vs-m3cli-architecture` | M3E/M3-CLI é workaround de calibração, NÃO arquitetura geral |
+| `metadata-default-required` | Frontmatter YAML em TUDO. User odeia esquecer. |
+| `document-roles` | 4 docs canônicos + regras de mutação. Não confundir. |
+| `end-of-session-handoff` | Regra: toda sessão termina com handoff atualizado |
+| `grill-with-docs-approach` | Próxima ferramenta: interrogar docs pra chegar em PRD |
+| `feedback-rapido-sla` | Waldemar #1: feedback <10s é CRÍTICO pro loop não burnar |
+| `loop-v2-failure-diagnostics` | Skill v0.2 step 8a (failure diagnostics pre-flight) |
+| `sub-agent-runaway-observation` | Cap ≠ observação. Pager. |
+| `claude-settings-never-commit` | NUNCA commitar `.claude/settings.json` |
+| `skill-readiness-needs-evidence` | "Ready" só com evidência fim-a-fim |
+| `node22-test-esm-quirk` | Node 22 quirk: `node --test` (recursive) OK |
+| `tlc-roadmap-loop-plan` | Turno 1 patches aplicados |
+| `notebooklm-loop-notebook-id` | Notebook ID do Waldemar (`6f72e66d-...`) |
+| `conselheiro-role` | Conselheiro = advisor distinto de M3-CLI |
 
 ---
 
 ## Cross-references
 
-- [CLAUDE.md](../CLAUDE.md) — convenções de stack, authority boundaries, testing contract
-- [PLAN.md](../PLAN.md) — product spec (decisões travadas §6)
-- [.specs/ROADMAP.md](ROADMAP.md) — phase ordering + dependency chain
-- [.specs/STATE.md](STATE.md) — current state + decisions append-only
-- [.specs/ARCHITECTURE.md](ARCHITECTURE.md) — farol em texto (LLM-facing)
-- [.specs/architecture.html](architecture.html) — farol renderizado (human-facing)
-- [.specs/DISCOVERIES.md](DISCOVERIES.md) — append-only log de drift arquitetural
-- [.claude/skills/tlc-roadmap-loop/SKILL.md](../.claude/skills/tlc-roadmap-loop/SKILL.md) — skill v0.2 (LOCAL + GLOBAL em parity)
-- [archive_handoff/handoff-session-2026-07-23.md](archive_handoff/handoff-session-2026-07-23.md) — histórico da calibração completa
+- [CLAUDE.md](CLAUDE.md) — project glue lean (foundation-focused)
+- [History.md](History.md) — narrativa consolidada + north star
+- [PLAN.md](PLAN.md) — product spec (forward-looking)
+- [.specs/STATE.md](.specs/STATE.md) — spec state vigente (era foundation-complete)
+- [.specs/ROADMAP.md](.specs/ROADMAP.md) — placeholder de roadmap
+- [.specs/archive/2026-07-calibration/](.specs/archive/2026-07-calibration/) — specs da era de calibração
+- [archive_handoff/handoff-session-2026-07-23.md](archive_handoff/handoff-session-2026-07-23.md) — handoff inicial da calibração
+- [archive_handoff/handoff-session-2026-07-23-post.md](archive_handoff/handoff-session-2026-07-23-post.md) — handoff pré-reframing (Phase 5 como next)
+- [.claude/skills/tlc-roadmap-loop/README.md](.claude/skills/tlc-roadmap-loop/README.md) — skill architecture map
+- [.claude/skills/tlc-roadmap-loop/diagrams/](.claude/skills/tlc-roadmap-loop/diagrams/) — 9 diagramas Mermaid
 
 ---
 
-## Lição consolidada (pra agente futuro)
+## Pra sessão futura (sessão fresca, contexto compactado)
 
-**Quando uma phase trava em FAIL repetido sem atacar root cause, failure diagnostics (step 8a) deve disparar antes do cap de 3 iterações.** Não confiar no cap sozinho — pre-flight explícito > retry cego.
-
-Mais: skill-readiness precisa de **evidência fim-a-fim**, não declaração. "Skill ready" só é ready quando sinais 2 + 5 verdes + pelo menos 1 de (3 OU 4) disparou em phase real. Phase 5+ deve mirar Sinal 4 explicitamente (recomendar sub-agents a notar drift arquitetural).
+1. **Ler `History.md` PRIMEIRO** — north star no topo explica o que estamos fazendo
+2. **Ler este handoff** — estado executivo do projeto
+3. **Ler `.specs/STATE.md`** — decisions (AD-001, AD-002) + handoff state
+4. **Ler `MEMORY.md`** (auto-injetado) — patterns de processo
+5. **Próximo passo:** rodar `grill-with-docs` sobre PLAN.md/CLAUDE.md/History.md/archive
+6. **NÃO construir Memory Studio** sem autorização humana explícita + PRD fechado
+7. **NÃO tratar M3E/M3-CLI como arquitetura da skill** — padrão é 1 orchestrator + sub-agents
+8. **Em compactação:** MEMORY.md é âncora principal; este handoff é secundário; History.md é terciário
