@@ -20,6 +20,18 @@ related:
 
 > **Por que este doc existe:** após confusão arquitetural em 2026-07-24, o usuário pediu um histórico consolidado para evitar repetir o que aconteceu. Este documento é EXECUTIVO sobre o que aconteceu — não substitui `git log`, `handoff-session.md`, `STATE.md`, ou `brief-m3cli-*.md`. É o **índice histórico narrativo**.
 
+## A história que norteia este repo
+
+**Memory Studio é um estúdio de injeção de contexto pra agentes de código** (Claude Code, Aider, Cursor, etc.). **É o objetivo final** deste repo.
+
+**MAS** — antes de construir Memory Studio, o trabalho é construir a **fundação**: a skill `tlc-roadmap-loop` (orquestrador de phases) + integração com `archify` (farol arquitetural) + `tlc-spec-driven` (base SDD). Sem essa fundação, Memory Studio seria construído sem processo.
+
+**O que está em `main` hoje é a fundação sendo construída.** As phases 0-4 que aparecem no `archive_handoff/` e em `.specs/archive/2026-07-calibration/` foram **exercício de calibração**, não entrega de produto. O código em `src/` é **resíduo descartável** do exercício.
+
+**Próximo passo:** usar `grill-with-docs` (skill do Matt Pocock, plugin `mattpocock/skills`, adaptada pra autonomous — sem human-in-the-loop constante) pra interrogar docs existentes (`PLAN.md`, `CLAUDE.md`, `History.md`, `archive_handoff/`) e chegar num **PRD final do MVP Memory Studio**. **Só então** Memory Studio entra em produção.
+
+**Se você é um agente novo lendo isto:** **não construa Memory Studio ainda**. Sua job é ajudar a terminar a fundação (skill v0.2 → v1, se aplicável) e/ou auxiliar no processo de PRD via `grill-with-docs`. Produção do produto só após autorização humana explícita + PRD fechado. Ver `MEMORY.md [[north-star-memory-studio]]` para detalhes.
+
 ## Linha do tempo (12 marcos)
 
 ### 1. Repo criado (2026-07-22)

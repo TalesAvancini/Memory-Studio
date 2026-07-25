@@ -10,21 +10,6 @@ Lê o prompt → match no catálogo (Skills / Rules / Personas) → injeta no sy
 
 ## Quick reference
 
-### Comandos essenciais (a definir quando o código entrar)
-
-```bash
-npm install              # deps
-npm run dev              # sobe o servidor em 127.0.0.1:7788
-npm run build-index      # recompila índice FTS5 + embeddings
-npm test                 # suíte unitária (precisa rodar em <10s — pré-condição Waldemar #1)
-npm run test:integration # testes com SQLite + ONNX reais
-npm run test:e2e         # smoke end-to-end com agente mock
-npm run lint             # ESLint + Prettier check
-npm run typecheck        # tsc --noEmit
-```
-
-> **Os comandos acima são placeholders** — serão preenchidos em `.specs/STATE.md` `## Decisions` quando o esqueleto entrar. Não rodar `npm` antes do `package.json` existir.
-
 ### Notebooks de referência (NotebookLM)
 
 | Tópico | Notebook ID | Para que serve |

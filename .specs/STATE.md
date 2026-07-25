@@ -1,3 +1,24 @@
+---
+date: 2026-07-24
+version: 2
+description: "Spec state vigente — era pós-calibração. Skill foundation complete; Memory Studio produção NÃO autorizada."
+explanation: |
+  Substitui STATE.md da era de calibração (movido pra
+  `.specs/archive/2026-07-calibration/STATE.md`).
+
+  Estado vigente:
+  - Skill `tlc-roadmap-loop` v0.2 calibrada (4/5 sinais verde)
+  - README + 9 Mermaid diagrams criados (global + local)
+  - Memory Studio: produção NÃO autorizada — PRD via `grill-with-docs` primeiro
+
+  Para histórico da calibração, ver `archive/2026-07-calibration/`.
+related:
+  - ./archive/2026-07-calibration/STATE.md
+  - ./archive/2026-07-calibration/ROADMAP.md
+  - ../../History.md
+  - ../../handoff-session.md
+---
+
 # STATE
 
 > **Papel:** memória da spec **vigente**. `## Decisions` é append-only (AD-NNN). `## Handoff` é overwrite por sessão.
@@ -11,43 +32,33 @@
 
 ## Decisions
 
+### AD-002 — Calibração fechada; próxima fase = grill-with-docs → PRD (2026-07-24)
+
+**Decisão:** Calibração da skill `tlc-roadmap-loop` está **fechada** (4/5 sinais verde, Sinal 4 mechanism in place). Próximo passo da era atual: usar `grill-with-docs` (Matt Pocock, plugin `mattpocock/skills`) adaptada pra autonomous, pra interrogar `PLAN.md`/`CLAUDE.md`/`History.md`/`archive_handoff/` e chegar num **PRD final do MVP Memory Studio**.
+
+**Por quê:** Skill é fundação; sem PRD fechado, Memory Studio é construído sem escopo claro. `grill-with-docs` é mecanismo estruturado pra eliminar ambiguidades sem depender de human-in-the-loop constante.
+
+**Regras da era:**
+
+- Decisões reversíveis (lib, naming, estrutura) → autonomous resolve
+- Decisões irreversíveis (escopo MVP, exclusões, authority) → escala humano
+- **Produção do produto Memory Studio SÓ após autorização humana explícita + PRD fechado**
+
+**Trigger pra sair desta era:** PRD do MVP fechado. Aí criar nova era (`2026-07-prd-ready/`) com roadmap real derivado do PRD.
+
 ### AD-001 — Loop v2 escopo = failure diagnostics only (2026-07-23)
 
-**Decisão:** A skill `tlc-roadmap-loop` evolui para v0.2 com **apenas 1 mecanismo novo** (failure diagnostics pre-flight, step 8a). Os outros 5 candidatos do Conselheiro (B3 + 4 especulativos) ficam em backlog com trigger explícito.
+(Decisão histórica — preservada da era de calibração. Ver `.specs/archive/2026-07-calibration/STATE.md` para contexto completo.)
 
-**Por quê:** Failure diagnostics tem evidência empírica direta (Phase 4 iter 1→2 reproduziu T-ORCH-19b sem atacar root cause). Os outros 4 (sub-agent awareness, sticky context, branch fingerprinting, handoff auto) não têm failure concreto observado que justifiquem implementação.
-
-**Critério de trigger pra reativar candidatos:**
-
-| Candidato | Implementar quando |
-|---|---|
-| B3 (Discovery contributions todos sub-agents) | Quando 5+ phases acumularem e quisermos retroativa estruturada |
-| Sub-agent context awareness | Quando sub-agent falhar por mal-entendido de contexto (não técnico) |
-| Sticky context | Quando brief ultrapassar 300 linhas e sub-agent ignorar seções |
-| Branch fingerprinting | Quando tivermos 2+ phases paralelas |
-| Handoff auto-generation | Quando phase cruzar sessão 2+ vezes consecutivas |
-
-**Por que não houve outras decisões (escopo Loop v2, etc):** Loop v2 vira patch da skill. Outras decisões (P3 hygiene, P4 memories) seguem em handoff-session.md na raiz.
+**Resumo:** Skill v0.2 inclui apenas `step 8a` (failure diagnostics pre-flight). Outros 4 candidatos a v2 (sub-agent awareness, sticky context, branch fingerprinting, handoff auto) deferidos com trigger explícito.
 
 ## Handoff
-- phase: `search` (Phase 4 do ROADMAP) — **PASS** (recovery via brief-m3cli-phase4-recovery.md)
-- skill-version: **v0.2** (added step 8a — failure diagnostics pre-flight, 2026-07-23)
-- skill-active: .claude/skills/tlc-roadmap-loop/SKILL.md (LOCAL, promoted to GLOBAL via cp 2026-07-23)
-- repo: c:\Users\User\Desktop\AI-Project\Memory-Studio
-- branch: main, head: see git log
-- uncommitted: nenhum (after skill patch + handoff rewrite commits)
-- next-phase: **Phase 5 — System message builder** (primeira production work usando a skill v0.2)
-- iter-log-completo-calibration:
-  - Phase 1: PASS (scaffold + smoke test, Waldemar #1)
-  - Phase 2: PASS (schema-and-crud, Sinais 2 + 5)
-  - Phase 3: PASS (social-detector, Sinais 2 + 5)
-  - Phase 4: PASS recovery (search, Sinal 3 strict fecha — Phase 4 iter 0 FAIL → iter 3 fix → recovery PASS)
-- skill-readiness-final:
-  - Sinal 1 (Promote global): ✅ done 2026-07-23 (cp + diff=0)
-  - Sinal 2 (Cycle fim-a-fim): ✅ Phase 1+2+3+4 verde
-  - Sinal 3 (Recovery FAIL→PASS): ✅ strict
-  - Sinal 4 (Discovery surface): not yet fired (acceptable — farol cobre as components atuais)
-  - Sinal 5 (Binary verifier c/ evidência): ✅
-- v0.2 delta: step 8a pre-flight — antes de re-dispatch em FAIL, compara failure atual vs anterior; se same-fixture-fail-2x, surface strategy alternatives (refine test design / escalate / skip signal) ao orchestrator. Iterations reset após strategy shift.
-- v0.2 archive: handoff-session.md antigo → archive_handoff/handoff-session-2026-07-23.md
 
+- **era:** `2026-07-foundation-complete` (skill v0.2 calibrada)
+- **era-anterior:** `2026-07-calibration` (archived em `.specs/archive/2026-07-calibration/`)
+- **next-epoch:** `2026-07-grill-with-docs` → PRD final
+- **skill-version:** v0.2 (em `.claude/skills/tlc-roadmap-loop/SKILL.md` LOCAL + GLOBAL em parity)
+- **autorização-produção-Memory-Studio:** ❌ NÃO (aguardando PRD)
+- **próximo-step-concreto:** rodar `grill-with-docs` sobre docs existentes
+- **working-tree:** clean (last commit `1fbd853`)
+- **não-congela:** STATE.md `## Decisions` append-only; `## Handoff` overwrite por sessão
