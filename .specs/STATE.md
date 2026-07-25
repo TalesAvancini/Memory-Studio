@@ -1,5 +1,14 @@
 # STATE
 
+> **Papel:** memória da spec **vigente**. `## Decisions` é append-only (AD-NNN). `## Handoff` é overwrite por sessão.
+> **Lê quando:** for entender estado atual de spec/decisões/handoff.
+> **Diferente de:**
+> - `History.md` — passado cronológico (narrativa + marcos)
+> - `handoff-session.md` — executivo de sessão (o que estamos fazendo AGORA)
+> - `MEMORY.md` — patterns de processo (1 fato por arquivo, auto-injetado)
+>
+> **Docs auxiliares:** ver `CLAUDE.md ## Documentation lifecycle` para o mapa completo.
+
 ## Decisions
 
 ### AD-001 — Loop v2 escopo = failure diagnostics only (2026-07-23)

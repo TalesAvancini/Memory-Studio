@@ -228,6 +228,31 @@ memory-studio/
 
 ---
 
+## Documentation lifecycle (regra operacional)
+
+Quatro documentos canônicos servem papéis distintos. **Não confundir.**
+
+| Doc | Conteúdo | Quando ler | Quando escrever |
+|---|---|---|---|
+| **History.md** | "Históriinha" (north star) + fatos cronológicos da sessão (numbered) | Início de sessão — entender o passado | Append-only quando marco novo |
+| **handoff-session.md** | Estado executivo atual: phase, próximos passos, blockers, decisions | Toda transição entre sessões | **Fim de CADA sessão (obrigatório)** |
+| **MEMORY.md** | Patterns de processo, lições, feedback (1 fato por arquivo, auto-injetado pelo sistema) | Início de sessão (carregado auto) | Quando lesson nova emerge |
+| **STATE.md** | Decisions (AD-NNN append-only) + Handoff state + validation | Pra ver spec state atual | Quando decisao/spec muda |
+
+**Regra de fim de sessão:** TODA sessão termina com `handoff-session.md` atualizado.
+
+- **Ferramenta preferida:** skill `handoff` do Matt Pocock (plugin `mattpocock/skills`, configurada em `## Agent skills` abaixo).
+- **Fallback manual:** template em `archive_handoff/handoff-session-2026-07-23.md`.
+
+**Arquivamento:**
+
+- Handoffs antigos → `archive_handoff/handoff-session-YYYY-MM-DD.md` (nunca deletar — append-only).
+- Specs/STATE.md/ROADMAP.md de eras anteriores → `.specs/archive/<era>/` (e.g., `.specs/archive/2026-07-calibration/`). STATE.md só reflete o estado vigente, não histórico de calibração.
+
+**Meta-narrativa (north star):** ver topo de `History.md` — Memory Studio é objetivo final, skill é fundação, fases 0-4 foram calibração.
+
+---
+
 ## Glossary
 
 | Termo | Significado |
