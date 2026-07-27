@@ -1,12 +1,17 @@
 ---
 date: 2026-07-27
-version: 3.1
+version: 3.2
 supersedes:
   - .specs/archive/memory-studio-v3/PLAN-v1.md
   - .specs/archive/memory-studio-v3/proposal-v2.md
 status: ready-to-build
-revision: 3.1 (2026-07-27) — revisão externa de 17 findings (5 CRITICAL, 5 HIGH, 5 MEDIUM, 2 LOW) aplicada. Renumeração §18 → §16. Nova §17 (Glossário caches + nomenclatura). Correções de drift em C1-C5, H1-H5, M1-M5, L1-L2.
-description: "Memory Studio v3.1 — PRD. Documenta DECISÕES (com justificativa 'por que X e não Y'). Companion do PLAN.md (fases de implementação)."
+revision: |
+  3.2 (2026-07-27) — ajustes pós `critica-plan.md` (filtro crítico, não-aplicação cega):
+  - §9: estimativa 30-40h → 35-50h (soma direta das phases é 36-51h)
+  - §10.1: inception híbrida marcada CONDICIONAL ao grill §16.6 (mover pra v3.2 se grill reprovar)
+
+  3.1 (2026-07-27) — revisão externa de 17 findings aplicada. Renumeração §18 → §16. Nova §17 (Glossário caches + nomenclatura).
+description: "Memory Studio v3.2 — PRD. Documenta DECISÕES (com justificativa 'por que X e não Y'). Companion do PLAN.md (fases de implementação)."
 explanation: |
   v3 é o successor de PLAN-v1 (middleware invisível, prompt-only) e
   proposal-v2 (draft não-autorizado, 41 decisões não-medidas).
@@ -479,7 +484,7 @@ Roda em qualquer máquina com 4GB livres.
 
 Ver [PLAN.md](PLAN.md) para phases, deliverables, estimates. PRD foca em decisões, PLAN em fases.
 
-**Estimativa total:** 30-40h single-dev (inclui erro, logging, 1 round de tuning empírico).
+**Estimativa total:** **35-50h single-dev** (inclui erro, logging, 1 round de tuning empírico). v3.1 prometeu 30-40h — soma direta das phases dá 36-51h, então v3.2 corrige pra 35-50h honesto.
 
 ---
 
@@ -497,7 +502,7 @@ Ver [PLAN.md](PLAN.md) para phases, deliverables, estimates. PRD foca em decisõ
 - [ ] Audit log grava todo request com prompt redactado + matched IDs + pruning reasons + latência
 - [ ] Modo prompt-only (v1 compat) continua funcionando quando contexto é null
 - [ ] Funciona com pelo menos 1 agente (Claude Code MVP)
-- [ ] **Inception híbrida (após grill §16.6):** Turn N (cold start) vai plain pro provedor, fast agent lê response em paralelo com humano, Turn N+1 augmenta com (intel + prompt + catalog)
+- [ ] **Inception híbrida (CONDICIONAL: grill §16.6 deve aprovar):** Turn N (cold start) vai plain pro provedor, fast agent lê response em paralelo com humano, Turn N+1 augmenta com (intel + prompt + catalog). **Se grill reprovar Phase 6, este critério é movido pra v3.2** e MVP core fecha sem inception híbrida.
 
 ### 10.2 Performance
 

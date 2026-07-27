@@ -1,7 +1,8 @@
 ---
-date: 2026-07-26
-version: 1
+date: 2026-07-27
+version: 2
 status: ready-to-build
+revision: 2 (2026-07-27) — revisão crítica PLAN.md aplicada (17+5 findings de `critica-plan.md`). Aceitos: PLAN-C1 nuance (Phase 3 = consumido externo), C2 (Phase 4 pre-reqs Phase 5), C3 (retrieval em Phase 1 build + Phase 5 query), C4 (inception gated), C5/C6 (nota hook/MCP deferred), C7 (total 35-50h), H1 (cross-ref schema SQLite v1), H2 (cacheHit cross-ref §17.1), H3 (Phase 7 reword), H4 (FTS5/vec explícito), H5 (detector proveniência v1→v3), H6 (Phase 5 done criteria), M2 (schema versioning policy), M3 (byte-string Phase 5 vs prefix-intacto Phase 6 split). Recusados: PLAN-M1 (single-dev sequence já claro), PLAN-L1 (8-12h honesto).
 description: "Memory Studio — plano de implementação em fases. Companion da PRD.md (decisões). Cada fase com pre-reqs, deliverables, dependencies, estimate."
 explanation: |
   PLAN.md é o companion de implementação da PRD.md.
@@ -17,9 +18,10 @@ explanation: |
   empírico. v1 (PRD) subestimou; este plano não repete o erro.
 
   Phase 6 (Fast agent + intel pipeline) é a peça NOVEL de v3. Aguarda
-  grill em PRD §18.6 antes de iniciar implementação.
+  grill em PRD §16.6 antes de iniciar implementação.
 related:
   - PRD.md
+  - critica-plan.md
   - CLAUDE.md
   - handoff-session.md
 ---
@@ -42,7 +44,11 @@ Phases em ordem. Cada phase tem:
 - **Estimate:** tempo single-dev (inclui erro, logging, 1 round de tuning)
 - **Por que X e não Y:** justificativa arquitetural (cross-ref PRD quando aplicável)
 
-**Total estimado:** 30-40h single-dev (consistente com PRD §9).
+**Total estimado:** **35-50h single-dev** (consistente com PRD §9). PRD v3.1 prometeu "30-40h" mas soma direta das phases dá 34-49h — v3.2 corrige pra 35-50h honesto.
+
+**Modos de integração cobertos:** só **proxy transparente (MVP)**. Hook e MCP são v3.1+ per PRD §14.3 + §11. PLAN não inclui phases pra eles — deferidos explicitamente.
+
+**Inception híbrida:** arquitetura capturada em PRD §16. Phase 6 do PLAN gated por grill §16.6. PRD §10.1 marca o critério como CONDICIONAL.
 
 ---
 
@@ -58,7 +64,9 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
           └──> Phase 4 (UI) ─────────────────────┘
 ```
 
-**Paralelização:** Phase 4 (UI) pode rodar em paralelo com Phase 5 (Proxy). Útil se houver 2 devs. Single-dev: sequencial.
+**Paralelização:** Phase 4 (UI) e Phase 5 (Proxy) podem rodar em paralelo com 2 devs. **Single-dev: sequencial** (1 → 2 → 3 → 4 → 5 → 6 → 7). Phase 4 antes de Phase 5 só com mocks do servidor (ver Phase 4 pre-reqs).
+
+**Note sobre Phase 3 (SDK):** Phase 3 é **consumida por agentes externos** (Claude Code etc.), não por outras phases internas. SDK tem Phase 2 como pre-req de tipos (fingerprint schema), mas nenhuma phase interna depende de Phase 3 — não é "floating", é track de entrega.
 
 ---
 
@@ -69,10 +77,16 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 **Deliverables:**
 
 - Schema YAML pra Skill, Rule, Persona (PRD §6)
-- Loader de YAML → SQLite
+- **Schema SQLite do catálogo** (tabelas `catalog`, `embeddings`, `audit_events`)
+- **Schema FTS5** (full-text search sobre `text` de cada item)
+- **Tabela sqlite-vec** (vetores 384d, multilingual-e5-small)
+- Loader de YAML → SQLite (popula catalog + embeddings + FTS5 + vec)
 - Embedding pipeline (multilingual-e5-small, ONNX, 384d)
-- Command `npm run build-index` regenera embeddings
+- Command `npm run build-index` regenera embeddings e índices
+- Schema versioning policy (catalog versionado em git + `schemaVersion` no API)
 - ~19 skills built-in migradas do Mavis
+
+**Cross-ref schema SQLite:** schema v1 (calibração) reside em `.specs/archive/2026-07-calibration/STATE.md`. Phase 1 revisa e migra — **NÃO** inventa schema do zero. Invariante sólida mantida.
 
 **Depends-on:** nenhuma (foundation).
 
@@ -96,6 +110,8 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 - Fingerprint 4-componente: projectPath, agentId, sessionId (hasheado), gitBranch
 - Hashing/redaction básico (sha256[0:16] pra tenantId/sessionId)
 - Audit log schema (estrutura, sem fill ainda)
+
+**Proveniência:** Detector social, fingerprint 4-componente, e hashing básico são **promovidos de v1 phases 0-4 (calibração)** pra produção. Phase 2 **NÃO** implementa do zero — revisa código de calibração, ajusta pro escopo v3, e move pro source tree principal. Invariante sólida de v1 mantida.
 
 **Depends-on:** Phase 1.
 
@@ -135,7 +151,14 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 
 ## Phase 4 — UI painel
 
-**Pre-reqs:** Phase 1.
+**Pre-reqs:** Phase 1 (schema + loader).
+
+**Pre-reqs condicionais:**
+
+- **Modo A — com mocks:** Phase 1 + interface mock do servidor. UI funciona mas Audit/Settings são stub. Útil pra single-dev que quer ver UI antes de Phase 5.
+- **Modo B — com servidor real:** Phase 1 + Phase 5 (proxy). Audit e Settings mostram dados reais.
+
+**Recomendação:** Modo B. UI sem dados reais é inerte (Audit vazio, Settings stub). Single-dev faz Phase 5 antes de Phase 4 — ordem sequencial 1 → 2 → 3 → 5 → 4 → 6 → 7.
 
 **Deliverables:**
 
@@ -168,11 +191,23 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 **Deliverables:**
 
 - Forwarder HTTP: recebe request do agente, augmenta, encaminha pro provedor real
+- **Retrieval pipeline em runtime:** query FTS5 + sqlite-vec → RRF fusion → threshold duplo (`min_cosine_similarity` + `min_fts_hits`) → top-K candidatos. Schema do índice vem de Phase 1.
 - System message augmenté: 2 blocos `cache_control: ephemeral` (persona + Skills)
-- Byte-string determinístico (mesma input → mesma saída)
-- Response struct com `pruningDecisions` (5 razões) + `cacheHit`
+- **Byte-string determinístico do input completo** (mesma input → mesma saída byte-a-byte). **Sem garantia cross-turn** do prefixo intacto — isso é deliverable de Phase 6.
+- Response struct com `pruningDecisions` (5 razões). `cacheHit` da response é v3.1+ (omitido no MVP) — **métrica de cache hit MVP é via log estruturado** (PRD §17.1 + §14.6), NÃO pelo campo da response.
 - Audit log preenchido
 - Structured JSON logging de `usage.cache_read_input_tokens` por request (PRD §14.6)
+
+**Done criteria (smoke test antes de Phase 6):**
+
+- [ ] Smoke test end-to-end com Claude Code via custom baseURL (PRD §13)
+- [ ] Byte-string determinístico validado: mesma input → mesmo SHA256 do system message
+- [ ] Cache hit do provedor verificado em log: `cache_read_input_tokens > 0` em 2 requests seguidos com mesmas Skills ativas
+- [ ] Retrieval retorna top-K com hit no índice (FTS5 + sqlite-vec)
+- [ ] Audit log gravado com prompt redactado + matched IDs + pruning reasons
+- [ ] `usage.cache_read_input_tokens` logado por request
+
+**Gating:** Phase 6 (Fast agent) **NÃO começa** sem smoke test verde.
 
 **Depends-on:** Phase 1, 2.
 
@@ -250,7 +285,7 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 
 **Depends-on:** Phase 5, 6.
 
-**Estimate:** 5-7h (1 semana de dados de produção).
+**Estimate:** 5-7h de trabalho + 1 semana wall-clock de coleta de dados de produção (sessões reais).
 
 **Por que X (CLI/arquivo) e não Y (Grafana/Prometheus):**
 
@@ -264,14 +299,16 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 
 | Phase | Estimate |
 |---|---|
-| 1 — Schema + Catalog | 3-4h |
-| 2 — Detector + fingerprint | 2-3h |
+| 1 — Schema + Catalog (incl. FTS5, sqlite-vec, schema versioning) | 4-5h |
+| 2 — Detector + fingerprint (promoção v1→v3) | 2-3h |
 | 3 — SDK | 3-4h |
 | 4 — UI | 8-12h |
-| 5 — Proxy | 5-7h |
-| 6 — Fast agent (NOVEL) | 8-12h |
-| 7 — Tuning | 5-7h |
-| **Total** | **30-40h** |
+| 5 — Proxy (incl. retrieval runtime + done criteria) | 6-8h |
+| 6 — Fast agent (NOVEL, gated por grill) | 8-12h |
+| 7 — Tuning (5-7h trabalho + 1 semana coleta) | 5-7h |
+| **Total** | **36-51h (honesto: 35-50h)** |
+
+**Por que 35-50h e não 30-40h (PRD §9 v3.1):** soma direta das phases dá 36-51h. PRD v3.1 prometeu 30-40h — promessa furada. v3.2 corrige pra 35-50h, mantendo o mesmo perfil (single-dev, inclui erro, logging, 1 round de tuning empírico).
 
 ---
 
