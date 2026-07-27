@@ -1,11 +1,12 @@
 ---
-date: 2026-07-26
-version: 3
+date: 2026-07-27
+version: 3.1
 supersedes:
   - .specs/archive/memory-studio-v3/PLAN-v1.md
   - .specs/archive/memory-studio-v3/proposal-v2.md
 status: ready-to-build
-description: "Memory Studio v3 — PRD. Documenta DECISÕES (com justificativa 'por que X e não Y'). Companion do PLAN.md (fases de implementação)."
+revision: 3.1 (2026-07-27) — revisão externa de 17 findings (5 CRITICAL, 5 HIGH, 5 MEDIUM, 2 LOW) aplicada. Renumeração §18 → §16. Nova §17 (Glossário caches + nomenclatura). Correções de drift em C1-C5, H1-H5, M1-M5, L1-L2.
+description: "Memory Studio v3.1 — PRD. Documenta DECISÕES (com justificativa 'por que X e não Y'). Companion do PLAN.md (fases de implementação)."
 explanation: |
   v3 é o successor de PLAN-v1 (middleware invisível, prompt-only) e
   proposal-v2 (draft não-autorizado, 41 decisões não-medidas).
@@ -37,7 +38,7 @@ explanation: |
 
   ## Mudança de arquitetura (2026-07-26)
 
-  v3 introduz **Inception Híbrida** (response-first) — ver §3 e §18.
+  v3 introduz **Inception Híbrida** (response-first) — ver §3 (fluxo) e §16 (engenharia).
   Esta é arquitetura NOVEL: nenhum routing tool existente
   (OmniRoute, 9Router, LiteLLM, Portkey, OpenRouter) implementa
   fast-agent-over-response. Memory Studio seria o primeiro.
@@ -67,7 +68,7 @@ Memory Studio é um estúdio de injeção de contexto, com painel UI. Quando um 
 
 **Características-chave:**
 
-- **Inception híbrida (response-first):** Turn N vai plain pro provedor. Fast agent (Haiku) lê response em paralelo com humano. Turn N+1 augmenta usando (intel + prompt + catalog). Latency trick: trabalho do fast agentuality escondido na leitura humana. **Ver §3 e §18.**
+- **Inception híbrida (response-first, integração pendente grill §16.6):** Turn N (cold start, sem intel prévia) vai plain pro provedor. Fast agent (Haiku) lê response em paralelo com humano. Turn N+1 augmenta usando (intel + prompt + catalog). Latency trick: trabalho do fast agentuality escondido na leitura humana. **Ver §3 (fluxo canônico) e §16 (engenharia).**
 - **Cache hit preservado:** system message augmentado é byte-string determinístico. Prefixo (persona) intacto, sufixo (intel + Skills) é a única parte variável.
 - **Painel UI:** humano controla Skills/Rules/Personas via UI. Layout em colunas, busca, janela lateral pra leitura.
 
@@ -79,12 +80,12 @@ Memory Studio v3 entrega:
 
 1. **Painel UI** onde o humano vê, liga/desliga e configura quais Skills, Rules e Personas estão ativas por projeto.
 2. **Middleware** que intercepta pedido do agente, lê prompt + estado, monta system message augmenté com catálogo ativo.
-3. **SDK cliente leve** (~50KB TypeScript) que os agentes usam pra coletar estado (scratch/todos/files/last_event) e enviar pro middleware.
+3. **SDK cliente leve** (~50KB TypeScript) que os agentes usam pra coletar estado (scratch/todos/recentFiles/lastEvent) e enviar pro middleware.
 4. **Catálogo versionado** em git (YAML), com campo `critical` em Rules (atomicidade).
 5. **Cache do provedor preservado** — system message augmenté é byte-string determinístico mesmo com Skills variáveis.
 6. **Audit log** do que foi injetado em cada request, com 5 razões de pruning (debug-first).
-7. **Inception híbrida** — fast agent processa response em paralelo com leitura humana; Turn N+1 augmenta com base em (intel + prompt + catalog).
-8. **3 modos de integração** com agentes: proxy transparente (preserva cache, zero trabalho no agente), hook (fallback), MCP (futuro).
+7. **Inception híbrida (arquitetura NOVEL capturada, integração pendente grill §16.6)** — fast agent processa response em paralelo com leitura humana; Turn N+1 augmenta com base em (intel + prompt + catalog).
+8. **Modos de integração** com agentes: **proxy transparente (MVP, preserva cache, zero trabalho no agente)**. Hook (v3.1+, fallback). MCP (v3.1+).
 
 ---
 
@@ -112,7 +113,7 @@ Limites explícitos, pra evitar drift:
 Turn N (cold start, sem augmentação):
   humano escreve prompt P_N
        ↓
-  SDK coleta contexto: scratch, todos, files, last_event
+  SDK coleta contexto: scratch, todos, recentFiles, lastEvent
        ↓
   SDK monta request: { prompt: P_N, context, fingerprint, tenant_id }
        ↓
@@ -161,13 +162,15 @@ Turn N+1 (augmentação cache-friendly):
 
 **Intercepção:**
 
-| Modo | Cache preservado | Agentes |
-|---|---|---|
-| **Proxy (baseURL custom)** | ✅ Sim | Claude Code, Cline, Aider, OpenCode |
-| **Hook** | depende | Agentes com hook system |
-| **MCP (v3.1)** | ✅ Sim | Cline v2+, Cursor |
+| Modo | Status MVP | Cache preservado | Agentes |
+|---|---|---|---|
+| **Proxy (baseURL custom)** | ✅ MVP | ✅ Sim | Claude Code (MVP); demais v3.1+ |
+| **Hook** | v3.1+ (fallback) | depende | Agentes com hook system (v3.1+) |
+| **MCP** | v3.1+ | ✅ Sim | Cline v2+, Cursor (v3.1+) |
 
-**Preferência:** proxy. Fallback: hook.
+**Preferência:** proxy. Fallback: hook (v3.1+).
+
+**Detalhe técnico da inception híbrida (latency trick, novelty, engineering decisions):** ver §16. §3 é fluxo canônico; §16 é engenharia.
 
 ---
 
@@ -227,7 +230,7 @@ Estado de toggle (skills/rules/personas ativas) vive em **`.memory-studio/state.
 
 **Por que SDK (X) e não prompt-only (Y):**
 
-- **X:** coleta estado do agente (scratch, todos, files, last_event). Hit-rate melhora vs prompt-only.
+- **X:** coleta estado do agente (scratch, todos, recentFiles, lastEvent). Hit-rate melhora vs prompt-only.
 - **Y:** v1 era prompt-only. Match pior em sessões longas ("tá dando erro 401" depois de 20min implementando OAuth vira "auth-jwt-01" via state, não "debug-401-01" via prompt).
 - **Y é fallback:** modo prompt-only continua funcionando (v1 compat).
 
@@ -239,7 +242,7 @@ import { collectContext, fingerprint, MemoryStudioClient } from "@memory-studio/
 const ctx = await collectContext({
   scratch: readRecentScratch(),           // últimos N chars do scratch local
   todos: readActiveTodos(),               // do todo system do agente
-  recentFiles: gitStatus().modified,      // ou equivalente
+  recentFiles: gitStatus().modified,      // ou equivalente — padrão canônico: ver PRD §17.2
   lastEvent: readLastEvent(),             // tool error / tool_result / tool_call
   redaction: "minimal",                   // "minimal" | "strict"
 })
@@ -251,7 +254,10 @@ const fp = await fingerprint({
   gitBranch: await collectGitBranch(),
 })
 
-const ms = new MemoryStudioClient({ baseURL: "http://127.0.0.1:7788", tenantId: "..." })
+const ms = new MemoryStudioClient({
+  baseURL: process.env.MEMORY_STUDIO_URL,   // ex.: "http://127.0.0.1:41823" — porta descoberta em runtime (PRD §14.2)
+  tenantId: "..."
+})
 const augmented = await ms.augment({ prompt, context: ctx, fingerprint: fp })
 // augmented.systemMessage → injetado no system message do agente
 // augmented.matchedSkills, augmented.cacheHit, augmented.pruningDecisions → log
@@ -366,7 +372,7 @@ text: |
     sessionId: string                                // hasheado
     gitBranch: string                                // branch atual
   }
-  activeCatalog: string[]                            // IDs ativos (do painel)
+  activeCatalog: string[]                            // IDs ativos. Source of truth = .memory-studio/state.json (PRD §4). SDK lê do filesystem e envia IDs ativos por convenience. Server valida contra filesystem.
   tenantId: string                                   // hasheado
   schemaVersion: 3
 }
@@ -380,11 +386,11 @@ text: |
   matchedSkills: { id: string, score: number, source: "builtin" | "user" }[]
   matchedRules: { id: string, score: number, critical: boolean }[]
   matchedPersonas: { id: string, score: number, isDefault: boolean }[]
-  cacheHit: "exact" | "semantic" | "miss"          // futuro v3.1
+  cacheHit?: "exact" | "semantic" | "miss"         // MVP: omitido (campo ausente na response). v3.1+: fingerprint cache sobre byte-string final. Métrica MVP de cache hit é via log (§14.6), NÃO este campo — ver §17.1.
   pruningDecisions: {                              // 5 razões, todas honestas
     rejectedByFloor: { id: string, reason: string }[]
     rejectedByBudget: { id: string, reason: string }[]
-    rejectedByAttentionTier: { id: string, reason: string }[]   // v3.1+
+    rejectedByAttentionTier: { id: string, reason: string }[]   // MVP: sempre []. v3.1+: ativo (attention tiers).
     rejectedByNegativeFeedback: { id: string, reason: string }[]
     rejectedByCriticalDropped: { id: string, reason: string }[]
   }
@@ -396,7 +402,7 @@ text: |
 }
 ```
 
-**Sem fingerprint cache** (descartado de v2). v3 MVP usa byte-string determinístico direto. Semantic cache 2-tier é v3.1+.
+**Sem fingerprint cache** (descartado de v2). v3 MVP usa byte-string determinístico direto. Semantic cache 2-tier é v3.1+. Ver §17.1 para distinção entre **cache do provedor** (MVP) e **cache de augmented/fingerprint** (v3.1+).
 
 ### 7.2 Outros endpoints (MVP)
 
@@ -431,14 +437,26 @@ text: |
 | UI | HTMX+Alpine (MVP) | ~50KB JS browser |
 | SDK cliente | TypeScript puro, ~50KB | 0 deps nativas |
 
-**Working set total: ~1GB de RAM.** Roda em qualquer máquina com 4GB livres.
+**Working set total: ~1GB de RAM (breakdown):**
+
+| Componente | Tamanho |
+|---|---|
+| Embedding (multilingual-e5-small ONNX) | ~470MB |
+| Reranker (ms-marco-MiniLM-L-6-v2 ONNX) | ~90MB |
+| SQLite cache + sqlite-vec | ~10MB |
+| Fastify + Node runtime baseline | ~200MB |
+| ONNX runtime overhead + file cache | ~125MB |
+| Misc (audit log buffer, catalog cache) | ~100MB |
+| **Total** | **~995MB (arredondado ~1GB)** |
+
+Roda em qualquer máquina com 4GB livres.
 
 **Sem Python no hot path, sem dependência externa pro usuário instalar.** Self-hosted friendly.
 
 **Invariantes sólidas (v1 mantidas, v3 não toca):**
 
 - ✅ Node-only, zero Python no hot path
-- ✅ SQLite + FTS5 + sqlite-vec (vs Qdrant/Pinecone — benchmark independente em v1 mostrou que SQLite vence na escala nossa)
+- ✅ SQLite + FTS5 + sqlite-vec (vs Qdrant/Pinecone — benchmark interno v1 em 2026-Q2, single-dev, 384d multilingual-e5-small em ~100k chunks de código; SQLite venceu em latência e footprint. **Não publicado formalmente**; invariante mantida por evidência operacional — não é publicação peer-reviewed)
 - ✅ `cache_control: ephemeral` no system message augmenté
 - ✅ Catálogo versionado em git (YAML por item)
 - ✅ `tenant_id` hasheado no audit log (sha256[0:16])
@@ -453,7 +471,7 @@ text: |
 - 🆕 Critical Rules atômicas (sempre injetadas se ativas no painel)
 - 🆕 Response com `pruning_decisions` (debug-first)
 - 🆕 State local do agente entra no match (`recentFiles`, `scratch`, `todos`, `lastEvent`)
-- 🆕 **Inception híbrida** (response-first + latency trick) — ver §18
+- 🆕 **Inception híbrida** (response-first + latency trick) — ver §16
 
 ---
 
@@ -469,7 +487,7 @@ Ver [PLAN.md](PLAN.md) para phases, deliverables, estimates. PRD foca em decisõ
 
 ### 10.1 Funcional
 
-- [ ] Memory Studio lê prompt + estado do agente (scratch, todos, files, last_event)
+- [ ] Memory Studio lê prompt + estado do agente (scratch, todos, recentFiles, lastEvent)
 - [ ] Top 3-5 skills/rules/personas são identificadas por augmentation
 - [ ] System message augmenté é byte-string determinístico (mesma input → mesmo byte-string)
 - [ ] `cache_control: ephemeral` em 2 blocos (persona estável + Skills variáveis)
@@ -479,14 +497,14 @@ Ver [PLAN.md](PLAN.md) para phases, deliverables, estimates. PRD foca em decisõ
 - [ ] Audit log grava todo request com prompt redactado + matched IDs + pruning reasons + latência
 - [ ] Modo prompt-only (v1 compat) continua funcionando quando contexto é null
 - [ ] Funciona com pelo menos 1 agente (Claude Code MVP)
-- [ ] **Inception híbrida:** Turn N vai plain, fast agent lê response, Turn N+1 augmenta com intel
+- [ ] **Inception híbrida (após grill §16.6):** Turn N (cold start) vai plain pro provedor, fast agent lê response em paralelo com humano, Turn N+1 augmenta com (intel + prompt + catalog)
 
 ### 10.2 Performance
 
 - [ ] p50 latência < 50ms (request sem embedding cache miss)
 - [ ] p99 latência < 200ms (com embedding)
 - [ ] Working set < 1.5GB de RAM
-- [ ] Cache hit rate do provedor > 70% em sessão real (>10 turns) — **métrica via `usage.cache_read_input_tokens`**
+- [ ] Cache hit rate do provedor > 70% em sessão real (>10 turns) — **métrica via log estruturado de `usage.cache_read_input_tokens`** (PRD §14.6: request hit rate + token cache coverage). **NÃO** confundir com campo `cacheHit` da response do `/augment` (campo é v3.1+, omitido no MVP — ver §17.1).
 
 ### 10.3 Segurança / Privacidade
 
@@ -637,7 +655,7 @@ Decisões fechadas após grill com humano. Justificativa "por que X e não Y" re
 
 ### 14.7 Inception híbrida (response-first)
 
-**Decisão:** arquitetura nova — ver §3 e §18.
+**Decisão:** arquitetura nova — ver §3 (fluxo canônico) e §16 (engenharia).
 
 **Por que X (response-first) e não Y (prompt-first):**
 
@@ -662,30 +680,30 @@ Decisões fechadas após grill com humano. Justificativa "por que X e não Y" re
 
 ---
 
-## 18. Inception Híbrida (response-first) — arquitetura NOVEL
+## 16. Inception Híbrida (response-first) — arquitetura NOVEL
 
-**Status:** definida 2026-07-26. Pré-grill em §18.6 antes de integrar formalmente em §3 e iniciar Phase 6 do PLAN.
+**Status:** definida 2026-07-26. Pré-grill em §16.6 antes de integrar formalmente em §3 e iniciar Phase 6 do PLAN.
 
-### 18.1 Conceito
+### 16.1 Conceito
 
 Memória curta:
-- **Turn N:** prompt plain → provedor → response. Fast agent (Haiku) lê response em paralelo com humano.
+- **Turn N (cold start):** prompt plain → provedor → response. Fast agent (Haiku) lê response em paralelo com humano.
 - **Turn N+1:** scripts fazem match (intel + prompt + context + catalog) → system message augmentado (prefixo estável + sufixo dinâmico) → cache hit.
 
-Detalhamento está em §3.
+Detalhamento de fluxo (canônico) está em §3. Esta §16 detalha engenharia.
 
-### 18.2 Latency trick
+### 16.2 Latency trick
 
-**Orçamento de trabalho do fast agentuality:**
+**Orçamento de trabalho do fast agent:**
 
 - Humano lê R_N: ~5-30s (típico).
 - Fast agent processa R_N: ~1-3s.
-- **Ambos em paralelo.** Fast agentuality termina **antes** do humano terminar de ler.
+- **Ambos em paralelo.** Fast agent termina **antes** do humano terminar de ler.
 - Quando humano digita P_{N+1}, intel já está pronto.
 
-**Esta é a peça central.** Sem isso, fast agentuality adiciona latency. Com isso, latency zero.
+**Esta é a peça central.** Sem isso, fast agent adiciona latency. Com isso, latency zero.
 
-### 18.3 Novelty (vs o que existe)
+### 16.3 Novelty (vs o que existe)
 
 Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 
@@ -699,7 +717,7 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 
 **Memory Studio seria o primeiro** com fast-agent-over-response. **Diferencial competitivo, não overhead.**
 
-### 18.4 Engineering decisions (a desenrolar)
+### 16.4 Engineering decisions (a desenrolar)
 
 | Decisão | Trade-off |
 |---|---|
@@ -709,7 +727,7 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 | Suffix injection: template vs raw concat | Cache hit vs flexibility |
 | Prefix stability N→N+1 | Core do produto |
 
-### 18.5 Lessons from research
+### 16.5 Lessons from research
 
 | Necessidade | Padrão equivalente (reaproveitar) |
 |---|---|
@@ -719,7 +737,7 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 | Cache TTL (5-min window) | Anthropic `cache_control: { ttl: "5m" }` faz async pre-fetch custo-effective |
 | Role normalization | OmniRoute: `developer` → `system` |
 
-### 18.6 Próximo passo
+### 16.6 Próximo passo
 
 **Pré-grill antes de Phase 6 do PLAN.md:**
 
@@ -736,6 +754,35 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 
 ---
 
+## 17. Glossário (caches + nomenclatura)
+
+> **Por que esta seção:** revisão externa (2026-07-27) identificou drift entre §0, §3, §7.1, §10.2 — caches confundidos, nomenclatura inconsistente. Esta seção fixa referência canônica.
+
+### 17.1 Caches (são 2, papéis diferentes)
+
+| Cache | O que é | Onde mora | Métrica | Status |
+|---|---|---|---|---|
+| **Cache do provedor** (Anthropic) | `cache_control: ephemeral` no system message augmenté. TTL 5min. Hash byte-string do system message = chave. | Anthropic API (server-side) | Log estruturado de `usage.cache_read_input_tokens` (PRD §14.6): request hit rate + token cache coverage | **MVP** |
+| **Cache de augmented** (fingerprint semântico) | Fingerprint sobre byte-string final do system message, pra hit entre inputs semanticamente equivalentes mas byte-diferentes. | Memory Studio (in-memory) | Campo `cacheHit: "exact" \| "semantic" \| "miss"` na response do `/augment` | **v3.1+** (omitido no MVP) |
+
+**Regra operacional:** métricas de aceitação MVP (PRD §10.2) usam **log do cache do provedor**, NÃO o campo `cacheHit` da response. Quem for implementar cache hit em Phase 7 do PLAN deve ler esta §17.1 antes.
+
+### 17.2 Nomenclatura (padronizada)
+
+| Termo | Significado | Onde é definido |
+|---|---|---|
+| **fast agent** | Agente rápido (Haiku-class) que lê response do provedor em paralelo com humano. Gera intel pra próximo turn. | §16 |
+| **fast-agent-over-response** | Padrão arquitetural: o fast agentuality roda sobre a response, não sobre o prompt. | §16.3 |
+| **fast agentuality** | Sinônimo informal de "fast agent" (uso descritivo, não técnico). Evitar em PRD/PLAN. | — |
+| **recentFiles** | Lista de paths de arquivos recentes do working tree do agente (`git status modified`, ou equivalente). **Padrão canônico** — usar este nome em PRD, SDK, schema, response. NÃO usar `gitStatus`, `files`, `recent_files`. | §5, §7.1 |
+| **scratch** | Scratchpad local do agente (últimos N chars). | §5, §7.1 |
+| **todos** | Lista de TODOs ativos do agente. | §5, §7.1 |
+| **lastEvent** | Último evento do agente (`tool_error`, `tool_call`, `tool_result`). camelCase canônico. | §5, §7.1 |
+
+**Regra:** PRD e PLAN sempre usam `recentFiles`, `lastEvent`. Casing consistente. Nomes em snake_case ou outras variantes são **drift** e devem ser corrigidos quando aparecerem.
+
+---
+
 ## Anexo — o que mudou vs v1 e v2
 
 ### v1 → v3 (preserva + adiciona)
@@ -745,7 +792,7 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 **Adiciona:**
 
 - Visão explícita de **painel UI** (v1 era middleware invisível)
-- **SDK cliente** que coleta estado do agente (scratch, todos, files, last_event)
+- **SDK cliente** que coleta estado do agente (scratch, todos, recentFiles, lastEvent)
 - **Campo `critical` em Rules** com UI warning
 - **Response debug-first** com `pruningDecisions` e 5 razões
 - **2 blocos de `cache_control: ephemeral`** (persona estável vs Skills variáveis)
@@ -777,4 +824,4 @@ PLAN.md → PRD.md (este arquivo). Razão: PRD é o tipo correto do documento (d
 
 ---
 
-**Próximo passo concreto:** grill com você (sessão futura) na §18.6 antes de Phase 6 do PLAN.md. Phase 1-5 podem começar antes.
+**Próximo passo concreto:** grill com você (sessão futura) na §16.6 antes de Phase 6 do PLAN.md. Phase 1-5 podem começar antes.
