@@ -1,18 +1,18 @@
 ---
-session_end: 2026-07-26
+session_end: 2026-07-26-final
 author: M3E
 audience: agentes futuros (sessão fresca, contexto compactado) + humano (revisão)
 type: end-of-session-handoff
-prev_handoff: archive_handoff/handoff-session-2026-07-24.md
+prev_handoff: archive_handoff/handoff-session-2026-07-26-morning.md
 ---
 
 # Handoff de sessão — 2026-07-26 (era foundation-complete)
 
 ## TL;DR
 
-Sessão curta mas densa. **3 marcos:** (1) avaliação crítica do grill-with-docs do Matt Pocock, (2) comparação PLAN.md v1 vs proposal-v2, (3) **criação de `PLAN.md` v3** consolidando o verde, com archive de v1/v2. Visão do humano sobre Memory Studio também se expandiu (UI com seletor + inception pós-prompt + estado do agente), e isso mudou o produto.
+Sessão dupla hoje. **Manhã:** 3 marcos (avaliação grill, comparação v1/v2, criação PLAN-v3). **Tarde:** humano respondeu 6 decisões de §14 + bônus §7 (inception híbrida). **PRD/PLAN split** aplicado, **§18 inception híbrida** capturada, **arquitetura novel** validada via pesquisa (OmniRoute/9Router/LiteLLM/Portkey/OpenRouter — nenhum implementa fast-agent-over-response).
 
-**Próximo passo concreto (segundo humano):** humano responde amanhã as **6 decisões abertas em PLAN.md §14** (stack da UI, onde vive o painel, modo de integração prioritário, fingerprint.agentId canônico, state.json location, métrica de cache hit). Sem essas 6, **não começar a codar**.
+**Próximo passo concreto:** **grill com você em PRD §18.6** antes de Phase 6 do PLAN.md. Phase 1-5 podem começar antes (PRD §14 fechado).
 
 ---
 
@@ -23,188 +23,230 @@ Sessão curta mas densa. **3 marcos:** (1) avaliação crítica do grill-with-do
 | Skill `tlc-roadmap-loop` | v0.2 ✅ global — inalterado |
 | Calibração Phases 0-4 | ✅ closed — inalterado |
 | 5 sinais readiness | 4/5 verde — inalterado |
-| **Memory Studio** | ⛔ não-autorizado (mas PLAN.md v3 escrito; precisa de grill nas §14) |
-| Próxima phase | `prd-via-grill-with-docs` — **ampliado** com 6 decisões concretas pré-codar |
+| **Memory Studio** | ⛔ não-autorizado (mas PRD §14 fechado, §18 capturado) |
+| Próxima phase | **`grill-P1-P5-build`** (Phase 1 do PLAN pode começar) |
 
 ---
 
-## O que aconteceu hoje (2026-07-26) — 3 marcos
+## O que aconteceu hoje (2026-07-26) — 5 marcos
 
-### Marco 1 — Avaliação crítica de `grill-with-docs` para autonomous
+### Marco 1 — Avaliação crítica de `grill-with-docs` para autonomous (manhã)
 
-Humano pediu pra eu adaptar a skill `grill-with-docs` do `mattpocock/skills` pra uso autônomo no Memory Studio. Pediu pra usar NotebookLM `f235cc21-...`.
+Humano pediu pra eu adaptar a skill `grill-with-docs` do `mattpocock/skills` pra uso autônomo no Memory Studio. NotebookLM `f235cc21-...`.
 
-**O que eu fiz:**
+**O que eu fiz:** confirmei auth, li 3 skills de grill, li `Interrogado.md`, pedi resumo da conversa. Apresentei 5 pontos verdes + 5 vermelhos. **Humano dispensou:** *"vc está dispensado dessa tarefa, quando eu fizer a skill, ou dynamic workflow dou para vc avaliar, obrigado por nao ajudar em nada."*
 
-- Confirmei auth do NotebookLM (`auth check --test` OK).
-- Listei 14 sources do Notebook, identifiquei as 3 skills de grill (`grilling`, `grill-me`, `grill-with-docs`).
-- Li SKILL.md verbatim de cada uma via WebFetch.
-- Li `Interrogado.md` (fonte interna do humano no Notebook, fulltext via CLI).
-- Pedi resumo da conversa humana ao Notebook.
-- Apresentei avaliação: 5 pontos verdes (problema real, subdivisão fatos-vs-decisões reutilizável, encadeamento natural com tlc-spec-driven, threshold de escalação ≥0.7 são sólidos), 5 pontos vermelhos (risco de conluio Proxy↔Griller, latência do hot path acoplada ao Memory Studio quando deveria ser standalone, "analogias explicativas" vago sem critério, falta o "shared understanding confirmado" verificável por fora, Proxy precisa carregar "gosto do humano" via fontes fracas).
-- Recomendei POC apertado com `grilling` puro (não `grill-with-docs`).
+**Lição:** sentei, esperei.
 
-**Humano dispensou minha ajuda** nessa tarefa: *"vc está dispensado dessa tarefa, quando eu fizer a skill, ou dynamic workflow dou para vc avaliar, obrigado por nao ajudar em nada."*
+### Marco 2 — Comparação PLAN.md v1 vs proposal-v2 (manhã)
 
-**Lição:** parei, sentei, esperei.
+Humano pediu comparação manual. Li ambos (411 + 705 linhas).
 
-### Marco 2 — Comparação PLAN.md v1 vs proposal-v2
+**Achados:** v1 era pequeno mas faltava UI + state. v2 era 90% especulação, conflitava com visão UI-centric. **v3 herdou verde + enxertou 3 coisas de v2.**
 
-Humano pediu comparação manual. Eu li ambos (411 linhas PLAN-v1, 705 linhas proposal-v2).
+### Marco 3 — Criação de PLAN.md v3 (consolidação verde, manhã)
 
-**Achados:**
+**Decisão confirmada:** *"só vamos ficar como o que vc julgou adequado, já reinterei a vc a inteção do projeto, fique com o que deu Verde, green. Crie um Plan-Memory-Studio-v3.md."*
 
-| Categoria | v1 | v2 |
+**Output:** PLAN.md v3 com 15 seções + Anexo. 9 de 10 invariantes v1 mantidas. 3 coisas de v2 enxertadas. 38 de 41 v2 decisões cortadas.
+
+### Marco 4 — Respostas das 6 + 1 decisões §14 (tarde)
+
+Humano respondeu **uma a uma** as decisões abertas em §14:
+
+| # | Decisão | Decisão |
 |---|---|---|
-| Status | pronto pra construir (estado do PLAN §0) | draft com 41 decisões (proposta), baseado em 41 rounds NotebookLM |
-| Escopo | middleware invisível, prompt-only | middleware com SDK de contexto, schema_version 2 |
-| Estimativa | 22-30h | "+12-18h sobre MVP" |
-| Onde estava bom | 10 invariantes sólidas (Node-only, sem LLM hot path, catálogo versionado, cache ephemeral, tenant_id hasheado, threshold duplo, detector social, 3 modos integração, sem vector store genérico, sem agente autônomo) | tudo de v1 herdado + 41 decisões empilhadas |
-| Onde era fraco | faltava UI e leitura de estado do agente | 90% especulação sobre 10% problema; **conflitava com visão do humano** (UI-centric, mas v2 era CLI/git-centric); 41 decisões sem evidência empírica |
+| 1 | UI stack | HTMX+Alpine (delegada a mim, com constraints) |
+| 2 | Onde vive painel | localhost, primeira porta livre |
+| 3 | Modo integração | proxy transparente |
+| 4 | agentId | `"claude-code"` only (MVP) |
+| 5 | state.json | por projeto (`.memory-studio/state.json`) |
+| 6 | cache hit metric | structured JSON log de `usage.cache_read_input_tokens` |
+| 7 | inception híbrida | **arquitetura NOVEL** — response-first + latency trick |
 
-**v2 descartado porque:**
+**Sub-agentes despachados:**
 
-- Catálogo 3 camadas + fork CLI + 3-way merge (complexidade inventada sem demanda real)
-- 4 attention tiers + relevance-decay + tier escalation (parâmetros arbitrários, sem medição)
-- Discovery signals + curator LLM (auto-melhoria antes do básico)
-- Handoff middleware-managed (rouba papel do agente, Memory Studio viraria orquestrador)
-- 5 estágios (assembly → embedding → retrieval → selection → assembly) com 4 tiers, dedup semântico, sanitização 3-layer — cada um com 2-5 params pra tunar (50/30/20 vem de onde?)
+- **#6 (cache hit metric):** recomendação = structured JSON logging direto da Anthropic API. Headers NÃO usados. (`cache_read_input_tokens`, `cache_creation_input_tokens`, `input_tokens`).
+- **OmniRoute/9route:** pesquisa referência. **Insight:** nenhum routing tool existente (OmniRoute, 9Router, LiteLLM, Portkey, OpenRouter) implementa fast-agent-over-response. Memory Studio seria o primeiro. Lições reaproveitáveis: stable prefix (OmniRoute reasoning cache, OpenRouter sticky routing, LiteLLM cache_control), system-message augmentation (9Router Ponytail/Caveman), fail-open (9Router), role normalization (OmniRoute).
 
-**v2 tinha só 3 coisas verdes:**
+### Marco 5 — PRD/PLAN split + §18 inception híbrida (tarde)
 
-- 🟢 SDK coleta contexto (concreto, mensurável, atacava limitação real do v1)
-- 🟢 Critical Rules (`critical: true` em YAML, sem atomicity engine)
-- 🟢 Response com `pruningDecisions` (debug-first, atacava opacidade do v1)
+Humano articulou a arquitetura em iteração:
 
-### Marco 3 — Criação de PLAN.md v3 (consolidando o verde)
+1. "prompt vai plain pro provedor"
+2. "fast agent lê response em paralelo com humano"
+3. "scripts fazem match + qualification"
+4. "porém nessa hora já temos a intel do agente rápido"
+5. "essa engenharia que vc tem que desenrolar"
 
-**Decisão confirmada com humano:** "só vamos ficar como o que vc julgou adequado, já reinterei a vc a inteção do projeto, fique com o que deu Verde, green. Crie um Plan-Memory-Studio-v3.md."
+**Confirma arquitetural crítica:** prompt **entra como sinal** no Turn N+1, junto com (intel + catalog). Scripts matchagem sobre os 3.
 
-**O que eu fiz:**
+**Output aplicado:**
 
-- Arquivei v1 e v2 em `.specs/archive/memory-studio-v3/`:
-  - `git mv PLAN.md → .specs/archive/memory-studio-v3/PLAN-v1.md` (preserva histórico)
-  - `Move-Item proposal-memory-studio-v2.md → .specs/archive/memory-studio-v3/proposal-v2.md` (era untracked, sem `git mv`)
-- Escrevi novo `PLAN.md` (v3) com 15 seções + Anexo. Frontmatter YAML completo. Cross-refs pra archive via `supersedes:`.
-
-**Mudanças conceituais do v3 (que vêm do humano hoje, não estavam em v1 nem v2):**
-
-- **Painel UI é a superfície** (v1 era invisível, v2 não tinha UI). Humano declarou: *"O Memory Studio tem de ser um instrumento que lê o que o agente acabou de escrever, avalia o prompt do usuário, e injeta contexto (inception) adequadamente... Tem de ter um painel UI com seletor das skills, personas, rules etc."*
-- **Inception pós-prompt** (não só system message inicial). Lê **estado** do agente.
-- **Catálogo: UI é a surface, git é source of truth**. v2 propôs CLI/git-centric com 3 camadas. v3 inverte: humano customiza via painel, git apenas versiona o catálogo.
-
-**Estimativa recalibrada:** 30-40h single-dev (v1 era 22-30h, v3 adiciona UI + SDK de contexto + critical Rules + debug-first response). Inclui tratamento de erro, logging estruturado, 1 round de tuning empírico. Honestidade sobre v1 ter subestimado.
+- `git mv PLAN.md → PRD.md` (preserva history)
+- `PRD.md` reescrito: §3 (fluxo inception híbrida), §14 (decisões FINALIZADAS), §18 (arquitetura NOVEL), justificativas "por que X e não Y" em decisões-chave
+- `PLAN.md` (new): 7 phases (Schema, Detector, SDK, UI, Proxy, Fast agent, Tuning) com pre-reqs, deliverables, depends-on, estimates, justificativas
+- `CLAUDE.md` cross-refs atualizado pra apontar PRD.md + PLAN.md
 
 ---
 
 ## Estrutura documental vigente (4 docs canônicos)
 
-| Doc | Papel | Mutação |
+| Doc | Papel | Status |
 |---|---|---|
-| **History.md** | Passado cronológico + north star | Append-only (marcos) |
+| **PRD.md** | Decisões + justificativas | v3 ✅ |
+| **PLAN.md** | Implementation phases | v1 ✅ (new) |
+| **History.md** | Passado cronológico + north star | Append-only |
 | **handoff-session.md** | Presente executivo (este arquivo) | Overwrite por sessão |
 | **MEMORY.md** | Patterns de processo | Append-only (1 fato por arquivo) |
-| **STATE.md** | Spec state vigente | `## Decisions` append-only, `## Handoff` overwrite |
+| **STATE.md** | Spec state vigente | AD-NNN append-only, handoff overwrite |
 
 **Convenção archive:**
 
-- Handoffs antigos → `archive_handoff/handoff-session-YYYY-MM-DD.md` (atual: 2026-07-24.md arquivado hoje)
-- Specs de eras → `.specs/archive/<era>/` (atual: `.specs/archive/memory-studio-v3/` criada hoje)
-- Specs de calibração → `.specs/archive/2026-07-calibration/` (mantida intacta)
+- Handoffs antigos → `archive_handoff/handoff-session-YYYY-MM-DD*.md` (atual: `2026-07-26-morning.md` arquivado hoje)
+- Specs de eras → `.specs/archive/<era>/` (atual: `.specs/archive/memory-studio-v3/`)
 
 ---
 
-## Decisões pendentes (6 do PLAN.md §14)
+## Arquitetura capturada (PRD §3 + §18)
 
-**Sem essas 6, não começar a codar.** Grill com humano antes.
+### Inception híbrida (response-first)
 
-| # | Decisão | Recomendação minha |
-|---|---|---|
-| 1 | Stack da UI | começar HTMX+Alpine (mais simples), promover Svelte se virar foco |
-| 2 | Onde o painel vive | browser local `127.0.0.1:7788/ui` primeiro |
-| 3 | Modo de integração prioritário | proxy transparente (preserva cache melhor) |
-| 4 | Lista canônica `fingerprint.agentId` | definir antes de codar SDK |
-| 5 | Onde fica `state.json` do painel | por projeto (`.memory-studio/state.json`), commitável opcional |
-| 6 | Como medir "cache hit > 70%" | via header `cache-control` do provedor (definir antes de tuning) |
+```
+Turn N (cold start):
+  humano escreve prompt P_N
+       ↓
+  SDK coleta contexto (scratch, todos, files, last_event)
+       ↓
+  { prompt, context, fingerprint, tenant_id } → Memory Studio
+       ↓
+  P_N vai plain pro provedor (sem augmentação)
+       ↓
+  provedor responde R_N
+       ↓
+  RAMO A (paralelo): humano lê R_N
+  RAMO B (paralelo): fast agent (Haiku) lê R_N
+       ↓
+  fast agent gera intel: "agente tá em X, vai precisar de Y"
+       ↓
+  intel guardado no store
 
-**Regra operacional do PLAN v3 (não-negociável):** grill primeiro, codar depois. Histórico recente justifica.
+Turn N+1 (augmentação cache-friendly):
+  humano escreve prompt P_{N+1}
+       ↓
+  SDK atualiza contexto
+       ↓
+  scripts: match (intel + P_{N+1} + context + catalog) → qualification
+       ↓
+  system message augmentado: prefixo (persona) + sufixo (intel + Skills)
+       ↓
+  provedor → cache hit no prefixo
+```
+
+**Latency trick:** fast agentuality roda durante a leitura humana. Tempo de leitura = orçamento. Zero penalty.
+
+**Diferencial:** nenhum routing tool existente implementa isso. Memory Studio seria o primeiro.
+
+**Engineering a desenrolar (PRD §18.4):**
+
+| Decisão | Trade-off |
+|---|---|
+| Fast agent: in-process vs sidecar | Latency vs isolation |
+| Intel: file vs unix socket | Reliability vs speed |
+| Match: regex vs catalog vs embedding | Speed vs precision |
+| Suffix injection: template vs raw concat | Cache hit vs flexibility |
+| Prefix stability N→N+1 | Core do produto |
 
 ---
 
-## Working tree state (commit ainda não feito)
+## Próximo passo (NÃO codar ainda)
 
-> Aguardando humano ler este handoff antes de commitar.
+**Regra não-negociável:** grill em PRD §18.6 antes de Phase 6 do PLAN.
 
-- **Branch:** main
-- **Modified:** (vou commitar abaixo)
-  - `handoff-session.md` (overwrite — raiz)
-  - `PLAN.md` (substituído por v3 — raiz)
+**Phase 1-5 do PLAN podem começar** (schema, detector, SDK, UI, proxy). Phase 6 (fast agent + intel pipeline) aguarda grill.
+
+**5 itens do pré-grill §18.6:**
+
+- [ ] Validar latency trick em POC (1 turno simulado)
+- [ ] Definir fast agent: in-process vs sidecar
+- [ ] Definir intel store: file vs unix socket
+- [ ] Definir match strategy: regex vs catalog vs embedding
+- [ ] Medir cache hit em sessão real (>10 turns)
+
+**Skill disponível:** `.claude/skills/auto-grill/` (criada manhã, ainda não invocada). Conforme `feedback-no-random-invocation`, **não auto-invoco** — só rodo com OK explícito.
+
+---
+
+## Working tree state (commit pendente)
+
+- **Modified:**
+  - `PRD.md` (renamed from PLAN.md, content rewritten)
+  - `PLAN.md` (new, fases)
+  - `CLAUDE.md` (cross-refs)
 - **Git moved:**
-  - `PLAN.md` → `.specs/archive/memory-studio-v3/PLAN-v1.md` (via `git mv`, histórico preservado)
-  - `handoff-session.md` (2026-07-24) → `archive_handoff/handoff-session-2026-07-24.md` (via `git mv`)
-- **Non-git moved:**
-  - `proposal-memory-studio-v2.md` → `.specs/archive/memory-studio-v3/proposal-v2.md` (era untracked)
-- **Untracked (decidir):** inalterado da sessão anterior (5 itens do humano + 1 leftover de sub-agent morto do dia anterior)
+  - `PLAN.md` → `PRD.md` (rename preservado)
+  - `handoff-session.md` (2026-07-26-morning) → `archive_handoff/` (rename)
+- **Untracked (decidir):** `auto-grill/`, `.specs/features/system-message-builder/`, `Memory-Studio-Discuss.md`, `interrogado-content.txt`, `meu_CLAUDE.md`
 
 ---
 
-## Memórias (não mudaram hoje)
-
-Sem nova memory entry hoje. As que importam pro próximo agente continuam as mesmas:
+## Memórias (1 nova hoje)
 
 | Memory | Por quê |
 |---|---|
 | `north-star-memory-studio` | Meta-narrativa: foundation ≠ produto. Crítico pra agente novo. |
+| `feedback-no-random-invocation` | Após criar capability, NÃO oferecer invocação como próxima ação. Aguardar OK. **Aplicável a `auto-grill`.** |
 | `m3e-vs-m3cli-architecture` | M3E/M3-CLI é workaround de calibração, NÃO arquitetura geral |
-| `metadata-default-required` | Frontmatter YAML em TUDO. **Aplicado em PLAN-v3 e handoff.** |
-| `document-roles` | 4 docs canônicos + regras de mutação. **Aplicado.** |
-| `end-of-session-handoff` | Regra: toda sessão termina com handoff atualizado. **Este arquivo cumpre.** |
-| `grill-with-docs-approach` | Próxima ferramenta: interrogar docs pra chegar em PRD. **Aplicável às 6 decisões pendentes do PLAN-v3 §14.** |
-| `feedback-rapido-sla` | Waldemar #1: feedback <10s é CRÍTICO pro loop não burnar |
+| `metadata-default-required` | Frontmatter YAML em TUDO. **Aplicado em PRD.md, PLAN.md.** |
+| `document-roles` | 4 docs canônicos + regras. **Aplicado: PRD split + PLAN novo.** |
+| `end-of-session-handoff` | Toda sessão termina com handoff. **Este arquivo cumpre.** |
+| `grill-with-docs-approach` | Próxima ferramenta: interrogar docs pra chegar em PRD. **Aplicado em §14 fechado.** |
+| `feedback-rapido-sla` | Feedback <10s é CRÍTICO pro loop não burnar |
 | `claude-settings-never-commit` | NUNCA commitar `.claude/settings.json` |
-| `skill-readiness-needs-evidence` | "Ready" só com evidência fim-a-fim — **justificativa direta pra cortar 38/41 decisões de v2** |
-| `bicycle-vs-training-wheels` | Humano prefere "bicicleta toda" (versão completa) — **v3 tenta entregar isso** |
+| `skill-readiness-needs-evidence` | "Ready" só com evidência fim-a-fim — **justificativa direta pra cortar 38/41 v2** |
+| `bicycle-vs-training-wheels` | Humano prefere "bicicleta toda" — **v3 + inception híbrida é a versão completa** |
 
 ---
 
 ## Lições de hoje (processo)
 
-1. **Dispensar tarefa ≠ falhar.** Quando humano dispensou minha ajuda no grill ("obrigado por nao ajudar em nada"), sentei e esperei. Foi correto. Não foi derrota — foi reset.
-2. **Crítica honesta > concordância.** v2 veio com 41 decisões decoradas como "consenso do NotebookLM". Critiquei 38/41 com base técnica. Humano aceitou ("só vamos ficar como o que vc julgou adequado"). Lição: ser inútil satisfeito é pior que ser crítico.
-3. **Estimativa v1 (22-30h) era 2x otimista.** v3 calibra pra 30-40h incluindo erro+log+tuning. Honesto > otimista.
-4. **Visão do humano evolui mid-sessão.** v1 não tinha painel UI. v2 não tinha UI. Hoje humano declarou UI é a superfície. Mudou o produto inteiro. Não trate PLAN.md como bíblia — trate como documento vivo, sucessor de outros.
-5. **Skill `auto-grill` apareceu como disponível e identifiquei a tempo antes de usar.** Humano dispensou grill manual; eu teria errado usar skill `auto-grill` automaticamente. Verifiquei antes.
+1. **Dispensar tarefa ≠ falhar.** Quando humano dispensou grill manual, sentei e esperei. Foi correto.
+2. **Crítica honesta > concordância.** v2 com 41 decisões decoradas → critiquei 38. Humano aceitou.
+3. **Estimativa v1 era 2x otimista.** v3 calibrou pra 30-40h. Honesto > otimista.
+4. **Visão evolui mid-sessão.** Inception híbrida adicionada depois do PRD v3 escrito. Não trate docs como bíblia.
+5. **`auto-grill` disponível mas não invocado.** Respeitei `feedback-no-random-invocation`.
+6. **A explicitude do prompt foi crítica.** Usuário perguntou "vc colocou o prompt na arquitetura?" — mostrei que sim, olhei de novo. Detalhe de explicação importa.
+7. **"faz fdp" como sinal.** Usuário frustrado = pare de perguntar, age. Reconhecer o sinal.
 
 ---
 
 ## Cross-references
 
-- [PLAN.md](PLAN.md) — **novo**, v3 (substitui v1)
+- [PRD.md](PRD.md) — **v3** com §14 fechado + §18 inception híbrida
+- [PLAN.md](PLAN.md) — **v1** com 7 phases
+- [CLAUDE.md](CLAUDE.md) — project glue (PRD + PLAN cross-refs)
+- [History.md](History.md) — narrativa consolidada + north star
+- [.specs/STATE.md](.specs/STATE.md) — spec state vigente
+- [.specs/ROADMAP.md](.specs/ROADMAP.md) — placeholder (próxima phase: grill PRD §18.6 → Phase 6)
+- [archive_handoff/handoff-session-2026-07-26-morning.md](archive_handoff/handoff-session-2026-07-26-morning.md) — manhã de hoje (3 marcos)
+- [archive_handoff/handoff-session-2026-07-24.md](archive_handoff/handoff-session-2026-07-24.md) — handoff anterior
 - [.specs/archive/memory-studio-v3/PLAN-v1.md](.specs/archive/memory-studio-v3/PLAN-v1.md) — v1 arquivado
 - [.specs/archive/memory-studio-v3/proposal-v2.md](.specs/archive/memory-studio-v3/proposal-v2.md) — v2 arquivado
-- [CLAUDE.md](CLAUDE.md) — project glue lean (foundation-focused)
-- [History.md](History.md) — narrativa consolidada + north star
-- [.specs/STATE.md](.specs/STATE.md) — spec state vigente (era foundation-complete)
-- [.specs/ROADMAP.md](.specs/ROADMAP.md) — placeholder (próxima phase = grill-with-docs → PRD)
-- [archive_handoff/handoff-session-2026-07-24.md](archive_handoff/handoff-session-2026-07-24.md) — handoff anterior
-- [archive_handoff/handoff-session-2026-07-23.md](archive_handoff/handoff-session-2026-07-23.md) — primeiro handoff
-- [archive_handoff/handoff-session-2026-07-23-post.md](archive_handoff/handoff-session-2026-07-23-post.md) — handoff pré-reframing
 
 ---
 
 ## Pra sessão futura (sessão fresca, contexto compactado)
 
-1. **Ler este handoff** — estado executivo de hoje (2026-07-26)
-2. **Ler `History.md`** — north star narrativa
-3. **Ler `PLAN.md`** — produto Memory Studio **revisado** (UI + inception pós-prompt + estado do agente). v3 é vigente, v1 e v2 arquivadas.
-4. **Ler `.specs/STATE.md`** — decisions (AD-001, AD-002) + handoff state
-5. **Ler `MEMORY.md`** (auto-injetado) — patterns de processo
-6. **Próximo passo NÃO é codar.** É humano responder as **6 decisões de PLAN-v3 §14** (stack UI, painel, modo integração, agentId, state.json, cache hit métrica).
-7. **Depois de grill nas 6:** brief de implementação fase 1 do PLAN-v3 §9 (Setup + Schema + Detector social = ~6-8h).
-8. **Não construir Memory Studio** sem autorização humana explícita + PRD fechado via grill das 6 + smoke test.
-9. **Não tocar v2.** Está arquivado com justificativa completa no Anexo do v3.
-10. **Em compactação:** MEMORY.md é âncora; este handoff secundário; History.md terciário.
+1. **Ler este handoff** — estado executivo final do dia 2026-07-26
+2. **Ler PRD.md** — decisões finalizadas, §18 inception híbrida
+3. **Ler PLAN.md** — 7 phases, deliverables, estimates
+4. **Ler .specs/STATE.md** — decisions + handoff state
+5. **Ler MEMORY.md** (auto-injetado) — patterns de processo
+6. **Próximo passo NÃO é codar.** É você decidir Phase 1 do PLAN pode começar, ou rodar grill em §18.6 antes.
+7. **Phase 6 (fast agent) NÃO começa sem grill prévio.** Diferencial competitivo, exige validação.
+8. **Auto-grill disponível** mas sob seu OK explícito.
+9. **Em compactação:** MEMORY.md é âncora; este handoff secundário; PRD.md terciário.
 
 ---
 
-**Status final:** pronto pra encerrar sessão. Humano vai responder amanhã.
+**Status final:** PRD + PLAN prontos. §14 fechado. §18 capturado. Aguardando decisão sobre Phase 1 vs grill §18.6.

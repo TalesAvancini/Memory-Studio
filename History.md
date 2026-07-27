@@ -32,7 +32,7 @@ related:
 
 **Se você é um agente novo lendo isto:** **não construa Memory Studio ainda**. Sua job é ajudar a terminar a fundação (skill v0.2 → v1, se aplicável) e/ou auxiliar no processo de PRD via `grill-with-docs`. Produção do produto só após autorização humana explícita + PRD fechado. Ver `MEMORY.md [[north-star-memory-studio]]` para detalhes.
 
-## Linha do tempo (12 marcos)
+## Linha do tempo (13 marcos)
 
 ### 1. Repo criado (2026-07-22)
 
@@ -146,6 +146,20 @@ related:
 - **Pragmaticamente pronta** — 4/5 sinais + Sinal 4 mechanism funcional
 - **Memory Studio:** modo exemplo/calibração. **PRODUÇÃO NÃO AUTORIZADA** — usuário não fechou PRD. Próxima fase de produção só após autorização explícita
 - **Próximo passo (sem autorização):** aguardar direcionamento do usuário
+
+### 13. Skill `auto-grill` criada (2026-07-26)
+
+Após PLAN-v3 (marco #12), humano pediu criação de uma variante autônoma do `grill-with-docs` do Matt Pocock — sem HITL síncrono, baseada no brainstorm do NotebookLM `f235cc21-...` (A2A grilling loop com Stakeholder Proxy).
+
+**Criado:** `.claude/skills/auto-grill/` (project-local, 12 arquivos: SKILL.md + README.md + 9 diagramas modulares + `prompts/to-roadmap.md`).
+
+**Diferença chave vs `grill-with-docs`:** Stakeholder Proxy (sub-agent com CONTEXT.md + ADRs + farol stable IDs) substitui humano síncrono. Confidence floor 0.7 hard (não advisory). Output = 4 files structured. CONTEXT.md é obrigatório. 100k tokens / 50 rounds caps (Dumb Zone guard).
+
+**Origem:** brainstorm de 2026-07-26 no NotebookLM `f235cc21-b876-483e-b8a7-20d6234fa35c`. Lenses Fog of War / Semantic Anchors / Tracer Bullets vieram do brainstorm; Cache Determinism / Hot-Path Purity são Memory-Studio-específicos (PLAN §6).
+
+**Test deferred** per `feedback-no-random-invocation` (criar ≠ invocar). Primeiro target: `.specs/features/system-message-builder/spec.md`.
+
+**4 memories novas:** `notebooklm-mattpocook-skills-id`, `auto-grill-skill-created`, `feedback-no-random-invocation`, `auto-grill-to-roadmap-prompt`.
 
 ---
 

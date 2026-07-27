@@ -90,11 +90,12 @@ Termos do **produto Memory Studio** (não usar até PRD fechar): Catalog, Skill,
 
 ## Cross-references
 
-- [PLAN.md](PLAN.md) — product spec completo (o que, pra quê, stack, decisões, MVP scope)
+- [PRD.md](PRD.md) — product spec (decisões, justificativas "por que X e não Y", escopo)
+- [PLAN.md](PLAN.md) — implementation phases (sequência, deliverables, estimates)
 - [History.md](History.md) — histórico narrativo + north star
 - [handoff-session.md](handoff-session.md) — executivo de sessão
 - [.specs/STATE.md](.specs/STATE.md) — spec state vigente (era `2026-07-foundation-complete`)
-- [.specs/ROADMAP.md](.specs/ROADMAP.md) — placeholder de roadmap (próxima phase: grill-with-docs → PRD)
+- [.specs/ROADMAP.md](.specs/ROADMAP.md) — placeholder de roadmap (próxima phase: grill PRD §18.6 → Phase 6)
 - [conversa-loop.md](conversa-loop.md) — brainstorm de processo (loop do Waldemar, Archify como farol)
 - [notebooklm skill](https://github.com/teng-lin/notebooklm-py) — CLI usada pra consultar o notebook acima
 - `tlc-spec-driven` (skill global) — base do ciclo Specify→Design→Tasks→Execute→Verify
