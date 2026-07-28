@@ -46,7 +46,7 @@
     :root,
     [data-theme="dark"] {
       --bg: #020617;
-      --grid: #1e293b;
+      --grid: transparent;
       --text: #ffffff;
       --text-muted: #94a3b8;
       --text-dim: #475569;
@@ -55,29 +55,28 @@
 
       --panel: rgba(15, 23, 42, 0.5);
       --panel-border: #1e293b;
-      --lane-fill: rgba(15, 23, 42, 0.22);
+      --lane-fill: transparent;
       --lane-stroke: #334155;
 
       --arrow: #64748b;
       --arrow-emphasis: #34d399;
 
-      /* Opaque mask color used behind semi-transparent component fills
-         so the arrows drawn underneath are properly hidden. */
-      --mask: #0f172a;
+      /* Transparent mask — boxes show page background through */
+      --mask: transparent;
 
-      --frontend-fill:    rgba(8, 51, 68, 0.4);
+      --frontend-fill:    transparent;
       --frontend-stroke:  #22d3ee;
-      --backend-fill:     rgba(6, 78, 59, 0.4);
+      --backend-fill:     transparent;
       --backend-stroke:   #34d399;
-      --database-fill:    rgba(76, 29, 149, 0.4);
+      --database-fill:    transparent;
       --database-stroke:  #a78bfa;
-      --cloud-fill:       rgba(120, 53, 15, 0.3);
+      --cloud-fill:       transparent;
       --cloud-stroke:     #fbbf24;
-      --security-fill:    rgba(136, 19, 55, 0.4);
+      --security-fill:    transparent;
       --security-stroke:  #fb7185;
-      --messagebus-fill:  rgba(251, 146, 60, 0.3);
+      --messagebus-fill:  transparent;
       --messagebus-stroke:#fb923c;
-      --external-fill:    rgba(30, 41, 59, 0.5);
+      --external-fill:    transparent;
       --external-stroke:  #94a3b8;
 
       --toolbar-bg:       rgba(15, 23, 42, 0.8);
@@ -89,7 +88,7 @@
 
     [data-theme="light"] {
       --bg: #f8fafc;
-      --grid: #e2e8f0;
+      --grid: transparent;
       --text: #0f172a;
       --text-muted: #64748b;
       --text-dim: #94a3b8;
@@ -97,27 +96,27 @@
 
       --panel: #ffffff;
       --panel-border: #e2e8f0;
-      --lane-fill: rgba(248, 250, 252, 0.65);
+      --lane-fill: transparent;
       --lane-stroke: #cbd5e1;
 
       --arrow: #94a3b8;
       --arrow-emphasis: #059669;
 
-      --mask: #ffffff;
+      --mask: transparent;
 
-      --frontend-fill:    rgba(34, 211, 238, 0.15);
+      --frontend-fill:    transparent;
       --frontend-stroke:  #0891b2;
-      --backend-fill:     rgba(52, 211, 153, 0.18);
+      --backend-fill:     transparent;
       --backend-stroke:   #059669;
-      --database-fill:    rgba(167, 139, 250, 0.2);
+      --database-fill:    transparent;
       --database-stroke:  #7c3aed;
-      --cloud-fill:       rgba(251, 191, 36, 0.18);
+      --cloud-fill:       transparent;
       --cloud-stroke:     #d97706;
-      --security-fill:    rgba(251, 113, 133, 0.15);
+      --security-fill:    transparent;
       --security-stroke:  #e11d48;
-      --messagebus-fill:  rgba(251, 146, 60, 0.15);
+      --messagebus-fill:  transparent;
       --messagebus-stroke:#ea580c;
-      --external-fill:    rgba(148, 163, 184, 0.18);
+      --external-fill:    transparent;
       --external-stroke:  #64748b;
 
       --toolbar-bg:       rgba(255, 255, 255, 0.92);
@@ -2933,7 +2932,8 @@
     /* ==========================================================
        SVG SEMANTIC CLASSES — use these instead of inline fill/stroke
        ========================================================== */
-    .c-grid       { stroke: var(--grid); fill: none; }
+    .c-grid       { stroke: var(--grid); fill: none; display: none; }
+    .c-grid, path.c-grid { display: none !important; }
     .c-mask       { fill: var(--mask); stroke: none; }
 
     .c-frontend   { fill: var(--frontend-fill);   stroke: var(--frontend-stroke); }
@@ -3430,6 +3430,7 @@
     svg[data-preset="blueprint"] .c-grid {
       stroke-dasharray: 1 3;
       opacity: 0.78;
+      display: none;
     }
     svg[data-preset="blueprint"] .c-region {
       fill: color-mix(in srgb, var(--cloud-fill) 58%, transparent);
