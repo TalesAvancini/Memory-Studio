@@ -88,6 +88,31 @@ Humano articulou a arquitetura em iteração:
 - `PLAN.md` (new): 7 phases (Schema, Detector, SDK, UI, Proxy, Fast agent, Tuning) com pre-reqs, deliverables, depends-on, estimates, justificativas
 - `CLAUDE.md` cross-refs atualizado pra apontar PRD.md + PLAN.md
 
+### Marco 6 — Documentação completa do auto-grill + descoberta sobre `to-spec` (noite)
+
+Humano voltou no fim do dia, percebeu que o round protocol do auto-grill estava espalhado em 3-4 artefatos (SKILL.md + diagram 01 + diagram 05 + regra 7) — remontável mas não plug-and-play pra outro modelo. Frase dele: *"documente tudo, quanto mais desenhado, menos chance de erro."*
+
+Durante a investigação, humano invocou `/mattpocock-skills:to-spec` na sessão atual. **Recusei rodar**: a janela tinha só meta-conversa sobre o skill (não feature speccing), `transcript.md` ainda não existia (auto-grill não havia rodado), e o resultado seria teatro — exatamente o "dock rot / sediment" que Pocock nomeia no source. Humano acolheu o push-back.
+
+**O que eu fiz (este turno noite):**
+
+- **Criei `assets/decisions-ui.html`** — UI standalone (zero deps, file://) pra revisar `decisions.md` em batches grandes (40+). Cards, filtros por lens/confiança/status, localStorage, exporta `<target>.auto-grill.decisions.respondido.md`. Campo `chapter` pra splits de capítulos.
+- **Criei 5 diagramas novos** (10-14), cada um respondendo uma pergunta diferente:
+  - `10-decisions-ui` — fluxo do gate com UI opcional
+  - `11-round-protocol` — stateDiagram-v2 do loop (resposta "em que estado estou?")
+  - `12-orchestrator-handoff` — decision tree do orquestrador por round (2 diagramas: flowchart + sequence)
+  - `13-quickstart-procedural` — sequenceDiagram CLI → gate (perspectiva do usuário)
+  - `14-fresh-subagent-invariant` — sequência mostrando fresh-sub-agents por round (regra 7 visualizada)
+- **Adicionei SKILL.md §Quickstart + §Round Protocol** — prosa canônica com cross-refs pros 5 diagramas.
+- **Descobri o que `to-spec` realmente faz** (verbatim do raw `to-spec/SKILL.md` + NotebookLM SSOT `f235cc21-...`). **CORREÇÃO IMPORTANTE**: `to-spec` **NÃO** lê `decisions.md` — lê `conversation context`. `transcript.md` é o surrogate. Apliquei correção em 5 lugares (SKILL.md, README.md, diagram 09, diagram 10, diagram 12).
+- **Criei 3 memories novas**: `auto-grill-decisions-ui-asset`, `to-spec-actual-behavior`, `auto-grill-round-protocol`.
+
+**Invariante crítica registrada em diagrama próprio (14):** cada round do auto-grill usa 2 sub-agentes **fresh**. Author(Interrogator) ≠ Author(Proxy). Sub-agentes são descartáveis; só o Orquestrador mantém estado via `transcript[N-1]`. Quebra auto-confirmação ("two AIs agreeing").
+
+**Implicação operacional:** PRD em capítulos precisa carregar **todos** os `transcript.md` na mesma janela antes de invocar `/to-spec` uma única vez. Re-rodar `to-spec` é fresh synthesis (não append, não overwrite) — comportamento depende da janela, não de preservar histórico.
+
+Humano fechou a sessão com: *"amanhã vemos mais alguns detalhes e teste."* Skill foundation agora está plug-and-play documentada.
+
 ---
 
 ## Estrutura documental vigente (4 docs canônicos)
@@ -187,10 +212,13 @@ Turn N+1 (augmentação cache-friendly):
   - `PLAN.md` → `PRD.md` (rename preservado)
   - `handoff-session.md` (2026-07-26-morning) → `archive_handoff/` (rename)
 - **Untracked (decidir):** `auto-grill/`, `.specs/features/system-message-builder/`, `Memory-Studio-Discuss.md`, `interrogado-content.txt`, `meu_CLAUDE.md`
+- **Modificações deste turno noite (auto-grill):** `SKILL.md`, `README.md`, `diagrams/09-companion-skills.md`, `diagrams/10-decisions-ui.md`
+- **Novos este turno noite (auto-grill):** `assets/decisions-ui.html`, `diagrams/11-round-protocol.md`, `diagrams/12-orchestrator-handoff.md`, `diagrams/13-quickstart-procedural.md`, `diagrams/14-fresh-subagent-invariant.md`
+- **Novos este turno noite (memory):** `to-spec-actual-behavior.md`, `auto-grill-round-protocol.md`, `auto-grill-decisions-ui-asset.md` (+ MEMORY.md atualizado com ponteiros)
 
 ---
 
-## Memórias (1 nova hoje)
+## Memórias (+3 noite, demais na tabela abaixo)
 
 | Memory | Por quê |
 |---|---|
@@ -205,6 +233,12 @@ Turn N+1 (augmentação cache-friendly):
 | `claude-settings-never-commit` | NUNCA commitar `.claude/settings.json` |
 | `skill-readiness-needs-evidence` | "Ready" só com evidência fim-a-fim — **justificativa direta pra cortar 38/41 v2** |
 | `bicycle-vs-training-wheels` | Humano prefere "bicicleta toda" — **v3 + inception híbrida é a versão completa** |
+| `auto-grill-skill-created` | Skill `.claude/skills/auto-grill/` criada. Variante autônoma de `grill-with-docs`. 8 lenses + floor 0.7 + Artifact Pack. **Aplicável pra grill §18.6.** |
+| `notebooklm-mattpocook-skills-id` | ID NotebookLM `f235cc21-...` SSOT do repo mattpocock/skills. Quando `gh`/raw.githubusercontent falham. |
+| `auto-grill-to-roadmap-prompt` | Prompt `prompts/to-roadmap.md` extrai `.specs/ROADMAP.md` da SPEC. Preenche gap auto-grill → tlc-roadmap-loop. |
+| `auto-grill-decisions-ui-asset` | HTML standalone pro gate. Zero deps. Cards + filtros + exporta `decisions.respondido.md`. |
+| `to-spec-actual-behavior` | `to-spec` NÃO lê decisions.md, lê conversation context (transcript.md surrogate). Re-invocation = fresh synthesis. |
+| `auto-grill-round-protocol` | Round protocol visual do auto-grill. Diagrams 11-14 (state machine + decision tree + sequence + regra 7 fresh-sub-agents). |
 
 ---
 
@@ -249,4 +283,4 @@ Turn N+1 (augmentação cache-friendly):
 
 ---
 
-**Status final:** PRD + PLAN prontos. §14 fechado. §18 capturado. Aguardando decisão sobre Phase 1 vs grill §18.6.
+**Status final:** PRD + PLAN prontos. §14 fechado. §18 capturado. Auto-grill **plug-and-play** documentado (5 diagramas novos + corrections + memories). Aguardando decisão sobre Phase 1 vs grill §18.6 + tests amanhã.

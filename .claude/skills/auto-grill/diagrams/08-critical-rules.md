@@ -80,8 +80,8 @@ flowchart TB
     r5 --> d5
     r6 --> d6
     r7 --> d7
-    r8 --> d2
-    r9 --> d3
+    r8 --> d8
+    r9 --> d9
 
     d1 --> R3
     d1 --> R4
@@ -94,6 +94,7 @@ flowchart TB
     d6 --> R4
     d7 --> R5
     d8 --> R10
+    d9 --> R2
 
     style r1 fill:#ffebee,stroke:#c62828
     style r2 fill:#ffebee,stroke:#c62828
