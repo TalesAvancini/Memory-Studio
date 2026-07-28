@@ -4,28 +4,142 @@
   "meta": {
     "title": "Layer 4a — Produto (Hot Path)",
     "subtitle": "Memory Studio · PRD v3.4 · UI + Server + Audit + Fast Agent",
-    "output": ".specs/architecture/layer-produto-hot.html"
+    "output": ".specs/architecture/layer-produto-hot.html",
+    "visual_preset": "classic",
+    "quality_profile": "standard"
   },
-  "layout": {"mode": "grid", "origin": [80, 100], "cols": 4, "gapX": 60, "gapY": 60, "cellW": 260, "cellH": 100},
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      80,
+      100
+    ],
+    "cols": 4,
+    "gapX": 60,
+    "gapY": 60,
+    "cellW": 260,
+    "cellH": 100
+  },
   "components": [
-    {"id": "ui-panel", "type": "frontend", "label": "UI Panel", "sublabel": "HTMX + Alpine · 5 telas", "row": 0, "col": 0, "tag": "control"},
-    {"id": "state-toggle", "type": "backend", "label": "/state/toggle", "sublabel": "critical_confirm enforcement", "row": 0, "col": 1, "tag": "endpoint"},
-    {"id": "state-json", "type": "database", "label": "state.json", "sublabel": ".memory-studio/state.json · toggle state per project", "row": 0, "col": 2, "tag": "git-tracked"},
-    {"id": "audit-buffer", "type": "backend", "label": "Audit Buffer", "sublabel": "async + batch flush + fail-open (D-007)", "row": 0, "col": 3, "tag": "D-007 ⚠"},
-    {"id": "fast-agent", "type": "backend", "label": "Fast Agent", "sublabel": "MiniMax-M2.7-highspeed · in-process", "row": 1, "col": 0, "tag": "Phase 6 ⚡"},
-    {"id": "intel-store", "type": "database", "label": "Intel Store", "sublabel": "{ agentState, nextNeeds, recentTopic }", "row": 1, "col": 1, "tag": "Phase 6 ⚡"},
-    {"id": "sdk", "type": "backend", "label": "@memory-studio/sdk", "sublabel": "TS ~50KB · zero deps", "row": 1, "col": 2, "tag": "client"},
-    {"id": "server", "type": "backend", "label": "Server", "sublabel": "Fastify · 7 endpoints", "row": 1, "col": 3, "tag": "edge"}
+    {
+      "id": "ui-panel",
+      "type": "frontend",
+      "label": "UI Panel",
+      "sublabel": "HTMX + Alpine · 5 telas",
+      "row": 0,
+      "col": 0,
+      "tag": "control"
+    },
+    {
+      "id": "state-toggle",
+      "type": "backend",
+      "label": "/state/toggle",
+      "sublabel": "critical_confirm enforcement",
+      "row": 0,
+      "col": 1,
+      "tag": "endpoint"
+    },
+    {
+      "id": "state-json",
+      "type": "database",
+      "label": "state.json",
+      "sublabel": ".memory-studio/state.json · toggle state per project",
+      "row": 0,
+      "col": 2,
+      "tag": "git-tracked"
+    },
+    {
+      "id": "audit-buffer",
+      "type": "backend",
+      "label": "Audit Buffer",
+      "sublabel": "async + batch flush + fail-open (D-007)",
+      "row": 0,
+      "col": 3,
+      "tag": "D-007 ⚠"
+    },
+    {
+      "id": "fast-agent",
+      "type": "backend",
+      "label": "Fast Agent",
+      "sublabel": "MiniMax-M2.7-highspeed · in-process",
+      "row": 1,
+      "col": 0,
+      "tag": "Phase 6 ⚡"
+    },
+    {
+      "id": "intel-store",
+      "type": "database",
+      "label": "Intel Store",
+      "sublabel": "{ agentState, nextNeeds, recentTopic }",
+      "row": 1,
+      "col": 1,
+      "tag": "Phase 6 ⚡"
+    },
+    {
+      "id": "sdk",
+      "type": "backend",
+      "label": "@memory-studio/sdk",
+      "sublabel": "TS ~50KB · zero deps",
+      "row": 1,
+      "col": 2,
+      "tag": "client"
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "Server",
+      "sublabel": "Fastify · 7 endpoints",
+      "row": 1,
+      "col": 3,
+      "tag": "edge"
+    }
   ],
   "boundaries": [
-    {"kind": "region", "label": "Memory Studio MVP — Hot Path", "wraps": ["ui-panel", "state-toggle", "state-json", "audit-buffer", "fast-agent", "intel-store", "sdk", "server"]}
+    {
+      "kind": "region",
+      "label": "Memory Studio MVP — Hot Path",
+      "wraps": [
+        "ui-panel",
+        "state-toggle",
+        "state-json",
+        "audit-buffer",
+        "fast-agent",
+        "intel-store",
+        "sdk",
+        "server"
+      ]
+    }
   ],
   "connections": [
-    {"from": "ui-panel", "to": "state-toggle", "label": "toggle UI"},
-    {"from": "state-toggle", "to": "state-json", "label": "write"},
-    {"from": "sdk", "to": "server", "label": "POST /augment"},
-    {"from": "server", "to": "audit-buffer", "label": "enqueue"},
-    {"from": "fast-agent", "to": "intel-store", "label": "write Intel"},
-    {"from": "fast-agent", "to": "intel-store", "label": "write Intel"}
+    {
+      "from": "ui-panel",
+      "to": "state-toggle",
+      "label": "toggle UI"
+    },
+    {
+      "from": "state-toggle",
+      "to": "state-json",
+      "label": "write"
+    },
+    {
+      "from": "sdk",
+      "to": "server",
+      "label": "POST /augment"
+    },
+    {
+      "from": "server",
+      "to": "audit-buffer",
+      "label": "enqueue"
+    },
+    {
+      "from": "fast-agent",
+      "to": "intel-store",
+      "label": "write Intel"
+    },
+    {
+      "from": "fast-agent",
+      "to": "intel-store",
+      "label": "write Intel"
+    }
   ]
 }

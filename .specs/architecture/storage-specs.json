@@ -4,23 +4,124 @@
   "meta": {
     "title": "Layer 5 — Storage",
     "subtitle": "Memory Studio · PRD v3.4 · SQLite + YAML + ONNX (runtime data)",
-    "output": ".specs/architecture/layer-storage-specs.html"
+    "output": ".specs/architecture/layer-storage-specs.html",
+    "visual_preset": "classic",
+    "quality_profile": "standard"
   },
-  "layout": {"mode": "grid", "origin": [60, 100], "cols": 5, "gapX": 50, "gapY": 60, "cellW": 240, "cellH": 100},
+  "layout": {
+    "mode": "grid",
+    "origin": [
+      60,
+      100
+    ],
+    "cols": 5,
+    "gapX": 50,
+    "gapY": 60,
+    "cellW": 240,
+    "cellH": 100
+  },
   "components": [
-    {"id": "sqlite", "type": "database", "label": "SQLite", "sublabel": "catalog + audit_events + intel tables", "row": 0, "col": 0, "tag": "data"},
-    {"id": "sqlite-fts5", "type": "database", "label": "SQLite FTS5", "sublabel": "full-text virtual table", "row": 0, "col": 1, "tag": "engine"},
-    {"id": "sqlite-vec", "type": "database", "label": "sqlite-vec", "sublabel": "vector engine 384d", "row": 0, "col": 2, "tag": "engine"},
-    {"id": "embedding-model", "type": "cloud", "label": "Embedding Model", "sublabel": "multilingual-e5-small ONNX 384d", "row": 0, "col": 3, "tag": "ONNX"},
-    {"id": "catalog-yaml", "type": "external", "label": "Catalog YAML", "sublabel": "config/catalog/<id>.yaml · git-versioned", "row": 0, "col": 4, "tag": "versioned"}
+    {
+      "id": "sqlite",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "catalog + audit_events + intel tables",
+      "row": 0,
+      "col": 0,
+      "tag": "data"
+    },
+    {
+      "id": "sqlite-fts5",
+      "type": "database",
+      "label": "SQLite FTS5",
+      "sublabel": "full-text virtual table",
+      "row": 0,
+      "col": 1,
+      "tag": "engine"
+    },
+    {
+      "id": "sqlite-vec",
+      "type": "database",
+      "label": "sqlite-vec",
+      "sublabel": "vector engine 384d",
+      "row": 0,
+      "col": 2,
+      "tag": "engine"
+    },
+    {
+      "id": "embedding-model",
+      "type": "cloud",
+      "label": "Embedding Model",
+      "sublabel": "multilingual-e5-small ONNX 384d",
+      "row": 0,
+      "col": 3,
+      "tag": "ONNX"
+    },
+    {
+      "id": "catalog-yaml",
+      "type": "external",
+      "label": "Catalog YAML",
+      "sublabel": "config/catalog/<id>.yaml · git-versioned",
+      "row": 0,
+      "col": 4,
+      "tag": "versioned"
+    }
   ],
   "boundaries": [
-    {"kind": "region", "label": "Storage (runtime data)", "wraps": ["sqlite", "sqlite-fts5", "sqlite-vec", "embedding-model", "catalog-yaml"]}
+    {
+      "kind": "region",
+      "label": "Storage (runtime data)",
+      "wraps": [
+        "sqlite",
+        "sqlite-fts5",
+        "sqlite-vec",
+        "embedding-model",
+        "catalog-yaml"
+      ]
+    }
   ],
   "connections": [
-    {"from": "catalog-yaml", "to": "sqlite", "label": "load (build-index)", "route": "orthogonal-v", "via": [[1220, 80], [180, 80]]},
-    {"from": "sqlite", "to": "sqlite-fts5", "label": "FTS5 virtual table", "route": "orthogonal-v", "via": [[180, 80], [640, 80]]},
-    {"from": "sqlite", "to": "sqlite-vec", "label": "vec virtual table"},
-    {"from": "embedding-model", "to": "sqlite-vec", "label": "writes 384d vectors"}
+    {
+      "from": "catalog-yaml",
+      "to": "sqlite",
+      "label": "load (build-index)",
+      "route": "orthogonal-v",
+      "via": [
+        [
+          1220,
+          80
+        ],
+        [
+          180,
+          80
+        ]
+      ]
+    },
+    {
+      "from": "sqlite",
+      "to": "sqlite-fts5",
+      "label": "FTS5 virtual table",
+      "route": "orthogonal-v",
+      "via": [
+        [
+          180,
+          80
+        ],
+        [
+          640,
+          80
+        ]
+      ]
+    },
+    {
+      "from": "sqlite",
+      "to": "sqlite-vec",
+      "label": "vec virtual table"
+    },
+    {
+      "from": "embedding-model",
+      "to": "sqlite-vec",
+      "label": "writes 384d vectors"
+    }
   ]
 }
