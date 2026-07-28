@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Auto-Grill — Decisions UI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #fafafa;
+    --panel: #ffffff;
+    --ink: #1f2328;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --line-strong: #c7cad1;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --ok: #16a34a;
+    --warn: #d97706;
+    --bad: #dc2626;
+    --loop: #7c3aed;
+    --neutral: #6b7280;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 4px 12px rgba(0,0,0,.06);
+    --radius: 10px;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --ink: #e6edf3;
+      --muted: #8b949e;
+      --line: #30363d;
+      --line-strong: #484f58;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 12px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.5; }
+  body { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+  header h1 { margin: 0 0 4px 0; font-size: 22px; }
+  header .subtitle { color: var(--muted); margin: 0 0 8px 0; font-size: 14px; }
+  header .hint { color: var(--muted); font-size: 13px; font-style: italic; margin: 0; }
+
+  section, details { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; box-shadow: var(--shadow); }
+  details summary { cursor: pointer; font-weight: 600; user-select: none; }
+  details[open] summary { margin-bottom: 12px; }
+
+  textarea { width: 100%; min-height: 180px; font-family: var(--mono); font-size: 12px; padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); resize: vertical; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 8px; }
+  .row label { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); flex: 1 1 200px; min-width: 0; }
+  .row label input, .row label select { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font-size: 14px; font-family: inherit; }
+
+  button { padding: 8px 14px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--panel); color: var(--ink); font-size: 13px; cursor: pointer; font-family: inherit; font-weight: 500; }
+  button:hover { background: var(--bg); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+  button.primary:hover { background: var(--accent-hover); }
+  button.danger { color: var(--bad); border-color: var(--bad); }
+  button.danger:hover { background: var(--bad); color: white; }
+
+  #filters { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .filter-group { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+  .filter-group .filter-label { font-weight: 600; color: var(--muted); margin-right: 4px; min-width: 80px; }
+  .filter-group label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+  .filter-group input[type="checkbox"] { margin: 0; cursor: pointer; }
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tab { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--ink); cursor: pointer; font-size: 13px; font-family: inherit; }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: white; }
+
+  .counters { display: flex; gap: 16px; color: var(--muted); font-size: 13px; }
+  .counters span { padding: 4px 10px; background: var(--bg); border-radius: 6px; }
+
+  main { display: grid; gap: 12px; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--neutral); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+  .card.conf-alta { border-left-color: var(--ok); }
+  .card.conf-media { border-left-color: var(--warn); }
+  .card.conf-baixa { border-left-color: var(--bad); }
+  .card.status-approved { background: linear-gradient(to right, rgba(22,163,74,.06), transparent 30%); }
+  .card.status-rejected { background: linear-gradient(to right, rgba(220,38,38,.06), transparent 30%); opacity: 0.7; }
+  .card.status-loop { background: linear-gradient(to right, rgba(124,58,237,.06), transparent 30%); }
+
+  .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+  .card-num { font-family: var(--mono); font-size: 12px; color: var(--muted); background: var(--bg); padding: 2px 8px; border-radius: 4px; }
+  .card-lens { font-weight: 600; font-size: 13px; }
+  .conf-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .conf-badge.alta { background: rgba(22,163,74,.12); color: var(--ok); }
+  .conf-badge.media { background: rgba(217,119,6,.12); color: var(--warn); }
+  .conf-badge.baixa { background: rgba(220,38,38,.12); color: var(--bad); }
+
+  .card-question { font-size: 15px; font-weight: 500; margin: 4px 0 10px 0; }
+  .card-decision { font-size: 13px; color: var(--ink); margin: 6px 0; padding-left: 10px; border-left: 2px solid var(--line); }
+  .card-decision strong { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 2px; }
+  .card-analogy { font-size: 13px; color: var(--muted); font-style: italic; margin: 8px 0; padding: 6px 10px; background: var(--bg); border-radius: 6px; }
+  .card-analogy::before { content: "💡 "; }
+  .card-tracer { font-family: var(--mono); font-size: 12px; color: var(--accent); margin: 6px 0; }
+
+  .card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .card-actions button { padding: 6px 12px; font-size: 12px; }
+  .card-actions button.selected.approve { background: var(--ok); border-color: var(--ok); color: white; }
+  .card-actions button.selected.reject { background: var(--bad); border-color: var(--bad); color: white; }
+  .card-actions button.selected.loop { background: var(--loop); border-color: var(--loop); color: white; }
+  .reason-input { width: 100%; margin-top: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font-size: 13px; font-family: inherit; }
+
+  #export-bar { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--panel); padding: 12px 16px; border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); margin-top: 16px; z-index: 10; }
+  #export-bar > div { display: flex; gap: 8px; align-items: center; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+  .empty-state code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-family: var(--mono); font-size: 12px; }
+
+  kbd { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; font-family: var(--mono); font-size: 11px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔥 Auto-Grill — Decisions UI</h1>
+  <p class="subtitle">Cole o <code>decisions.md</code>, marque aprovações por card, exporte o resultado.</p>
+  <p class="hint" id="status-line">Sem dados — cole o arquivo abaixo.</p>
+</header>
+
+<section id="meta-form">
+  <div class="row">
+    <label>Target <input id="meta-target" placeholder="ex: spec.md"></label>
+    <label>Capítulo <input id="meta-chapter" placeholder="opcional, ex: 01-setup"></label>
+    <label>Data <input id="meta-date" type="date"></label>
+  </div>
+  <div class="row">
+    <label>Confidence floor <input id="meta-floor" type="number" min="0" max="1" step="0.05" value="0.7"></label>
+    <label>Rounds run <input id="meta-rounds" type="number" min="0" value="0"></label>
+    <label>Outcome
+      <select id="meta-outcome">
+        <option value="pending-human">pending-human</option>
+        <option value="approved">approved</option>
+        <option value="rejected">rejected</option>
+        <option value="halted-dumb-zone">halted-dumb-zone</option>
+      </select>
+    </label>
+  </div>
+</section>
+
+<section id="filters">
+  <div class="filter-group">
+    <span class="filter-label">Lens:</span>
+    <div id="lens-tabs" class="tabs"></div>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Confiança:</span>
+    <label><input type="checkbox" data-conf-key="alta" checked> 🟢 alta</label>
+    <label><input type="checkbox" data-conf-key="media" checked> 🟡 média</label>
+    <label><input type="checkbox" data-conf-key="baixa" checked> 🔴 baixa</label>
+  </div>
+  <div class="filter-group">
+    <span class="filter-label">Status:</span>
+    <label><input type="checkbox" data-status-key="undecided" checked> ⏳ pendentes</label>
+    <label><input type="checkbox" data-status-key="approved" checked> ✅ aprovados</label>
+    <label><input type="checkbox" data-status-key="rejected" checked> ❌ rejeitados</label>
+    <label><input type="checkbox" data-status-key="loop" checked> 🔁 loop-branch</label>
+  </div>
+  <div class="counters">
+    <span id="counter-total">0 linhas</span>
+    <span id="counter-visible">0 visíveis</span>
+    <span id="counter-pending">0 pendentes</span>
+  </div>
+</section>
+
+<details id="paste-section">
+  <summary>📋 Colar / trocar decisions.md</summary>
+  <textarea id="paste-input" placeholder="Cole aqui o conteúdo do decisions.md (cabeçalho + tabela + seções). O parser extrai a tabela e ignora o resto."></textarea>
+  <div class="row">
+    <button id="load-paste-btn" class="primary">Carregar</button>
+    <button id="reset-all-btn" class="danger">Resetar tudo</button>
+  </div>
+</details>
+
+<main id="cards">
+  <div class="empty-state">
+    <p><strong>Nenhum dado ainda.</strong></p>
+    <p>Abra o painel acima, cole o conteúdo do <code>decisions.md</code> e clique em <strong>Carregar</strong>.</p>
+    <p style="font-size: 12px; margin-top: 16px;">Dica: estado é salvo em localStorage, então F5 não perde trabalho.</p>
+  </div>
+</main>
+
+<footer id="export-bar">
+  <div>
+    <span id="footer-summary">Sem dados carregados.</span>
+  </div>
+  <div>
+    <button id="clear-actions-btn">Limpar ações</button>
+    <button id="export-btn" class="primary" disabled>📥 Exportar decisions.respondido.md</button>
+  </div>
+</footer>
+
+<script>
+(function() {
+  'use strict';
+
+  const STORAGE_KEY = 'auto-grill-decisions-ui-v1';
+  const LENS_OPTIONS = [
+    'Fog of War', 'Semantic Anchors', 'Tracer Bullets', 'Cache Determinism',
+    'Latency / Hot-Path Purity', 'Latency / Hot-Path', 'Edge Cases',
+    'Contradictions', 'Vague Decisions', '_no-lens'
+  ];
+
+  const defaultState = () => ({
+    meta: {
+      target: '',
+      chapter: '',
+      date: new Date().toISOString().slice(0, 10),
+      confidenceFloor: 0.7,
+      rounds: 0,
+      outcome: 'pending-human',
+    },
+    rawText: '',
+    rows: [],
+    actions: {},
+    filters: {
+      lens: 'all',
+      conf: { alta: true, media: true, baixa: true },
+      status: { undecided: true, approved: true, rejected: true, loop: true },
+    },
+  });
+
+  let state = defaultState();
+
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { console.warn(e); }
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      state = { ...defaultState(), ...parsed };
+      state.meta = { ...defaultState().meta, ...(parsed.meta || {}) };
+      state.filters = {
+        ...defaultState().filters,
+        ...(parsed.filters || {}),
+        conf: { ...defaultState().filters.conf, ...(parsed.filters?.conf || {}) },
+        status: { ...defaultState().filters.status, ...(parsed.filters?.status || {}) },
+      };
+    } catch (e) { console.warn('load failed', e); }
+  }
+
+  function confKey(text) {
+    const t = (text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (t.startsWith('alt')) return 'alta';
+    if (t.startsWith('med')) return 'media';
+    return 'baixa';
+  }
+
+  function splitRow(line) {
+    let s = line.trim();
+    if (s.startsWith('|')) s = s.slice(1);
+    if (s.endsWith('|')) s = s.slice(0, -1);
+    return s.split('|').map(c => c.trim());
+  }
+
+  function parseMarkdown(text) {
+    const meta = { ...state.meta };
+    const dateMatch = text.match(/\*\*Date:\*\*\s*(.+)/i);
+    if (dateMatch) meta.date = dateMatch[1].trim();
+    const floorMatch = text.match(/\*\*Confidence floor:\*\*\s*([\d.]+)/i);
+    if (floorMatch) meta.confidenceFloor = parseFloat(floorMatch[1]);
+    const roundsMatch = text.match(/\*\*Rounds run:\*\*\s*(\d+)/i);
+    if (roundsMatch) meta.rounds = parseInt(roundsMatch[1], 10);
+    const outcomeMatch = text.match(/\*\*Outcome:\*\*\s*(\S+)/i);
+    if (outcomeMatch) meta.outcome = outcomeMatch[1].trim();
+    const targetMatch = text.match(/^#\s*Auto-Grill Decisions\s*[—–-]\s*(.+)$/m);
+    if (targetMatch) meta.target = targetMatch[1].trim();
+
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.startsWith('|') && l.endsWith('|') && l.includes('|'));
+    const rows = [];
+    for (let i = 2; i < lines.length; i++) {
+      const cells = splitRow(lines[i]);
+      if (cells.length < 4) continue;
+      const num = parseInt(cells[0], 10);
+      if (isNaN(num)) continue;
+      rows.push({
+        num,
+        lens: cells[1] || '',
+        question: cells[2] || '',
+        decision: cells[3] || '',
+        analogy: cells[4] || '',
+        tracer: cells[5] || '',
+        confidence: cells[6] || '',
+      });
+    }
+    return { meta, rows };
+  }
+
+  function getStatus(rowNum) {
+    return state.actions[rowNum]?.status || 'undecided';
+  }
+
+  function setAction(rowNum, status, reason) {
+    if (status === 'undecided') {
+      delete state.actions[rowNum];
+    } else {
+      state.actions[rowNum] = { status, reason: reason || '' };
+    }
+    save();
+    renderCards();
+  }
+
+  function buildLensTabs() {
+    const tabs = ['all'];
+    const lensCounts = new Map();
+    for (const r of state.rows) {
+      const l = r.lens || '_no-lens';
+      lensCounts.set(l, (lensCounts.get(l) || 0) + 1);
+    }
+    for (const [lens, count] of [...lensCounts.entries()].sort()) {
+      tabs.push(lens);
+    }
+    const container = document.getElementById('lens-tabs');
+    container.innerHTML = '';
+    for (const t of tabs) {
+      const btn = document.createElement('button');
+      btn.className = 'tab' + (state.filters.lens === t ? ' active' : '');
+      const label = t === 'all' ? `Todas (${state.rows.length})` : `${t} (${lensCounts.get(t)})`;
+      btn.textContent = label;
+      btn.dataset.lens = t;
+      btn.addEventListener('click', () => {
+        state.filters.lens = t;
+        save();
+        renderCards();
+      });
+      container.appendChild(btn);
+    }
+  }
+
+  function cardFilter(row) {
+    const lens = row.lens || '_no-lens';
+    if (state.filters.lens !== 'all' && state.filters.lens !== lens) return false;
+    const ck = confKey(row.confidence);
+    if (!state.filters.conf[ck]) return false;
+    const status = getStatus(row.num);
+    if (!state.filters.status[status]) return false;
+    return true;
+  }
+
+  function escapeMd(s) {
+    return (s || '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  }
+
+  function exportMarkdown() {
+    if (state.rows.length === 0) { alert('Nenhum dado pra exportar.'); return; }
+    const m = state.meta;
+    const targetLabel = m.target || '(sem target)';
+    const approved = state.rows.filter(r => getStatus(r.num) === 'approved');
+    const rejected = state.rows.filter(r => getStatus(r.num) === 'rejected');
+    const loop = state.rows.filter(r => getStatus(r.num) === 'loop');
+    const pending = state.rows.filter(r => getStatus(r.num) === 'undecided');
+    const outcome = pending.length === 0 ? (m.outcome === 'pending-human' ? 'approved' : m.outcome) : 'pending-human';
+
+    let md = '';
+    md += `# Auto-Grill Decisions — ${targetLabel}\n\n`;
+    if (m.chapter) md += `**Chapter:** ${m.chapter}\n`;
+    md += `**Date:** ${m.date}\n`;
+    md += `**Confidence floor:** ${m.confidenceFloor}\n`;
+    md += `**Rounds run:** ${m.rounds}\n`;
+    md += `**Outcome:** ${outcome}\n`;
+    md += `**UI export:** decisions-ui.html @ ${new Date().toISOString()}\n\n`;
+
+    if (approved.length > 0) {
+      md += `| # | Lens | Pergunta | Decisão | Analogia (não-especialista) | Tracer Bullet | Confiança |\n`;
+      md += `|---|------|----------|---------|----------------------------|---------------|-----------|\n`;
+      for (const r of approved) {
+        md += `| ${r.num} | ${escapeMd(r.lens)} | ${escapeMd(r.question)} | ${escapeMd(r.decision)} | ${escapeMd(r.analogy)} | ${escapeMd(r.tracer)} | ${escapeMd(r.confidence)} |\n`;
+      }
+      md += '\n';
+    }
+
+    if (rejected.length > 0) {
+      md += `## Rejected items (restart loop with focus)\n`;
+      for (const r of rejected) {
+        const a = state.actions[r.num];
+        const reason = a?.reason ? ` → ${a.reason}` : '';
+        md += `- #${r.num} — ${r.lens}: "${escapeMd(r.question)}"${reason}\n`;
+      }
+      md += '\n';
+    }
+
+    if (loop.length > 0) {
+      md += `## Loop-branch items (next run focuses here)\n`;
+      for (const r of loop) {
+        const a = state.actions[r.num];
+        const reason = a?.reason ? ` → ${a.reason}` : ` → revisit`;
+        md += `- #${r.num} — ${r.lens}: "${escapeMd(r.question)}"${reason}\n`;
+      }
+      md += '\n';
+    }
+
+    if (pending.length > 0 && state.outcome === 'pending-human') {
+      md += `## Pending (still undecided)\n`;
+      for (const r of pending) {
+        md += `- #${r.num} — ${r.lens}: "${escapeMd(r.question)}"\n`;
+      }
+      md += '\n';
+    }
+
+    const researchMatch = state.rawText.match(/##\s*Research tickets[\s\S]*?(?=\n## |\n*$)/);
+    if (researchMatch) {
+      md += researchMatch[0].trim() + '\n\n';
+    }
+
+    const safeTarget = (m.target || 'decisions').replace(/[^a-zA-Z0-9._-]/g, '_') || 'decisions';
+    let filename = safeTarget;
+    if (filename.endsWith('.md')) filename = filename.slice(0, -3);
+    if (m.chapter) filename += `.ch-${m.chapter}`;
+    filename += '.auto-grill.decisions.respondido.md';
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function renderCards() {
+    const container = document.getElementById('cards');
+    if (state.rows.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p><strong>Nenhum dado ainda.</strong></p><p>Cole o <code>decisions.md</code> no painel acima.</p></div>';
+      document.getElementById('export-btn').disabled = true;
+      document.getElementById('status-line').textContent = 'Sem dados — cole o arquivo abaixo.';
+      return;
+    }
+
+    const visible = state.rows.filter(cardFilter);
+    const total = state.rows.length;
+    const pending = state.rows.filter(r => getStatus(r.num) === 'undecided').length;
+    document.getElementById('counter-total').textContent = `${total} linhas`;
+    document.getElementById('counter-visible').textContent = `${visible.length} visíveis`;
+    document.getElementById('counter-pending').textContent = `${pending} pendentes`;
+    document.getElementById('export-btn').disabled = false;
+    document.getElementById('status-line').textContent = `${total} linhas carregadas · ${pending} ainda pendentes · ${state.meta.target || '(sem target)'}`;
+    document.getElementById('footer-summary').textContent = `${pending} pendentes de ${total}`;
+
+    if (visible.length === 0) {
+      container.innerHTML = '<div class="empty-state"><p>Nenhuma linha atende os filtros atuais.</p></div>';
+      return;
+    }
+
+    container.innerHTML = '';
+    let currentLens = null;
+    for (const r of visible) {
+      const lens = r.lens || '_(sem lens)_';
+      if (lens !== currentLens) {
+        const h = document.createElement('h3');
+        h.style.cssText = 'margin: 16px 0 4px; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--line); padding-bottom: 4px;';
+        h.textContent = lens;
+        container.appendChild(h);
+        currentLens = lens;
+      }
+      container.appendChild(renderCard(r));
+    }
+  }
+
+  function renderCard(r) {
+    const ck = confKey(r.confidence);
+    const status = getStatus(r.num);
+    const card = document.createElement('div');
+    card.className = `card conf-${ck} status-${status}`;
+    card.innerHTML = `
+      <div class="card-header">
+        <div>
+          <span class="card-num">#${r.num}</span>
+          <span class="card-lens">${escapeHtml(r.lens)}</span>
+        </div>
+        <span class="conf-badge ${ck}">${ck === 'baixa' ? '⚠ ' : ''}${escapeHtml(r.confidence.toLowerCase())}</span>
+      </div>
+      <div class="card-question">${escapeHtml(r.question)}</div>
+      <div class="card-decision"><strong>Decisão do Proxy</strong>${escapeHtml(r.decision)}</div>
+      ${r.analogy ? `<div class="card-analogy">${escapeHtml(r.analogy)}</div>` : ''}
+      ${r.tracer ? `<div class="card-tracer">${escapeHtml(r.tracer)}</div>` : ''}
+      <div class="card-actions">
+        <button class="approve ${status === 'approved' ? 'selected' : ''}" data-action="approved">✅ Aprovar</button>
+        <button class="reject ${status === 'rejected' ? 'selected' : ''}" data-action="rejected">❌ Rejeitar</button>
+        <button class="loop ${status === 'loop' ? 'selected' : ''}" data-action="loop">🔁 Loop-branch</button>
+        ${status !== 'undecided' ? `<button data-action="reset">↺ Resetar</button>` : ''}
+      </div>
+      ${(status === 'rejected' || status === 'loop') ? `<input class="reason-input" placeholder="Motivo (opcional, vai pro decisions.respondido.md)" value="${escapeHtml(state.actions[r.num]?.reason || '')}" data-num="${r.num}" data-status="${status}" />` : ''}
+    `;
+    card.querySelectorAll('[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        if (action === 'reset') {
+          setAction(r.num, 'undecided');
+        } else {
+          setAction(r.num, action);
+        }
+      });
+    });
+    const reasonInput = card.querySelector('.reason-input');
+    if (reasonInput) {
+      reasonInput.addEventListener('input', (e) => {
+        const current = state.actions[r.num];
+        if (current) {
+          current.reason = e.target.value;
+          save();
+        }
+      });
+    }
+    return card;
+  }
+
+  function escapeHtml(s) {
+    return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function syncMetaForm() {
+    document.getElementById('meta-target').value = state.meta.target || '';
+    document.getElementById('meta-chapter').value = state.meta.chapter || '';
+    document.getElementById('meta-date').value = state.meta.date || '';
+    document.getElementById('meta-floor').value = state.meta.confidenceFloor;
+    document.getElementById('meta-rounds').value = state.meta.rounds;
+    document.getElementById('meta-outcome').value = state.meta.outcome;
+  }
+
+  function bindMetaForm() {
+    const ids = ['meta-target', 'meta-chapter', 'meta-date', 'meta-floor', 'meta-rounds', 'meta-outcome'];
+    const keys = ['target', 'chapter', 'date', 'confidenceFloor', 'rounds', 'outcome'];
+    for (let i = 0; i < ids.length; i++) {
+      const el = document.getElementById(ids[i]);
+      el.addEventListener('input', () => {
+        const v = el.type === 'number' ? parseFloat(el.value) : el.value;
+        state.meta[keys[i]] = isNaN(v) && el.type === 'number' ? 0 : v;
+        save();
+      });
+      el.addEventListener('change', () => {
+        const v = el.type === 'number' ? parseFloat(el.value) : el.value;
+        state.meta[keys[i]] = isNaN(v) && el.type === 'number' ? 0 : v;
+        save();
+      });
+    }
+  }
+
+  function bindFilters() {
+    document.querySelectorAll('[data-conf-key]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        state.filters.conf[cb.dataset.confKey] = cb.checked;
+        save();
+        renderCards();
+      });
+    });
+    document.querySelectorAll('[data-status-key]').forEach(cb => {
+      cb.addEventListener('change', () => {
+        state.filters.status[cb.dataset.statusKey] = cb.checked;
+        save();
+        renderCards();
+      });
+    });
+    document.querySelectorAll('[data-conf-key], [data-status-key]').forEach(cb => {
+      cb.checked = cb.dataset.confKey
+        ? state.filters.conf[cb.dataset.confKey]
+        : state.filters.status[cb.dataset.statusKey];
+    });
+  }
+
+  function bindPaste() {
+    document.getElementById('load-paste-btn').addEventListener('click', () => {
+      const text = document.getElementById('paste-input').value;
+      if (!text.trim()) { alert('Texto vazio.'); return; }
+      const { meta, rows } = parseMarkdown(text);
+      state.meta = { ...state.meta, ...meta };
+      state.rawText = text;
+      state.rows = rows;
+      save();
+      syncMetaForm();
+      buildLensTabs();
+      renderCards();
+      document.getElementById('paste-section').removeAttribute('open');
+    });
+
+    document.getElementById('reset-all-btn').addEventListener('click', () => {
+      if (!confirm('Resetar TUDO (metadados + linhas + ações)?')) return;
+      state = defaultState();
+      save();
+      syncMetaForm();
+      document.querySelectorAll('[data-conf-key], [data-status-key]').forEach(cb => { cb.checked = true; });
+      document.getElementById('paste-input').value = '';
+      buildLensTabs();
+      renderCards();
+    });
+  }
+
+  function bindExport() {
+    document.getElementById('export-btn').addEventListener('click', exportMarkdown);
+    document.getElementById('clear-actions-btn').addEventListener('click', () => {
+      if (!confirm('Limpar todas as ações (approved/rejected/loop) e voltar pra pendentes?')) return;
+      state.actions = {};
+      save();
+      renderCards();
+    });
+  }
+
+  load();
+  syncMetaForm();
+  bindMetaForm();
+  bindFilters();
+  bindPaste();
+  bindExport();
+  buildLensTabs();
+  renderCards();
+})();
+</script>
+
+<script>
+(function() {
+    const B64 = "IyBBdXRvLUdyaWxsIERlY2lzaW9ucyDigJQgUFJELm1kICsgUExBTi5tZCAoY29tcG9zaXRlKQoKKipEYXRlOioqIDIwMjYtMDctMjgKKipSdW4gSUQ6KiogMjAyNi0wNy0yOF8wMjMwNTAKKipDb25maWRlbmNlIGZsb29yOioqIDAuNwoqKlJvdW5kcyBydW4gc28gZmFyOioqIDgKKipPdXRjb21lOioqIGh1bWFuLWdhdGUg4oaSICoqYWxsIDkgZGVjaXNpb25zIGFwcHJvdmVkIDIwMjYtMDctMjgqKiDihpIgc2tpbGwgaGFsdGVkCgoqKlN0YXR1czoqKiBza2lsbCBzdG9wcGVkLiBQZXIgU0tJTEwubWQgwqdHYXRlIGNvbnRyYWN0LCB0YXJnZXQgZG9jIChQUkQvUExBTikgTkVWRVIgbW9kaWZpZWQgYnkgc2tpbGwg4oCUIGh1bWFuIGFwcGxpZXMgZWRpdHMgcG9zdC1nYXRlLiBXYWl0aW5nIGZvciBkb3duc3RyZWFtIGhhbmRvZmYgKHRvLXNwZWMsIG1hbnVhbCBlZGl0cywgb3Igc3RvcCkuCgotLS0KCnwgIyB8IExlbnMgfCBQZXJndW50YSB8IERlY2lzw6NvIHwgQW5hbG9naWEgKG7Do28tZXNwZWNpYWxpc3RhKSB8IFRyYWNlciBCdWxsZXQgfCBDb25maWFuw6dhIHwKfC0tLXwtLS0tLS18LS0tLS0tLS0tLXwtLS0tLS0tLS18LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLXwtLS0tLS0tLS0tLS0tLS18LS0tLS0tLS0tLS18CnwgMSB8IEZvZyBvZiBXYXIgfCBQUkQgwqcxMC4xIG1hcmNhIGluY2VwdGlvbiBow61icmlkYSBjb21vIENPTkRJQ0lPTkFMIGFvIGdyaWxsIMKnMTYuNiwgbWFzIFBMQU4gaGFyZGNvZGUgUGhhc2UgNiAoOC0xMmgpIGUgUGhhc2UgNyBwcmUtcmVxcyAoUGhhc2UgNSwgNikuIFF1YWwgZmFsbGJhY2sgZXhpc3RlPyB8ICoqTkVOSFVNLioqIFBMQU4gbsOjbyBkZWZpbmUgYnJhbmNoIEIuIFNlIGdyaWxsIHJlcHJvdmFyLCBQUkQgwqcxMC4xIG1hbmRhICJtb3ZlciBwcmEgdjMuMiIgbWFzIFBMQU4gbsOjbyBjb2RpZmljYS4gQ2FjaGUgaGl0IMKnMTAuMi40IGRlcml2w6F2ZWwgc8OzIGRlIFBoYXNlIDUgKGJ5dGUtc3RyaW5nICsgY2FjaGVfY29udHJvbCBlcGhlbWVyYWwgKyBsb2cgZXN0cnV0dXJhZG8pIOKAlCBQaGFzZSA2IG7Do28gw6kgbmVjZXNzw6FyaW8gcHJhIGVzc2EgdmFsaWRhw6fDo28uIEVzdGltYXRpdmE6IGRyb3AgUGhhc2UgNiAoOC0xMmgpIOKGkiBUb3RhbCAyOC0zOWguIHwgw4kgY29tbyB1bWEgY2FzYSBjb20gcGxhbnRhIGRlIDIgYW5kYXJlcyBtYXMgZnVuZGHDp8OjbyBxdWUgYWd1ZW50YSBzw7MgMS4gU2UgbyAywrogYW5kYXIgcmVwcm92YXIsIGEgcGxhbnRhIGRpeiAidGlyYSBvIDLCuiBhbmRhciIgbWFzIGEgZnVuZGHDp8OjbyBhaW5kYSBleGlnZSBvIHBpbGFyIGV4dHJhLiB8IOKGkiBicmFuY2ggQiBleHBsw61jaXRvIG5vIFBMQU4gKG1hbnVhbCBlZGl0IHBvc3QtZ2F0ZSkgfCBhbHRhIHwKfCAyIHwgRm9nIG9mIFdhciAoZHJpZnQpIHwgQXDDs3MgdjMuMSByZW51bWJlciDCpzE44oaIsqcxNiwgbyBQTEFOLm1kIGZvaSBzaW5jcm9uaXphZG8/IHwgKipOw4NPLioqIDMgcmVmZXLDqm5jaWFzIHN0YWxlIGNvbmZpcm1hZGFzOiBQTEFOLm1kOjI0MSAoIsKnMTguNiIpLCBQTEFOLm1kOjI1NCAoIsKnMTguNCIpLCBQTEFOLm1kOjM3NSAoIsKnMTguNiIpLiBQUkQgdjMuMSBmcm9udG1hdHRlciByZWdpc3RyYSBvIHJlbnVtYmVyIG1hcyBQTEFOIG7Do28gYWNvbXBhbmhvdS4gfCDDiSB0aXBvIGF0dWFsaXphciBvIMOtbmRpY2UgZGUgdW0gbGl2cm8gbWFzIGVzcXVlY2VyIGRlIHJlbnVtZXJhciBvcyBjYXDDrXR1bG9zIOKAlCBsZWl0b3Igc2VndWUgw61uZGljZSBlIGNhaSBubyBsdWdhciBlcnJhZG8uIHwg4oaSIGZpeCBtYW51YWw6IHN1YnN0aXR1aXIgwqcxOC54IOKGkiDCpzE2LnggZW0gUExBTi5tZCAoMyBvY29ycsOqbmNpYXMpIHwgYWx0YSB8CnwgMyB8IENvbnRyYWRpY3Rpb25zIHwgUExBTi5tZCB0ZW0gZHJpZnQgaW50ZXJubzogUGhhc2UgMSBib2R5IEw5MyBkaXogMy00aCBtYXMgdGFibGUgTDMwMiBkaXogNC01aC4gUGhhc2UgNSBib2R5IEwyMTQgZGl6IDUtN2ggbWFzIHRhYmxlIEwzMDYgZGl6IDYtOGguIFF1YWwgw6kgY2Fuw7RuaWNvIHBybyB0b3RhbCAzNS01MGg/IHwgKipUYWJlbGEgw6kgY2Fuw7RuaWNhLioqIENhcHRpb24gZXhwbGljYSBvcyArMWggKEZUUzUvc3FsaXRlLXZlYy9zY2hlbWEgdmVyc2lvbmluZyBlbSBQaGFzZSAxOyByZXRyaWV2YWwgcnVudGltZSArIGRvbmUgY3JpdGVyaWEgZW0gUGhhc2UgNSkuIFRvdGFsIDM2LTUxaCBkZXJpdmEgZGEgdGFiZWxhLCBlbnTDo28gYm9keSBzZWN0aW9ucyBlc3TDo28gc3RhbGUuICoqUHJvY2VzcyBnYXA6Kiogc3BlYyBuw6NvIGRlZmluZSBjb252ZW7Dp8OjbyBib2R5LXZzLXRhYmxlIHF1YW5kbyBjb25mbGl0YW0uIHwgw4kgY29tbyB1bWEgcGxhbmlsaGEgb25kZSBvIHJlc3VtbyBkaXogWCBtYXMgYXMgbGluaGFzIHNvbWFtIFkg4oCUIGUgbmluZ3XDqW0gZG9jdW1lbnRvdSBxdWFsIMOpIGZvbnRlIGRlIHZlcmRhZGUuIHwg4oaSIGZpeDogUExBTi5tZCBMOTMgIjMtNGgiIOKGkiAiNC01aCI7IEwyMTQgIjUtN2giIOKGkiAiNi04aCIuIEFkaWNpb25hciBub3RhIGVtIENMQVVERS5tZCDCp0RvYyByb2xlczogUExBTiB0YWJsYSDDqSBjYW7DtG5pY2EgcHJhIGVzdGltYXRlcywgYm9keSDDqSBkZXNjcml0aXZvLiB8IGFsdGEgfAp8IDQgfCBWYWd1ZSBEZWNpc2lvbnMgfCBDcml0aWNhbCBSdWxlczogc2VtcHJlIGF0aXZhcyAoaW11dMOhdmVpcykgb3UgZGVzYXRpdsOhdmVpcyBjb20gY29uZmlybWHDp8Ojbz8gfCAqKkNvbnRyYXRvIMOpIGNvZXJlbnRlLCBOw4NPIHZhZ28uKiogMyBsb2NhaXMgKFBSRCDCpzYuMiwgwqcxMC4xOyBQTEFOIMKnMTApIGNvbmNvcmRhbTogdG9nZ2xlIG9mZiBTRU0gY29uZmlybWHDp8OjbyDDqSBibG9xdWVhZG87IGNvbSBjb25maXJtYcOnw6NvIGV4cGzDrWNpdGEsIMOpIHBlcm1pdGlkby4gU2VydmVyIGVuZm9yw6dhIChQaGFzZSA1KSArIFVJIGdhdGUgKFBoYXNlIDQpLiBSZWNvbWVuZGFyICJzZW1wcmUgaW11dMOhdmVpcyIgw6kgTUFJUyByZXN0cml0aXZvIHF1ZSBvIHNwZWMgZGl6LiB8IMOJIGNvbW8gdW0gYm90w6NvIGRlIHDDom5pY28g4oCUIG7Do28gcG9kZSBzZXIgYXBlcnRhZG8gc2VtIHF1ZXJlciwgbWFzIGNvbSBpbnRlbsOnw6NvIGNsYXJhLCBmdW5jaW9uYS4gfCDihpIgbmVuaHVtYSBhY3Rpb24gKGNvbnRyYXRvIGrDoSBlc3TDoSBjbGFybyk7IG9wY2lvbmFsOiBleHBsaWNpdGFyIMKnNi4yIGNvbSBleGVtcGxvICgiUnVsZSBjcml0aWNhbDp0cnVlLCB1c3XDoXJpbyBkaWdpdGEgJ0NPTkZJUk1BUicgbm8gcGFpbmVsIOKGkiB0b2dnbGUgb2ZmIGFjZWl0byIpIHByYSBlbGltaW5hciBhbWJpZ3VpZGFkZSB8IGFsdGEgfAp8IDUgfCBTZW1hbnRpYyBBbmNob3JzIHwgImludGVsIiBhcGFyZWNlIDIwKyB2ZXplcyAodmVyaWZpY2FkbzogMjEgPSBQUkQ6MTUgKyBQTEFOOjYpIGNvbW8gZXN0cnV0dXJhIGNlbnRyYWwgbWFzIG51bmNhIGZvcm1hbG1lbnRlIGRlZmluaWRvLiDDiSBmcmVlLXRleHQsIHRhZ3MsIGNsYXNzaWZpY2HDp8Ojbz8gfCAqKk5FTkhVTUEgZGVmaW5pw6fDo28gZm9ybWFsLioqIMOabmljYSAiZGVzY3Jpw6fDo28iIMOpIGZyYXNlIGxpdnJlIGVtIFBSRCDCpzM6MTM0ICgnYWdlbnRlIHTDoSBlbSBYLCB2YWkgcHJlY2lzYXIgZGUgWScpLiBTY2hlbWEgYXVzZW50ZSBkZSBQUkQgwqcxNiwgwqcxNy4yLCBDT05URVhULm1kIMKnNS4gKipXcml0ZXItcmVhZGVyIGNvbnRyYWN0OioqIGZhc3QgYWdlbnQgKMKnMTYuMikgZXNjcmV2ZSBpbnRlbDsgbWF0Y2ggcGlwZWxpbmUgKMKnMyBUdXJuIE4rMSkgbMOqLiBTZW0gc2NoZW1hLCBQaGFzZSA2IHZhaSBpbnZlbnRhciBlIHF1ZWJyYXIgY29udHJhdG8uIHwgw4kgY29tbyBjb21iaW5hciBxdWUgbyBnYXLDp29tIHRyYXogImEgY29taWRhIiBzZW0gZGVmaW5pciBzZSDDqSBwaXp6YSBvdSBzdXNoaSDigJQgY2xpZW50ZSBlc3BlcmEgdW0sIGdhcsOnb20gdHJheiBvdXRyby4gfCDihpIgYWRpY2lvbmFyIHR5cGVkIHNjaGVtYSBlbSBQUkQgwqcxNjogYGludGVsID0geyBhZ2VudFN0YXRlOiBzdHJpbmcsIG5leHROZWVkczogc3RyaW5nW10sIHJlY2VudFRvcGljOiBzdHJpbmcgfWAgKyBhZGljaW9uYXIgZGVmaW5pw6fDo28gZW0gZ2xvc3NhcnkgwqcxNy4yICsgQ09OVEVYVC5tZCDCpzUgYW50ZXMgZGUgUGhhc2UgNiBjb21lw6dhciB8IGFsdGEgfAp8IDYgfCBDYWNoZSBEZXRlcm1pbmlzbSB8IFNwZWMgbWFuZGEgYnl0ZS1zdHJpbmcgZGV0ZXJtaW7DrXN0aWNvIGRvIHN5c3RlbSBtZXNzYWdlIG1hcyBOw4NPIG1hbmRhIG9yZGVyaW5nIGNhbsO0bmljbyBkb3MgYXJyYXlzIG1hdGNoZWRTa2lsbHMvUnVsZXMvUGVyc29uYXMuIFJSRiB0aWVzIHBvZGVtIHF1ZWJyYXIgYnl0ZS1kaWZmZXJlbnRseSBlbnRyZSBydW5zPyB8ICoqU0lNIOKAlCBnYXAgcmVhbC4qKiBTY2hlbWEgwqc3LjEgZGVjbGFyYSBhcnJheXMgc2VtICdzb3J0ZWQgYnknIC8gJ2luc2VydGlvbiBvcmRlcicgLyBzdGFibGUtc29ydCBhbm5vdGF0aW9uLiBSUkYgdGllcyBjb20gY29zaW5lIDM4NGQgcGVydG8gZG8gdGhyZXNob2xkIHPDo28gY29tdW5zOyBzZW0gdGllYnJlYWsgZXhwbMOtY2l0bywgVjggb3JkZXJpbmcgdmFyaWEgZW50cmUgcHJvY2Vzc2VzL3ZlcnNpb25zLiBDYWNoZSBrZXkgZG8gcHJvdmlkZXIgPSBieXRlLXN0cmluZyAoQ09OVEVYVCDCpzQpLCBlbnTDo28gb3JkZXJpbmcgZ2FwIHF1ZWJyYSBjYWNoZSBzaWxlbmNpb3NhbWVudGUuIHwgw4kgY29tbyBvcmRlbmFyIHVtYSBsaXN0YSBkZSBtw7pzaWNhcyBwb3Igc2NvcmUgbWFzIG7Do28gZGVmaW5pciBvIHF1ZSBmYXplciBjb20gZW1wYXRlcyDigJQgcGxheWxpc3QgbXVkYSBlbnRyZSBleGVjdcOnw7Vlcy4gfCDihpIgYWRpY2lvbmFyIHRpZWJyZWFrZXIgZXhwbMOtY2l0bzogYEFycmF5LnNvcnQoKGEsYikgPT4gYS5pZC5sb2NhbGVDb21wYXJlKGIuaWQpKWAgZW0gdG9wLUsgKFBoYXNlIDUpLiBBZGljaW9uYXIgZG9uZSBjcml0ZXJpb246IFNIQTI1NiBieXRlLXN0cmluZyBlcXVhbGl0eSBlbnRyZSBpZGVudGljYWwtaW5wdXQgcmVxdWVzdHMgcXVlIHByb2JlIG9yZGVyaW5nIHN0YWJpbGl0eS4gfCBhbHRhIHwKfCA3IHwgTGF0ZW5jeSBIb3QtUGF0aCB8IE8gYC9hdWdtZW50YCBhZ3VhcmRhIGEgcGVyc2lzdMOqbmNpYSBTUUxpdGUgZG8gYXVkaXQgbG9nIGFudGVzIGRlIGVuY2FtaW5oYXIgYW8gcHJvdmVkb3I/IHwgKipOw4NPIGV4cGxpY2l0YW1lbnRlLCBtYXMgw6kgZ2FwIGltcGzDrWNpdG8uKiogRG9jcyBuw6NvIHVzYW0gJ3N5bmMnLydhd2FpdCcvJ2Jsb2NraW5nJyBwYXJhIGF1ZGl0LiBCdWRnZXQgcDUwPDUwbXMvcDk5PDIwMG1zIChQUkQgwqcxMC4yKSDDqSBpbmNvbXBhdMOtdmVsIGNvbSBzeW5jIHdyaXRlIHBvciByZXF1ZXN0LiBBdWRpdCBhcGFyZWNlIGNvbW8gZG9uZS1jcml0ZXJpb24gKFBMQU46MTk4LDIwNyksIG7Do28gcHLDqS1jb25kacOnw6NvLiDCpzEwLjMgKHNlY3VyaXR5KSBuw6NvIGV4aWdlIHRhbXBlci1ldmlkZW5jZSB2aWEgc3luYy4gKipSZWNvbWVuZGHDp8OjbzoqKiBidWZmZXIgYXNzw61uY3Jvbm8gKyBiYXRjaCBmbHVzaCArIGZhaWwtb3BlbiBjb25zaXN0ZW50ZSBjb20gYnVkZ2V0LiB8IMOJIGNvbW8gYW5vdGFyIHVtYSBsaWdhw6fDo28gbm8gY2FkZXJubyBhbnRlcyBkZSBhdGVuZGVyIOKAlCBhdHJhc2EgbyBjbGllbnRlIHNlbSBiZW5lZsOtY2lvLiB8IOKGkiBkZWNsYXJhciBleHBsaWNpdGFtZW50ZSBlbSBQTEFOLm1kIFBoYXNlIDU6ICdhdWRpdCBsb2cgdmlhIGFzeW5jIGJ1ZmZlciBjb20gYmF0Y2ggZmx1c2ggKGEgY2FkYSBOIGV2ZW50cyBvdSBUIG1zKSwgZmFpbC1vcGVuIGVtIGVycm8gZGUgd3JpdGUgKHJlcXVlc3QgbsOjbyBibG9xdWVpYSknLiBBZGljaW9uYXIgaW52YXJpYW50IGVtIFBSRCDCpzguIHwgbcOpZGlhIHwKfCA4IHwgRWRnZSBDYXNlcyB8IFdIRU4gYGFjdGl2ZUNhdGFsb2dgIGlzIGVtcHR5LCBxdWFsIMOpIG8gY29tcG9ydGFtZW50byBleGF0byBkZSBgL2F1Z21lbnRgPyBGb3J3YXJkIHVuY2hhbmdlZCwgaW5qZWN0IGRlZmF1bHRzLCBvdSByZWplY3Q/IHwgKipHQVAg4oCUIHNlbSBjb250cmF0byBkZWZpbmlkby4qKiBFbnVtIGBlbXB0eVJlYXNvbmAgYXR1YWw6IGBsb3dfY29uZmlkZW5jZSBcfCBzb2NpYWwgXHwgdGltZW91dCBcfCBudWxsYC4gTsOjbyBjb2JyZSBhY3RpdmVDYXRhbG9nIHZhemlvLiBNb2RvIHByb21wdC1vbmx5IChQUkQgwqcxMC4xIzkpIGNvYnJlIGNvbnRleHQgbnVsbCwgbsOjbyBjYXRhbG9nIHN0YXRlLiBQaGFzZSA1IHJlcXVlciB0b3AtSyByZXRyaWV2YWwgc2VtIHplcm8tbWF0Y2ggYnJhbmNoLiBQcmluY8OtcGlvIGZhaWwtb3BlbiAoZXJybyDihpIgZm9yd2FyZCB1bm1vZGlmaWVkKSBzdXBvcnRhIHVuY2hhbmdlZCBmb3J3YXJkLiB8IMOJIGNvbW8gY2hlZ2FyIG5vIHJlc3RhdXJhbnRlIGUgbyBjYXJkw6FwaW8gZXN0YXIgdmF6aW8g4oCUIHNlbSByZWdyYSBkbyBxdWUgc2VydmlyIChvdSBuw6NvIHNlcnZpcikuIHwg4oaSIGRlY2xhcmFyIGNvbnRyYXRvOiAyMDAgKyBzeXN0ZW0gbWVzc2FnZSBkZXRlcm1pbsOtc3RpY28gdW5hdWdtZW50ZWQgKyBtYXRjaGVkIGFycmF5cyB2YXppb3MgKyBgZW1wdHlSZWFzb246ICJub19hY3RpdmVfaXRlbXMiYCAobm92byBlbnVtIHZhbHVlKSArIHdhcm5pbmcvYXVkaXQgbWFya2VyICsgZm9yd2FyZCB1bmNoYW5nZWQuIENhY2hlIGtleSBlc3TDoXZlbCBwb3JxdWUgYnl0ZS1zdHJpbmcgw6kgZGV0ZXJtaW7DrXN0aWNvLiB8IG3DqWRpYSB8CnwgOSB8IFRyYWNlciBCdWxsZXRzIHwgUFJEIMKnNy4yIGxpc3RhIDUgZW5kcG9pbnRzIE1WUCAoL2NhdGFsb2csIC9jYXRhbG9nL3JlYnVpbGQsIC9hdWRpdCwgL2F1ZGl0L3N1bW1hcnksIC9oZWFsdGgpIG1hcyBuZW5odW1hIFBMQU4gcGhhc2Ugb3Mgb3ducyBleHBsaWNpdGFtZW50ZS4gT25kZSBlbnRyZWdhbT8gfCAqKkdBUCDigJQgb3duZXJzaGlwIGltcGzDrWNpdG8uKiogUGhhc2UgMSBjb25zdHLDs2kgY2F0YWxvZyBEQVRBIChzY2hlbWEsIEZUUzUsIHNxbGl0ZS12ZWMsIGJ1aWxkLWluZGV4KSBzZW0gZW5kcG9pbnQgc3VyZmFjZS4gUGhhc2UgNSBjb25zdHLDs2kgZm9yd2FyZGVyIEhUVFAsIGVudMOjbyB0b2RvcyBvcyA1IGVuZHBvaW50cyBkZXZlbSBzYWlyIGzDoS4gQWNjZXB0YW5jZSBtYXBwaW5nIGNvYnJlIGF1ZGl0IG1hcyBuw6NvIG1lbmNpb25hIC9oZWFsdGgg4oCUIHF1ZSDDqSBjcsOtdGljbyBwcmEgwqcxMC4yIChsYXRlbmN5IGdhdGluZykuIHwgw4kgY29tbyBhbnVuY2lhciA1IHBvcnRhcyBudW0gcHLDqWRpbyBtYXMgZXNxdWVjZXIgZGUgY29sb2NhciBhcyBwb3J0YXMgbmEgcGxhbnRhIOKAlCBxdWVtIGNoZWdhLCBmaWNhIGRvIGxhZG8gZGUgZm9yYS4gfCDihpIgZGVjbGFyYXIgb3duZXJzaGlwIGV4cGzDrWNpdG8gZW0gUExBTi5tZCBQaGFzZSA1IGRlbGl2ZXJhYmxlczogJy9jYXRhbG9nLCAvY2F0YWxvZy9yZWJ1aWxkIChQaGFzZSA1IHJvdXRlcyArIFBoYXNlIDEgZGF0YSksIC9hdWRpdCwgL2F1ZGl0L3N1bW1hcnksIC9oZWFsdGggKFBoYXNlIDUpJy4gQWRpY2lvbmFyIC9oZWFsdGggYW8gYWNjZXB0YW5jZSBtYXBwaW5nIMKnMTAgbWFwcGluZy4gfCBhbHRhIHwKCi0tLQoKIyMgUmVqZWN0ZWQgaXRlbXMgKHJlc3RhcnQgbG9vcCB3aXRoIGZvY3VzKQoqKG5vbmUgeWV0IOKAlCBhbGwgNCBkZWNpc2lvbnMgaGF2ZSBldmlkZW5jZSArIGhpZ2ggY29uZmlkZW5jZSkqCgojIyBSZXNlYXJjaCB0aWNrZXRzIChBRkspCioobm9uZSB5ZXQpKgoKLS0tCgojIyBMb29wIHN1bW1hcnkKCi0gKipSb3VuZHMgcnVuOioqIDggKDggbGVuc2VzOiBmb2ctb2Ytd2FyLCBjb250cmFkaWN0aW9ucywgdmFndWUtZGVjaXNpb25zLCBzZW1hbnRpYy1hbmNob3JzLCBjYWNoZS1kZXRlcm1pbmlzbSwgbGF0ZW5jeS1ob3QtcGF0aCwgZWRnZS1jYXNlcywgdHJhY2VyLWJ1bGxldHMpCi0gKipEZWNpc2lvbnM6KiogOSBhY2NlcHRlZCwgMCByZWplY3RlZCwgMCByZXNlYXJjaCB0aWNrZXRzCi0gKipDb25maWRlbmNlOioqIDcgaGlnaCAo4omlIDAuOSksIDIgbWVkaXVtICh+MC43LTAuOSkg4oCUIGFsbCBwYXNzIGZsb29yCi0gKipIYWx0IHJlYXNvbjoqKiBodW1hbi1nYXRlIChhbGwgOCBsZW5zZXMgZXhoYXVzdGVkKQotICoqQXJ0aWZhY3RzOioqCiAgLSBgUFJELVBMQU4uYXV0by1ncmlsbC50cmFuc2NyaXB0Lm1kYCAoZnVsbCBBMkEgbG9nKQogIC0gYFBSRC1QTEFOLmF1dG8tZ3JpbGwuZGVjaXNpb25zLm1kYCAodGhpcyBmaWxlKQogIC0gYFBSRC1QTEFOLmF1dG8tZ3JpbGwubG9vcC1zdGF0ZS5qc29uYCAocmVzdW1lIHN0YXRlKQogIC0gYC5zcGVjcy9ESVNDT1ZFUklFUy5tZGAgKDkgZW50cmllcyBhcHBlbmRlZDogRC0wMDEgdG8gRC0wMDkpCgoqKlBlciBTS0lMTC5tZCDCp0dhdGUgY29udHJhY3Q6Kiogb3JjaGVzdHJhdG9yIGRvZXMgTk9UIG1vZGlmeSBQUkQvUExBTi4gQWxsIHRhcmdldC1kb2MgZWRpdHMgYXJlIG1hbnVhbCwgcG9zdC1nYXRlLiBObyBhdXRvLWludm9rZSBvZiBgdG8tc3BlY2AgLyBgdG8tcm9hZG1hcGAgLyBgdG8tdGlja2V0c2AuCgoqKlNldmVyaXR5IGRpc3RyaWJ1dGlvbiBvZiBkaXNjb3ZlcmllczoqKgotIDEgY3JpdGljYWwgKEQtMDA3OiBhdWRpdCBsb2cgYm91bmRhcnkpCi0gNyBzdHJ1Y3R1cmFsIChELTAwMSwgRC0wMDIsIEQtMDAzLCBELTAwNSwgRC0wMDYsIEQtMDA4LCBELTAwOSkKLSAxIGNvc21ldGljIChELTAwNCk=";
+    const CONTENT = atob(B64);
+    let tries = 0;
+    function bootstrap() {
+        const ta = document.getElementById('paste-input');
+        const btn = document.getElementById('load-paste-btn');
+        if (!ta || !btn) {
+            if (tries++ < 30) { setTimeout(bootstrap, 100); return; }
+            return;
+        }
+        ta.value = CONTENT;
+        btn.click();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', bootstrap);
+    } else {
+        bootstrap();
+    }
+})();
+</script>
+</body>
+</html>

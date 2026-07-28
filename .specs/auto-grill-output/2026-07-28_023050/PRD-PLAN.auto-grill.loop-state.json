@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "skill": "auto-grill",
+  "run_id": "2026-07-28_023050",
+  "started_at": "2026-07-28T02:30:50Z",
+  "target": {
+    "type": "composite",
+    "docs": ["PRD.md", "PLAN.md"],
+    "slug": "PRD-PLAN"
+  },
+  "config": {
+    "confidence_floor": 0.7,
+    "max_rounds": 50,
+    "lenses": "all",
+    "context_dir": ".",
+    "output_dir": ".specs/auto-grill-output/2026-07-28_023050/",
+    "composite": true
+  },
+  "context_md": ".specs/auto-grill-output/2026-07-28_023050/CONTEXT.md",
+  "farol": {
+    "checked": true,
+    "exists": false,
+    "action": "skip (regra 10)"
+  },
+  "lens_progress": {
+    "fog-of-war": {"status": "complete", "rounds_spent": 1, "exhausted": true, "decisions": [1, 2]},
+    "semantic-anchors": {"status": "complete", "rounds_spent": 1, "exhausted": true, "decisions": [5]},
+    "tracer-bullets": {"status": "complete", "rounds_spent": 1, "exhausted": true, "decisions": [9]},
+    "cache-determinism": {"status": "complete", "rounds_spent": 1, "exhausted": true, "decisions": [6]},
+    "latency-hot-path": {"status": "complete", "rounds_spent": 1, "exhausted": true, "decisions": [7]},
+    "edge-cases": {"status": "complete", "rounds_spent": 1, "exhausted": true, "decisions": [8]},
+    "contradictions": {"status": "complete", "rounds_spent": 1, "exhausted": true, "decisions": [3]},
+    "vague-decisions": {"status": "complete", "rounds_spent": 1, "exhausted": true, "decisions": [4]}
+  },
+  "current_lens": null,
+  "current_round": 8,
+  "decisions": [
+    {
+      "id": 1,
+      "lens": "fog-of-war",
+      "round": 1,
+      "question": "PRD §10.1 marca inception híbrida CONDICIONAL ao grill §16.6, mas PLAN hardcode Phase 6 (8-12h) e Phase 7 pre-reqs (Phase 5, 6). Qual fallback existe?",
+      "decision": "NENHUM. PLAN não define branch B. Se grill reprovar, PRD §10.1 manda 'mover pra v3.2' mas PLAN não codifica. Cache hit §10.2.4 derivável só de Phase 5 (byte-string + cache_control ephemeral + log estruturado) — Phase 6 não é necessário pra essa validação. Estimativa: drop Phase 6 (8-12h) → Total 28-39h.",
+      "confidence": "high",
+      "evidence": ["PRD.md:505", "PRD.md:745-758", "PLAN.md:226", "PLAN.md:276", "PLAN.md:309"],
+      "tracer": "branch B explícito no PLAN (manual edit post-gate)",
+      "status": "accepted",
+      "approval": "approved 2026-07-28",
+      "applied": true
+    },
+    {
+      "id": 2,
+      "lens": "fog-of-war",
+      "round": 1,
+      "subtype": "drift",
+      "question": "Após v3.1 renumber §18→§16, o PLAN.md foi sincronizado?",
+      "decision": "NÃO. 3 referências stale: PLAN.md:241 ('§18.6'), PLAN.md:254 ('§18.4'), PLAN.md:375 ('§18.6').",
+      "confidence": "high",
+      "evidence": ["PLAN.md:241", "PLAN.md:254", "PLAN.md:375", "PRD.md:13 (frontmatter revision log)"],
+      "tracer": "fix manual: substituir §18.x → §16.x em PLAN.md (3 ocorrências)",
+      "status": "accepted",
+      "approval": "approved 2026-07-28",
+      "applied": false,
+      "applied_note": "5 edits já aplicados antes do 'calma' (drift §18→§16 x3 + body estimates x2). Skill protocol: target doc nunca é tocado pelo skill — humanos aplicam pós-gate. Confirmar com humano se mantém ou reverte."
+    },
+    {
+      "id": 3,
+      "lens": "contradictions",
+      "round": 2,
+      "question": "PLAN.md tem drift interno: Phase 1 body L93 diz 3-4h mas table L302 diz 4-5h. Phase 5 body L214 diz 5-7h mas table L306 diz 6-8h. Qual é canônico pro total 35-50h?",
+      "decision": "Tabela é canônica (caption explica +1h). Total 36-51h deriva da tabela. Body sections stale. Process gap: nenhum doc define convenção body-vs-table.",
+      "confidence": "high",
+      "tracer": "fix: PLAN.md L93 '3-4h' → '4-5h'; L214 '5-7h' → '6-8h'. Adicionar nota em CLAUDE.md §Doc roles.",
+      "status": "accepted",
+      "approval": "approved 2026-07-28",
+      "applied": false
+    },
+    {
+      "id": 4,
+      "lens": "vague-decisions",
+      "round": 3,
+      "question": "Critical Rules: sempre ativas (imutáveis) ou desativáveis com confirmação?",
+      "decision": "Contrato é coerente, NÃO vago. 3 locais concordam: toggle off SEM confirmação é bloqueado; com confirmação explícita, é permitido. Server enforça (Phase 5) + UI gate (Phase 4).",
+      "confidence": "high",
+      "tracer": "nenhuma action obrigatória; opcional: explicitar §6.2 com exemplo",
+      "status": "accepted",
+      "approval": "approved 2026-07-28",
+      "applied": false,
+      "note": "Decisão recusa Interrogator recommendation. Contrato já está coerente."
+    },
+    {
+      "id": 5,
+      "lens": "semantic-anchors",
+      "round": 4,
+      "question": "'intel' aparece 20+ vezes (21 = PRD:15 + PLAN:6) como estrutura central mas nunca formalmente definido. É free-text, tags, classificação?",
+      "decision": "Nenhuma definição formal. Única 'descrição' é frase livre em PRD §3:134. Schema ausente de PRD §16, §17.2, CONTEXT.md §5. Phase 6 vai inventar se não definir antes.",
+      "confidence": "high",
+      "tracer": "adicionar typed schema em PRD §16: intel = { agentState, nextNeeds, recentTopic } + glossary §17.2 + CONTEXT.md §5 antes de Phase 6",
+      "status": "accepted",
+      "approval": "approved 2026-07-28",
+      "applied": false
+    },
+    {
+      "id": 6,
+      "lens": "cache-determinism",
+      "round": 5,
+      "question": "Spec manda byte-string determinístico do system message mas NÃO manda ordering canônico dos arrays matchedSkills/Rules/Personas. RRF ties podem quebrar byte-differently entre runs?",
+      "decision": "SIM — gap real. Schema §7.1 declara arrays sem 'sorted by' / 'insertion order' / stable-sort annotation. RRF ties com cosine 384d perto do threshold quebram cache key byte-string silenciosamente.",
+      "confidence": "high",
+      "tracer": "adicionar tiebreaker explícito: Array.sort((a,b) => a.id.localeCompare(b.id)) em top-K (Phase 5). Adicionar done criterion: SHA256 byte-string equality.",
+      "status": "accepted",
+      "approval": "approved 2026-07-28",
+      "applied": false
+    },
+    {
+      "id": 7,
+      "lens": "latency-hot-path",
+      "round": 6,
+      "question": "O /augment aguarda a persistência SQLite do audit log antes de encaminhar ao provedor?",
+      "decision": "NÃO explicitamente, mas é gap implícito. Docs não usam 'sync'/'await'/'blocking' para audit. Budget p50<50ms/p99<200ms é incompatível com sync write por request.",
+      "confidence": "medium",
+      "tracer": "declarar explicitamente em PLAN.md Phase 5: audit log via async buffer com batch flush (a cada N events ou T ms), fail-open em erro de write. Adicionar invariant em PRD §8.",
+      "status": "accepted",
+      "approval": "approved 2026-07-28",
+      "applied": false,
+      "note": "Único CRITICAL discovery (D-007). Maior prioridade pra aplicar."
+    },
+    {
+      "id": 8,
+      "lens": "edge-cases",
+      "round": 7,
+      "question": "WHEN activeCatalog é empty, qual é o comportamento exato de /augment? Forward unchanged, inject defaults, ou reject?",
+      "decision": "GAP — sem contrato definido. Enum emptyReason atual não cobre activeCatalog vazio. Modo prompt-only cobre context null, não catalog state.",
+      "confidence": "medium",
+      "tracer": "declarar contrato: 200 + system message determinístico unaugmented + matched arrays vazios + emptyReason: 'no_active_items' (novo enum) + warning/audit marker + forward unchanged.",
+      "status": "accepted",
+      "approval": "approved 2026-07-28",
+      "applied": false
+    },
+    {
+      "id": 9,
+      "lens": "tracer-bullets",
+      "round": 8,
+      "question": "PRD §7.2 lista 5 endpoints MVP (/catalog, /catalog/rebuild, /audit, /audit/summary, /health) mas nenhuma PLAN phase os owns explicitamente. Onde entregam?",
+      "decision": "GAP — ownership implícito. Phase 1 constrói catalog DATA sem endpoint surface. Phase 5 constrói forwarder HTTP, então todos os 5 endpoints devem sair lá.",
+      "confidence": "high",
+      "tracer": "declarar ownership explícito em PLAN.md Phase 5 deliverables. Adicionar /health ao acceptance mapping §10.",
+      "status": "accepted",
+      "approval": "approved 2026-07-28",
+      "applied": false
+    }
+  ],
+  "research_tickets": [],
+  "rejected_items": [],
+  "discoveries": [
+    {"id": "D-001", "severity": "structural", "description": "Drift §18→§16 em PLAN.md:241, 254, 375 — referências stale ao PRD v3.0. PRD v3.1 renumerou mas PLAN não acompanhou. Affects cross-doc reading trust.", "decision_ref": 2, "status": "open"},
+    {"id": "D-002", "severity": "structural", "description": "Drift interno em PLAN.md: Phase 1/Phase 5 body sections vs table estimates divergem. Tabela é canônica (caption explica +1h em cada), body stale. Process gap: nenhum doc define convenção body-vs-table quando conflitam.", "decision_ref": 3, "status": "open"},
+    {"id": "D-003", "severity": "structural", "description": "Branch B ausente: PRD §10.1 marca inception híbrida CONDICIONAL ao grill §16.6 mas PLAN hardcode Phase 6 e Phase 7 pre-reqs sem fallback. Se grill reprovar, PLAN precisa de branch explícito.", "decision_ref": 1, "status": "open"},
+    {"id": "D-004", "severity": "cosmetic", "description": "Critical Rules contrato é coerente entre PRD §6.2 + §10.1 + PLAN §10, mas redação atual pode gerar ambiguidade de implementação. Recomendação: adicionar exemplo explícito em §6.2.", "decision_ref": 4, "status": "open"},
+    {"id": "D-005", "severity": "structural", "description": "'intel' usado 21 vezes (PRD:15 + PLAN:6) sem schema formal. É o contrato writer-reader entre fast agent (§16.2) e match pipeline (§3 Turn N+1). Phase 6 vai inventar se não definir antes.", "decision_ref": 5, "status": "open"},
+    {"id": "D-006", "severity": "structural", "description": "Tiebreak policy ausente em matchedSkills/Rules/Personas. RRF ties com cosine 384d perto do threshold quebram byte-string determinístico → cache hit do provedor falha silenciosamente.", "decision_ref": 6, "status": "open"},
+    {"id": "D-007", "severity": "critical", "description": "Audit log: docs silenciosos sobre boundary de persistência (sync vs async). Budget p50<50ms/p99<200ms implica async, mas spec não declara. Sem declaração explícita, Phase 5 pode bloquear request.", "decision_ref": 7, "status": "open"},
+    {"id": "D-008", "severity": "structural", "description": "Empty activeCatalog: sem contrato definido. Enum emptyReason cobre low_confidence | social | timeout | null mas não catalog vazio. Behavior deve ser explícito (200 + unaugmented + emptyReason: 'no_active_items').", "decision_ref": 8, "status": "open"},
+    {"id": "D-009", "severity": "structural", "description": "5 endpoints MVP (/catalog, /catalog/rebuild, /audit, /audit/summary, /health) sem ownership explícito em PLAN. /health crítico pra §10.2 latency gating.", "decision_ref": 9, "status": "open"}
+  ],
+  "halt": {
+    "halted": true,
+    "reason": "human-gate: all 9 decisions approved 2026-07-28. Skill halted. Per SKILL.md §Gate contract, target doc (PRD/PLAN) NEVER modified by skill — human applies edits post-gate. Waiting for downstream handoff (to-spec, manual edits, or stop)."
+  },
+  "stats": {
+    "tokens_estimate": 0,
+    "rounds_total": 8,
+    "decisions_accepted": 9,
+    "decisions_approved": 9,
+    "decisions_low_confidence": 0,
+    "no_evidence_count": 0,
+    "fresh_subagents_enforced": true
+  }
+}
