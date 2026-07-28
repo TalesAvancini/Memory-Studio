@@ -39,7 +39,7 @@ explanation: |
 related:
   - ../scratch/memory-studio/spec.md
   - ../../PRD.md
-  - ../../PLAN.md
+  - ../../PLAN.md   # referência histórica — execução segue este ROADMAP
   - ../../.specs/DISCOVERIES.md
   - ../../CLAUDE.md
 ---
@@ -62,7 +62,7 @@ related:
 5. **Cache distinction:** MVP usa **só cache do provedor** (Anthropic `cache_control: ephemeral`). Cache de augmented (fingerprint semântico) é v3.1+ omitido — não medir nem expor no MVP (PRD §17.1).
 6. **Security default:** zero raw persistence, `tenantId` hasheado, placeholders determinísticos não vazam secret, proxy local-only.
 7. **Fail-open:** todo erro de retrieval/augmentation/audit → forward unchanged, request 200, log em stderr.
-8. **(removido 2026-07-28)** Branch B fork eliminado — Phase 6 é mandatório. Phase 6a (Grill + POC) funciona como validation gate: se POC reprova, decisão humana (ajustar, não collapsar). Total fixo 41-61h.
+8. **(removido 2026-07-28)** Branch B fork eliminado — Phase 6 é mandatório. Phase 6a (POC Validation) funciona como validation gate: se POC reprova, decisão humana (ajustar, não collapsar). Total fixo 41-61h.
 9. **Endpoint count: 7 total** (6 auxiliary + /augment). `/state/toggle` foi adicionado pós-D-009 (Phase 4 UI dependency). Lista: `/augment`, `/catalog`, `/catalog/rebuild`, `/audit`, `/audit/summary`, `/health`, `/state/toggle`.
 
 ---
@@ -368,13 +368,14 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 6a — Grill + POC Validation (gate antes de Phase 6b)
+## Phase 6a — POC Validation (hot path + fast agent)
 
-**Goal:** validar empiricamente latency trick + intel pipeline antes de Phase 6b. Não é binary fork — é validation. Se POC reprova, decisão humana é ajustar (não collapsar).
+**Goal:** validar empiricamente que inception híbrida adiciona <10ms ao hot path E que fast agentuality termina em <3s. Não é binary fork — é validation empírica. Se POC reprova, decisão humana é ajustar (trocar modelo, otimizar query), não collapsar.
 
 **Scope:**
-- PRD §16.7 (Pré-grill checklist — canonical, §16.6 é stale por causa do §16.5 insert)
-- Latency trick POC (Haiku reads R_N paralelo com humano)
+- PRD §16.7 (POC checklist — canonical, §16.6 é stale por causa do §16.5 insert)
+- Hot path overhead POC (intel load + concat + template render, budget <10ms)
+- Fast agent latency POC (MiniMax-M2.7-highspeed lê R_N paralelo com humano)
 - Intel pipeline POC (writer-reader contract end-to-end)
 
 **PRD refs:**
@@ -387,12 +388,17 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 **Estimate:** 2-3h
 
 **Done criteria:**
-- [ ] Grill roda em PRD §16.7 (não §16.6 — stale ref) com ≥4 lenses: latency-trick, novelty, fail-open, novelty-vs-existing
-- [ ] Grill decision recorded em `.specs/DISCOVERIES.md` (append nova entry, ID >= D-010)
-- [ ] **POC hot path overhead inception** (PRIMARY): Turn N+1 mede inception overhead <10ms — `sqlite.get(intel)` <5ms (p95, 10 amostras), concat intel+prompt <1ms (p95), template render 2 blocos <1ms (p95). Total inception overhead <10ms mantém budget p50<50ms (PRD §10.2).
-- [ ] **POC latency trick** (SECONDARY, arquitetural): fast agent processa R_N enquanto humano lê. Default `MiniMax-M2.7-highspeed` (highspeed variant) tipicamente <1s; humano tem 5-30s lendo. Latência do fast agent não bloqueia request — paralelismo natural.
-- [ ] POC intel pipeline end-to-end: fast agent gera Intel → match pipeline consome → system message augmentado
-- [ ] POC result doc com timing measurements + decisão humana (proceed / adjust)
+
+Targets medidos (10 amostras cada), não estimados:
+
+- [ ] `sqlite.get(intel)` por `session_id` < 5ms (p95)
+- [ ] Concatenação intel + prompt < 1ms (p95)
+- [ ] Template rendering (2 blocos `cache_control: ephemeral`) < 1ms (p95)
+- [ ] **Overhead total no hot path < 10ms** (PRIMARY — mantém budget p50<50ms do PRD §10.2)
+- [ ] Fast agent (default `MiniMax-M2.7-highspeed`) responde < 3s (10 amostras; highspeed variant tipicamente <1s)
+- [ ] **Byte-string determinístico com template:** SHA256(byte-string) igual entre 2 inputs idênticos (mesmo persona + mesmo intel + mesmas Skills ativas)
+
+**Regra:** se algum target falhar → ajustar (trocar modelo, otimizar query, refactor template), não collapsar.
 
 **Por que hot path overhead é PRIMARY, latency trick é SECONDARY:**
 

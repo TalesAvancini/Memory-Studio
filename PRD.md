@@ -802,20 +802,26 @@ type Intel = {
 | Cache TTL (5-min window) | Anthropic `cache_control: { ttl: "5m" }` faz async pre-fetch custo-effective |
 | Role normalization | OmniRoute: `developer` → `system` |
 
-### 16.7 Próximo passo
+### 16.7 Próximo passo (POC técnica antes de Phase 6)
 
-**Pré-grill antes de Phase 6 do PLAN.md:**
+**POC targets (medidos, não estimados):**
 
-- [ ] Validar latency trick em POC (1 turno simulado)
-- [ ] Definir fast agent: in-process vs sidecar
-- [ ] Definir intel store: file vs unix socket
-- [ ] Definir match strategy: regex vs catalog vs embedding
-- [ ] Medir cache hit em sessão real (>10 turns)
+- [ ] Overhead da inception no hot path < 10ms total: `sqlite.get(intel)` < 5ms (p95, 10 amostras) + concat intel+prompt < 1ms (p95) + template render 2 blocos < 1ms (p95)
+- [ ] Latência do fast agent (default `MiniMax-M2.7-highspeed`) < 3s em 10 amostras
 
-**Após grill aprovado:**
+**Regra:** se algum target falhar → ajustar (trocar modelo, otimizar query, refactor template), não collapsar.
+
+**Resolvido em §16.4 (não repetir como TODO):**
+
+- ✅ Fast agent: in-process (não sidecar)
+- ✅ Intel store: SQLite WAL mode (não file/unix socket)
+- ✅ Match strategy: embedding pipeline existente (FTS5 + sqlite-vec + RRF), não regex novo
+
+**Após POC aprovado:**
 
 - Integrar formalmente em §3
 - Iniciar Phase 6 (Fast agent + intel pipeline) do PLAN.md
+- Medir cache hit > 70% em sessão real (>10 turns) — tarefa de Phase 7b
 
 ---
 
