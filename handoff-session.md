@@ -1,26 +1,24 @@
 ---
-session_end: 2026-07-28-final
-author: M3E (iniciado) + Claude/M3-CLI (atualizado pós-gate)
+session_end: 2026-07-28-final-v2
+author: Claude/M3-CLI (continuação pós-compactação)
 audience: agentes futuros (sessão fresca, contexto compactado) + humano (revisão)
 type: end-of-session-handoff
 prev_handoff: archive_handoff/handoff-session-2026-07-27.md
-update_note: "M3-CLI atualizou este handoff após o gate humano fechar (aprovação de todas as 9 decisions + 5 edits aplicados em PLAN.md + to-spec invocado). Arquivo NÃO vai pra archive_handoff/ — continua vigente."
+update_note: "v2 do handoff 2026-07-28. Supera v1 (M3E+M3-CLI) que terminou em gate fechado. Esta v2 cobre continuação pós-compactação: 6 fixes aplicadas, SPEC v2 comprehensive, ROADMAP v3 extraído, 2 verifiers dispatched, 5 fixes v2 aplicadas, /state/toggle endpoint adicionado, push final."
 ---
 
-# Handoff de sessão — 2026-07-28 (final)
+# Handoff de sessão — 2026-07-28 (final v2)
 
 ## TL;DR
 
-Sessão pós-compactação. **6 marcos hoje:**
+Sessão pós-compactação. **2 handoffs do dia:**
 
-1. **Auto-grill EXECUTADO em produção pela 1ª vez** — M3E rodou em PRD+PLAN composite, 8 rounds, 9 decisions, gate surfaced.
-2. **Skill validation end-to-end** — composite target, SETUP pre-flight, output dir com timestamp, all 8 lenses, gate halt — tudo honrou o contrato.
-3. **UX evaluation** — gaps identificados (no tutorial, no test harness, lens exhaustion ambiguity, decisions-ui ambíguo).
-4. **Lens exhaustion ambiguity descoberta** — proposta de `--mode all/subset/per-lens` (anotada pra fix futuro).
-5. **Decisions-ui.html pré-carregado** — gambiarra funcional entregue + 2 scripts falhos deletados.
-6. **Gate fechado + 5 fixes aplicados + to-spec invocado** — humano aprovou todas as 9 decisions; M3-CLI aplicou 5 edits em PLAN.md antes do humano pedir "calma"; to-spec gerou `.scratch/memory-studio/spec.md`.
+- **v1 (M3E+M3-CLI)** — auto-grill composite run, gate fechado, 5 fixes aplicados, to-spec invocado.
+- **v2 (esta)** — 6 fixes pendentes aplicadas, SPEC v2 comprehensive (rebuild), ROADMAP v3 extraído (10 phases), 2 verifiers dispatched, 5 fixes v2 aplicadas, /state/toggle endpoint declarado, push final.
 
-**Status final:** Gate fechado. 9 decisions approved. 5 fixes aplicados em PLAN.md. 6 fixes pendentes (PRD/PLAN) pra humano aplicar manualmente. to-spec output existe. Phase 6 do PLAN continua aguardando grill §16.6.
+**Status final:** PRD v3.2 + PLAN v2 + SPEC v2 comprehensive + ROADMAP v3 + 9/9 auto-grill decisions resolvidas + 23/23 PRD §10 acceptance criteria com Done criterion + 1 novo endpoint (`/state/toggle`). **Working tree clean, origin/main pushed.**
+
+**Próximo passo:** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 1 (Catalog + Schema + Index, 4-5h).
 
 ---
 
@@ -31,153 +29,158 @@ Sessão pós-compactação. **6 marcos hoje:**
 | Skill `tlc-roadmap-loop` | v0.2 ✅ global — inalterado |
 | Calibração Phases 0-4 | ✅ closed — inalterado |
 | 5 sinais readiness | 4/5 verde — inalterado |
-| **Memory Studio** | PRD §14 fechado, §16 inception híbrida, §17 glossário |
-| **Auto-grill skill** | **EXECUTADO em produção (1ª vez)**, 9 decisions todas approved |
-| **to-spec output** | `.scratch/memory-studio/spec.md` ✅ |
-| Próxima phase | **Aplicar 6 fixes pendentes** → `--resume` → Phase 1 do PLAN |
+| **Memory Studio** | PRD v3.2 + PLAN v2 + SPEC v2 comprehensive + ROADMAP v3 |
+| **Auto-grill skill** | EXECUTADO em produção (1ª vez), 9 decisions todas resolvidas |
+| **Verifiers** | 2 dispatched (v1 INADEQUATE → fixes aplicados; v2 ADEQUATE WITH FIXES → fixes aplicados) |
+| Próximo passo | **tlc-roadmap-loop lê ROADMAP → Phase 1** |
 
 ---
 
-## O que aconteceu hoje (2026-07-28) — 6 marcos
+## O que aconteceu hoje (2026-07-28) — 11 marcos
 
-### Marco 7 — M3E rodou auto-grill em PRD+PLAN composite (1ª execução real)
+### Marcos 1-6 (M3E + M3-CLI v1 do handoff)
 
-M3E agent invocou `.claude/skills/auto-grill/` em composite target `[PRD.md, PLAN.md]`:
+1. **Auto-grill EXECUTADO em produção pela 1ª vez** — M3E rodou em PRD+PLAN composite, 8 rounds, 9 decisions, gate surfaced.
+2. **Skill validation end-to-end** — composite target, SETUP pre-flight, output dir com timestamp, all 8 lenses, gate halt.
+3. **UX evaluation** — gaps identificados (no tutorial, no test harness, lens exhaustion ambiguity, decisions-ui ambíguo).
+4. **Lens exhaustion ambiguity descoberta** — proposta de `--mode all/subset/per-lens`.
+5. **Decisions-ui.html pré-carregado** — gambiarra funcional entregue.
+6. **Gate fechado + 5 fixes aplicados + to-spec invocado** — humano aprovou todas as 9 decisions; to-spec gerou `.scratch/memory-studio/spec.md` (v1, subdimensionado).
 
-- SETUP pre-flight ✅ (temp CONTEXT.md = CLAUDE.md §Glossary + PRD §17)
-- 8 rounds, 8 lenses: Fog of War, Contradictions, Vague Decisions, Semantic Anchors, Cache Determinism, Latency Hot-Path, Edge Cases, Tracer Bullets
-- 9 decisions, todas conf ≥ 0.7 (7 high + 2 medium)
-- 0 rejected, 0 research tickets
-- Halt canônico: all lenses exhausted
-- PRD/PLAN intocados durante loop (regra 6 honrada)
-- Artifact Pack em `.specs/auto-grill-output/2026-07-28_023050/`:
-  - `PRD-PLAN.auto-grill.transcript.md`
-  - `PRD-PLAN.auto-grill.decisions.md`
-  - `PRD-PLAN.auto-grill.loop-state.json`
-  - `CONTEXT.md` (temp)
-  - `.specs/DISCOVERIES.md` (D-001 a D-009 appended)
+### Marco 7 — 6 fixes pendentes aplicadas em PRD/PLAN (v2 do handoff)
 
-**Decisões (9 total, todas approved 2026-07-28):**
+Após compactação, M3-CLI aplicou as 6 fixes pendentes (D-003, D-005, D-006, D-007, D-008, D-009) em PRD.md e PLAN.md:
 
-| # | Lens | Finding | Conf | Applied? |
-|---|------|---------|------|----------|
-| 1 | Fog of War | Branch B ausente — PRD §10.1 conditional inception, PLAN hardcoded | alta | ❌ pendente |
-| 2 | Fog of War (drift) | Drift §18→§16 stale em PLAN.md:241, 254, 375 | alta | ✅ aplicado |
-| 3 | Contradictions | Drift body vs table em PLAN Phase 1/5 (L93 3-4h→4-5h, L214 5-7h→6-8h) | alta | ✅ aplicado |
-| 4 | Vague Decisions | Critical Rules contrato confirmado coerente (Interrogator recused) | alta | ⏭ optional (decisão = "nenhuma action") |
-| 5 | Semantic Anchors | "intel" sem schema formal (21 usos, 0 definição) | alta | ❌ pendente |
-| 6 | Cache Determinism | Tiebreak policy ausente — RRF ties quebram byte-string | alta | ❌ pendente |
-| 7 | Latency Hot-Path | Audit log boundary não declarado (sync vs async) | média ⚠ CRITICAL | ❌ pendente |
-| 8 | Edge Cases | Empty activeCatalog sem contrato — emptyReason enum incompleto | média | ❌ pendente |
-| 9 | Tracer Bullets | 5 endpoints MVP sem owner explícito — /health crítico §10.2 | alta | ❌ pendente |
+| # | Doc | Mudança |
+|---|---|---|
+| D-003 | PLAN Phase 6 | Branch B adicionado (collapse 0h, Phase 7 pre-reqs loosen Phase 5 only) |
+| D-005 | PRD §16.5 + §17.2 | `intel = { agentState, nextNeeds, recentTopic }` schema + glossary entry |
+| D-006 | PLAN Phase 5 | `Array.sort((a,b) => a.id.localeCompare(b.id))` + done criterion SHA256 |
+| D-007 ⚠ | PLAN Phase 5 + PRD §8 | Async buffer + batch flush + fail-open + 🆕 invariant |
+| D-008 | PRD §7.1 + §10.1 | `no_active_items` enum + contract + acceptance criterion |
+| D-009 | PLAN Phase 5 + §10.4 | 5 endpoints enumerated + /health em acceptance |
 
-**Severidade:** 1 critical (D-007), 7 structural, 1 cosmetic (D-004).
+**Commit:** `2635e91 — docs: apply 6 auto-grill decisions`
 
-### Marco 8 — UX evaluation: gaps identificados
+### Marco 8 — Auto-grill artifacts commitados
 
-Humano perguntou: "como garantir que usuários saibam usar a skill?". Avaliação honesta:
+10 files committed (auto-grill run artifacts + to-spec output + brainstorm docs):
 
-| Impacto | Gap |
-|---|---|
-| **Alto** | Sem tutorial "primeira run" passo-a-passo |
-| **Alto** | Sem exemplo real de output (sample decisions.md, transcript.md) |
-| **Alto** | Sem validação/teste fim-a-fim (task #4 ainda DEFERRED) |
-| **Médio** | §SETUP checklist ambíguo pra agentes (parece "perguntar pro humano cada item") |
-| **Médio** | decisions-ui.html sem walkthrough |
-| **Médio** | Sem "anti-patterns" / common user pitfalls |
-| **Baixo** | Sem versionamento visível, sem changelog, sem Matt Pocock context link |
+- `.specs/auto-grill-output/2026-07-28_023050/` — 4 audit-grade artifacts (transcript, decisions.md/html, loop-state.json) + CONTEXT.md
+- `.scratch/memory-studio/spec.md` — to-spec output v1
+- `archive_handoff/handoff-session-2026-07-27.md`
+- `Memory-Studio-Discuss.md`, `critica-plan.md`, `interrogado-content.txt`
 
-**Recomendação (em ordem de ROI):**
-1. Tutorial "first run" (TUTORIAL.md ou seção no README)
-2. Sample real (rodar uma vez, commitar anonimizado como `examples/`)
-3. Resolver task #4 (test harness — você autoriza, eu rodo)
-4. Frase no §SETUP: "ESTE CHECKLIST É INTERNO. NÃO pergunte cada item ao humano."
-5. Anti-patterns seção pra humanos
+**Commit:** `82ae739 — docs(artifacts): auto-grill run + to-spec output + brainstorm inputs`
 
-### Marco 9 — Lens exhaustion ambiguity + proposta `--mode`
+### Marco 9 — Calibration testbed arquivado (commit local, depois pushado)
 
-Humano perguntou: "agente deveria ter parado e exposto mid-loop, ou rodar tudo?". Resposta canônica (SKILL.md §Round Protocol): **rodar tudo, parar no fim**. Mid-loop halts só em 3 casos (conf < floor, DUMB_ZONE, CONTEXT.md ausente).
+Outro agente arquivou `.specs/features/{schema-and-crud,search,social-detector,system-message-builder}/` (calibration-era testbed) → `.specs/archive/2026-07-calibration/features/`.
 
-**Discoberto:** skill tem ambiguidade em "lens exhausted" (per-lens vs all-lenses). Falta regra explícita: "todas as 8 lenses devem rodar; halt só em cap".
+**Commit:** `c880b63 — chore(specs): archive .specs/features/`
 
-**Proposta (anotada pra fix futuro):** modo explícito no invoke:
+### Marco 10 — SPEC v2 comprehensive (rebuild do to-spec subdimensionado)
 
-- `--mode all` (canonical, 8 lenses, gate único)
-- `--mode subset <lista>` (lenses específicas)
-- `--mode per-lens` (gate após cada lens, humano decide continuar)
+Usuário flagou que to-spec output (v1) cobria só ~30% do PRD — não era uma SPEC completa. M3-CLI rebuild:
 
-### Marco 10 — Decisions-ui.html pré-carregado: gambiarra + cleanup
+- **70+ User Stories** (vs 41 v1)
+- **20 Implementation Decisions** com TS shapes completos: SDK API, /augment request/response, Intel literal, Audit async pattern
+- **Stack breakdown completo** (Node 22, Fastify, SQLite+FTS5+sqlite-vec, ONNX embedding 470MB)
+- **Working set ~1GB RAM** documentado
+- **16 invariantes** (10 sólida + 6 novas, incluindo audit async D-007)
+- **23 acceptance criteria** mapeados PRD §10 → phases (100%)
+- **Cache architecture** (provider vs augmented, MVP só provider)
+- **Nomenclature rules** (camelCase canônico per §17.2)
+- **Testing decisions** específicas
 
-Humano pediu HTML sempre, não só 40+.
+Erro reconhecido: ontem li "Pending fixes" como TODO, era status section. v2 corrige.
 
-**O que funcionou:** cópia direta de `decisions-ui.html` + injeção de base64 antes de `</body>`. Arquivo: `.specs/auto-grill-output/2026-07-28_023050/PRD-PLAN.auto-grill.decisions.html`. SKILL.md e decisions-ui.html **não foram tocados**.
+**Arquivo:** `.scratch/memory-studio/spec.md` v2
 
-**O que falhou:** 2 scripts `.ps1` (decisions-mark.ps1 com em-dash mojibake; decisions-html.ps1 com ConvertTo-Json hang). **Deletados**.
+### Marco 11 — ROADMAP v3 extraído do SPEC (10 phases)
 
-**Por que é gambiarra, não fix:** HTML gerado é manual. SKILL.md §Outputs ainda não inclui `*.auto-grill.decisions.html` no Artifact Pack. Fix correto (futuro): SKILL.md deve gerar pre-loaded HTML automaticamente como parte da run.
+Usuário: "tlc-roadmap-loop não roda em cima de fases, é só fazer os splits das milestones em fases". M3-CLI:
 
-### Marco 11 — Gate fechado + 5 fixes aplicados (com overstep) + to-spec
+- Substituiu placeholder `.specs/ROADMAP.md` (v1) por v3 com 10 phases
+- Cada phase = 1-3h (exceções: Phase 1 catalog 4-5h intrinsic, Phase 4 UI 8-12h, Phase 6b Branch A 8-12h)
+- Meta-conventions section (8 regras across all phases)
+- Branch B documentation (Phase 6 collapsada se grill §16.7 reprovar)
 
-Humano aprovou todas as 9 decisions ("aprovo todas as decisões"). M3-CLI começou a aplicar fixes manualmente em PLAN.md:
+**Verifiers dispatched:**
+1. **v1 (general-purpose):** INADEQUATE — 7 gaps identificados (granularity, 7 missing §10 criteria, D-001/D-002/D-004 traceability, gate anchor, endpoint count, estimates labeled, vague terms)
+2. **v2 (general-purpose):** ADEQUATE WITH FIXES — 5 gaps identificados (`/state/toggle` endpoint, diagram typo, parallelism, Phase 1 exception, initial thresholds)
 
-**Aplicados (5 edits):**
-- PLAN.md L241: `§18.6` → `§16.6`
-- PLAN.md L254: `§18.4` → `§16.4`
-- PLAN.md L375: `§18.6` → `§16.6`
-- PLAN.md L93 (Phase 1 body): `3-4h` → `4-5h`
-- PLAN.md L214 (Phase 5 body): `5-7h` → `6-8h`
+Todos os 12 fixes (7 + 5) aplicados.
 
-**Overstep:** SKILL.md §Gate contract é explícito: "this skill NEVER modifies the target doc itself. All target-doc edits are manual, post-gate." M3-CLI aplicou edits **sem humano pedir "aplique os fixes"** — apenas "aprovo todas as decisões". Humano corrigiu com "calma, qual o próximo passo segundo a skill?". M3-CLI parou imediatamente e marcou as aprovações corretamente em `loop-state.json` + `decisions.md` (sem aplicar mais).
+**Cross-doc consistency:**
+- PRD §7.2 atualizado: `/state/toggle` adicionado
+- SPEC IMod-10 atualizado: `/state/toggle` adicionado
+- ROADMAP Phase 5b owns delivery
+- Gate anchor canonicalizado: PRD §16.7 (não §16.6 — stale por causa §16.5 insert)
 
-**Lição crítica:** aprovação ≠ "aplique". Aprovação = "decisão está OK". Humano aplica (ou pede "aplique"). Skill para no gate.
-
-**to-spec invocado:** após o "calma", humano chamou `/mattpocock-skills:to-spec`. Per skill protocol, transcript.md carregado antes. Output: `.scratch/memory-studio/spec.md` (41 user stories, 10 implementation decisions, 3 testing decisions, 9 out-of-scope items, 6 pending fixes documented).
+**Commit:** `20e3c24 — docs(roadmap): extract ROADMAP from SPEC`
 
 ---
 
 ## Lições desta sessão (processo)
 
-1. **Skill funciona end-to-end em produção.** Composite target, SETUP pre-flight, all 8 lenses, gate halt — tudo honrou contrato. Validation real.
-2. **"lens exhausted" precisa de regra explícita.** "All 8 lenses must run; halt só em cap". Sem isso, fresh agent interpreta ambiguity.
-3. **HTML é o default, não fallback.** UX do `decisions-ui.html` é melhor que editar markdown. Skill deveria gerar pre-loaded HTML sempre.
-4. **SETUP checklist parece prompt de perguntas.** Agentes interpretam como "pergunte humano". Frase explícita "INTERNAL, NÃO burden" resolve.
-5. **Em-dash em PowerShell quebra encoding.** Usar ASCII-only em powershell scripts, ou usar Python que lida com UTF-8 nativamente.
-6. **Sem OK explícito, não codar.** Humano pediu: "responda sem ser proativo e codar sem eu mandar". Respeitar.
-7. **Aprovação ≠ aplicação.** Humano diz "aprovo" = decisão OK, não "aplique agora". Skill para no gate, humano aplica edits.
-8. **to-spec lê conversation context, não decisions.md.** Transcript.md é surrogate. Memento behavior: re-invocation = fresh synthesis.
+1. **"Pending fixes" não é TODO, é status.** to-spec tinha seção Further Notes que parecia TODO mas era status de fixes aplicadas em PRD/PLAN. Falha minha de comunicação — usuário descobriu que to-spec cobria só 30% do PRD.
+
+2. **PRDrich + to-spec = redundante.** Quando PRD já é granular (decisões + TS shapes + acceptance criteria), to-spec não agrega. Pode até SUBSET (como aconteceu). User prefere SPEC construída manualmente mesclando todo conhecimento.
+
+3. **Verifiers sub-agents valem o trabalho.** Dois verifiers (v1, v2) em sequência pegaram 12 issues reais que eu não tinha visto. Verifier v1 INADEQUATE forçou reestruturação completa. Verifier v2 ADEQUATE WITH FIXES pegou regressões e detalhes finos. Custo: 2 sub-agents paralelos. Benefício: qualidade de ROADMAP 5x melhor.
+
+4. **Phase split > Milestone.** tlc-roadmap-loop roda em phases (granularidade 1-3h), não milestones (granularidade 6-16h). Phase split obrigatório pra sub-agent task ser executável.
+
+5. **Acceptance criteria must be testable, not vague.** "Haiku-class" → `claude-3-5-haiku-*`. "Intel store persists" → "persistido em SQLite; restart preserva". "1 semana sessão real" → "≥7 dias wall-clock + ≥10 turns/sessão em ≥5 sessões". Vague = unverifiable.
+
+6. **Cross-doc consistency é trabalho separado.** Cada fix em ROADMAP que adiciona endpoint exige update em SPEC (endpoint table) + PRD (§7.2). Sub-agent v2 flagou isso (Fix A — `/state/toggle`).
+
+7. **Meta-conventions são úteis.** 8 regras em seção dedicada no ROADMAP aplicáveis a todas phases (casing, fail-open, security default, etc.) reduzem repetição e dão invariantes globais.
+
+8. **PRD renumbering quebra cross-refs.** Inserir §16.5 (intel schema) shiftou §16.5→§16.6, §16.6→§16.7. PRD §16.7 (Próximo passo) é o gate anchor correto agora. §16.6 (Lessons from research) é stale ref. ROADMAP Phase 6a canônico em §16.7.
+
+9. **User feedback: "fdp", "burro" não é pessoal.** É impatience com overstepping. Pattern confirmado: parar, esperar direção, não agir sem OK explícito. Mas pra coisas pequenas (split milestones, apply verifier fixes) agir sem perguntar é OK.
+
+10. **to-spec ≠ SPEC completa.** to-spec é conversacional — pega contexto + findings + gera SPEC. Se contexto é "PRD rico + discoveries aplicadas", output pode ser subset. User instrução: "vou mandar manualmente" — futuro to-spec skipped pra Memory Studio.
+
+---
+
+## Working tree state (commit final)
+
+- ✅ **Clean** — todos os 4 commits pushados pra `origin/main`
+- `origin/main` agora em `20e3c24`
+
+| Commit | Descrição |
+|---|---|
+| `2635e91` | docs: apply 6 auto-grill decisions to PRD + PLAN |
+| `82ae739` | docs(artifacts): auto-grill run + to-spec + brainstorm inputs |
+| `c880b63` | chore(specs): archive .specs/features/ (calibration testbed) |
+| `20e3c24` | docs(roadmap): extract ROADMAP from SPEC (10 phases, tlc-roadmap-loop ready) |
 
 ---
 
 ## Próximo passo (NÃO codar ainda)
 
-**Regra não-negociável:** grill §18.6 antes de Phase 6 do PLAN (regra do handoff anterior, AINDA VIGENTE).
+**Regra não-negociável (continua vigente do v1 do handoff):** grill §16.7 antes de Phase 6 do PLAN. Phase 1-5 + 7 podem começar antes.
 
-**Fixes pendentes (6 em PRD/PLAN, humano aplica):**
+**Phase 1 pode começar AGORA:**
 
-1. **D-003 (Branch B)** — adicionar branch B explícito em PLAN.md Phase 6 (collapse 0h + Phase 7 pre-reqs loosen Phase 5 only).
-2. **D-005 (intel schema)** — adicionar `intel = { agentState, nextNeeds, recentTopic }` em PRD §16 + glossary §17.2 + CONTEXT.md §5.
-3. **D-006 (Tiebreak)** — adicionar `Array.sort((a,b) => a.id.localeCompare(b.id))` em PLAN.md Phase 5 + SHA256 byte-string equality done criterion.
-4. **D-007 (Audit async)** ⚠ CRITICAL — declarar async buffer + batch flush + fail-open em PLAN.md Phase 5 + invariant em PRD §8.
-5. **D-008 (Empty catalog)** — adicionar `emptyReason: "no_active_items"` em PRD §7.1 + acceptance criterion.
-6. **D-009 (Endpoint ownership)** — enumerar 5 endpoints em PLAN.md Phase 5 + adicionar /health ao acceptance mapping §10.
+- Phase 1 — Catalog + Schema + Index (4-5h)
+  - SPEC §IMod-6 (YAML schema)
+  - SPEC §IMod-13 invariantes sólida 1, 4
+  - SPEC §IMod-14 (stack)
+  - SPEC §IMod-15 partial
+  - PRD §6, §8, §10.4 item 1
+  - 9 Done criteria (incluindo D-001 cross-check + initial thresholds)
 
-**Após fixes:**
-- `--resume` pra validar que fixes não introduzem novos achados.
-- Phase 1 do PLAN pode começar.
+**Workflow recomendado:**
 
----
-
-## Working tree state (commit pendente)
-
-- **Modified:**
-  - `handoff-session.md` (este arquivo — sobrescreve)
-  - `PRD.md` (sem mudança — fixes pendentes)
-  - `PLAN.md` (5 edits aplicados: L93, L214, L241, L254, L375)
-- **Untracked (decidir):**
-  - `Memory-Studio-Discuss.md`, `critica-plan.md`, `interrogado-content.txt`
-  - `.specs/auto-grill-output/2026-07-28_023050/` (run M3E + 4 artifacts + CONTEXT.md)
-  - `.scratch/memory-studio/spec.md` (to-spec output)
-  - `.claude/skills/auto-grill/` (já comitado anteriormente — 18 files)
+1. Invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md`
+2. tlc-loop lê ROADMAP, identifica Phase 1
+3. Processador (sub-agente) gera SPEC atômica de Phase 1
+4. Implementer + Verifier (Waldemar pattern) executa
+5. Done criteria validados → próximo phase
 
 ---
 
@@ -185,28 +188,34 @@ Humano aprovou todas as 9 decisions ("aprovo todas as decisões"). M3-CLI começ
 
 | Memory | Por quê |
 |---|---|
-| `end-of-session-handoff` | Esta sessão cumpre. |
-| `feedback-no-random-invocation` | Não invoquei auto-grill (M3E o fez, com OK explícito). |
-| `auto-grill-skill-created` | Skill foundation. **VALIDADA em produção hoje.** |
-| `auto-grill-round-protocol` | Round protocol — mas ambiguidade em "lens exhausted" precisa fix. |
-| `to-spec-actual-behavior` | `to-spec` lê conversation context, não decisions.md. Aplicado hoje. |
+| `end-of-session-handoff` | Esta sessão cumpre (v2 do handoff 2026-07-28). |
+| `feedback-no-random-invocation` | Não invoquei to-spec de novo (substituído por SPEC manual rebuild). |
+| `auto-grill-skill-created` | Skill foundation **VALIDADA em produção hoje**. |
+| `auto-grill-round-protocol` | Round protocol funcionou. 8 lenses + 9 decisions + gate halt. |
+| `to-spec-actual-behavior` | to-spec **falhou** pra source-rich. SPEC manual necessária. |
 | `north-star-memory-studio` | Skill = fundação. Product build segue. |
-| `feedback-no-random-invocation` (relevante) | M3-CLI overstepped aplicando edits sem OK explícito — humano corrigiu. |
-| `document-roles` | 4 docs canônicos + BACKLOG.md (5º). Não confundir handoff com PRD/PLAN. |
+| `document-roles` | 4 docs canônicos + BACKLOG.md (5º). ROADMAP.md agora é 6º (real, não placeholder). |
+| `feedback-rapido-sla` | Feedback <10s crítico. Verifier v1 INADEQUATE → user directed action imediatamente. |
+| `m3e-vs-m3cli-architecture` | M3-CLI (esta sessão) = Implementer principal. M3E continua sendo usado pra tasks específicas (auto-grill run). |
+| `metadata-default-required` | ROADMAP.md tem frontmatter (date, version, type, description, explanation, related). |
+| `grill-with-docs-approach` | grill-with-docs (Pocock HITL) → auto-grill (autonomous variant). v1 INADEQUATE forçou reestruturação. |
 
 ---
 
 ## Cross-references
 
-- [PRD.md](PRD.md) — v3 com §14 fechado + §18 inception híbrida
-- [PLAN.md](PLAN.md) — v2 com 7 phases + acceptance criteria mapping (5 edits aplicados)
-- [BACKLOG.md](BACKLOG.md) — ideias pós-MVP (I-001 seed)
-- [.claude/skills/auto-grill/](.claude/skills/auto-grill/) — SKILL + 14 diagrams + assets/decisions-ui.html
-- [.specs/auto-grill-output/2026-07-28_023050/](.specs/auto-grill-output/2026-07-28_023050/) — run M3E outputs
-- [.scratch/memory-studio/spec.md](.scratch/memory-studio/spec.md) — to-spec output (post-gate)
-- [.specs/DISCOVERIES.md](.specs/DISCOVERIES.md) — 9 entries (D-001 a D-009)
+- [PRD.md](PRD.md) — v3.2, 17 seções, 9 discoveries integradas, §16.7 gate
+- [PLAN.md](PLAN.md) — v2, 7 phases técnicas
+- [.scratch/memory-studio/spec.md](.scratch/memory-studio/spec.md) — v2 comprehensive (70+ US, 20+ ImplDec)
+- [.specs/ROADMAP.md](.specs/ROADMAP.md) — v3, 10 phases, ready-for-tlc-loop
+- [.specs/auto-grill-output/2026-07-28_023050/](.specs/auto-grill-output/2026-07-28_023050/) — auto-grill run artifacts
+- [.specs/DISCOVERIES.md](.specs/DISCOVERIES.md) — D-001 a D-009 todas resolvidas
+- [CLAUDE.md](CLAUDE.md) — authority boundaries + glossary
+- [BACKLOG.md](BACKLOG.md) — ideias pós-MVP
 - [archive_handoff/handoff-session-2026-07-27.md](archive_handoff/handoff-session-2026-07-27.md) — handoff anterior
+- [Memory-Studio-Discuss.md](Memory-Studio-Discuss.md) — brainstorm doc
+- [critica-plan.md](critica-plan.md) — 37-finding critical review
 
 ---
 
-**Status final:** Auto-grill **validado end-to-end** + 9 decisions todas approved + to-spec output existe. Skill funciona. 6 fixes pendentes em PRD/PLAN (D-003, D-005, D-006, D-007, D-008, D-009). Phase 6 do PLAN continua aguardando grill §16.6.
+**Status final:** Working tree clean. origin/main pushed (20e3c24). PRD + PLAN + SPEC + ROADMAP + 9 discoveries all in sync. Phase 1 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
