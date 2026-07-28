@@ -427,7 +427,7 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 **Estimate:** 8-12h + 4h §16.4 overhead = **12-16h**
 
 **Done criteria:**
-- [ ] Fast agent (default `MiniMax-M2.7-highspeed` via Anthropic-compatible API, fallback `claude-3-5-haiku-*`, configurável via `fastAgent.model` em `.memory-studio/state.json`) lê R_N em paralelo com humano (in-process, não daemon)
+- [ ] Fast agent (default `MiniMax-M2.7-highspeed` via Anthropic-compatible API `https://api.minimax.io/anthropic` — no Claude Code, "Haiku" option = MiniMax-M2.7-highspeed, sem acesso a Anthropic oficial. Configurável via `fastAgent.model` em `.memory-studio/state.json`) lê R_N em paralelo com humano (in-process, não daemon)
 - [ ] Intel schema `{ agentState, nextNeeds, recentTopic }` gerado por fast agent (literal — D-005)
 - [ ] Intel store persistido em SQLite (WAL mode); restart do server preserva intel do último turn
 - [ ] Turn N+1 augmenta com `(intel + prompt + context + catalog)`

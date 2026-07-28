@@ -187,7 +187,7 @@ Quando `activeCatalog` é `[]`:
 ### E. Inception híbrida (Phase 6, gated)
 
 34. As a **user**, I want Turn N to go plain to the provider (no augmentação, cold start), so that the first request doesn't suffer latency.
-35. As a **user**, I want a fast agent (default `MiniMax-M2.7-highspeed`, configurable via `.memory-studio/state.json` `fastAgent.model`, fallback `claude-3-5-haiku-*`) to read response in parallel with my reading, so that intel is ready when I type the next turn.
+35. As a **user**, I want a fast agent (default `MiniMax-M2.7-highspeed` — verified 2026-07-28: no Claude Code, "Haiku" option = MiniMax-M2.7-highspeed, sem acesso a Anthropic oficial. Configurable via `.memory-studio/state.json` `fastAgent.model`) to read response in parallel with my reading, so that intel is ready when I type the next turn.
 36. As a **user**, I want Turn N+1 to augment with `intel = { agentState, nextNeeds, recentTopic }` from previous turn, so that context flows across turns without re-prompting. **← D-005**
 37. As a **user**, I want the fast agent (default `MiniMax-M2.7-highspeed`) to finish in <3s (tipicamente <1s com highspeed variant), so that latency trick works (human reads take 5-30s). Latency do fast agent é **arquitetural** (paralelismo natural) — não bloqueia request humano.
 37a. As a **user**, I want inception hot path overhead (intel load + concat + template render) <10ms total, so that request p50 stays <50ms (PRD §10.2 budget). **Medido, não estimado.**
@@ -615,7 +615,7 @@ Roda em qualquer máquina com 4GB livres.
 | `intel` | `{ agentState, nextNeeds, recentTopic }` (D-005). Shape exato. | §16.5 |
 | `activeCatalog` | Array de IDs ativos. Source = `.memory-studio/state.json`. | §7.1 |
 | `emptyReason` | Enum: `low_confidence \| social \| timeout \| no_active_items \| null`. | §7.1, D-008 |
-| `fast agent` | Default `MiniMax-M2.7-highspeed` (configurável via `.memory-studio/state.json` `fastAgent.model`, fallback `claude-3-5-haiku-*`). Anthropic-compatible API via `https://api.minimax.io/anthropic`. Lê response em paralelo com humano. | §16 |
+| `fast agent` | Default `MiniMax-M2.7-highspeed` (no Claude Code, "Haiku" = MiniMax-M2.7-highspeed, sem acesso a Anthropic oficial). Configurável via `.memory-studio/state.json` `fastAgent.model`. Anthropic-compatible API via `https://api.minimax.io/anthropic`. Lê response em paralelo com humano. | §16 |
 | `fast-agent-over-response` | Padrão arquitetural. | §16.3 |
 
 **Regra:** PRD, PLAN, SPEC, SDK, schema, response — todos usam casing canônico. Drift = discovery.
