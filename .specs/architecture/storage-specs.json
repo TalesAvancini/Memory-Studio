@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Layer 5 — Storage + Specs",
+    "subtitle": "Memory Studio · PRD v3.4 · SQLite + YAML + Spec docs",
+    "output": ".specs/architecture/layer-storage-specs.html"
+  },
+  "layout": {"mode": "grid", "origin": [60, 100], "cols": 5, "gapX": 50, "gapY": 60, "cellW": 240, "cellH": 100},
+  "components": [
+    {"id": "sqlite", "type": "database", "label": "SQLite", "sublabel": "catalog + audit + intel", "row": 0, "col": 0, "tag": "data"},
+    {"id": "sqlite-fts5", "type": "database", "label": "SQLite FTS5", "sublabel": "full-text engine", "row": 0, "col": 1, "tag": "engine"},
+    {"id": "sqlite-vec", "type": "database", "label": "sqlite-vec", "sublabel": "vector engine 384d", "row": 0, "col": 2, "tag": "engine"},
+    {"id": "embedding-model", "type": "cloud", "label": "Embedding Model", "sublabel": "multilingual-e5-small 384d ONNX", "row": 0, "col": 3, "tag": "ONNX"},
+    {"id": "catalog-yaml", "type": "external", "label": "Catalog YAML", "sublabel": "config/catalog/<id>.yaml", "row": 0, "col": 4, "tag": "versioned"},
+    {"id": "prd-md", "type": "database", "label": "PRD.md v3.4", "sublabel": "decisões + §16.7 gate", "row": 1, "col": 0, "tag": "doc"},
+    {"id": "spec-md", "type": "database", "label": "spec.md v2", "sublabel": "70+ US · 20+ ImplDec", "row": 1, "col": 1, "tag": "doc ⚡"},
+    {"id": "roadmap-md", "type": "database", "label": "ROADMAP.md v5", "sublabel": "10 phases · tlc-loop ready", "row": 1, "col": 2, "tag": "doc ⚡"},
+    {"id": "discoveries-md", "type": "database", "label": "DISCOVERIES.md", "sublabel": "D-001 a D-009 resolvidas", "row": 1, "col": 3, "tag": "append-only"},
+    {"id": "architecture-md", "type": "database", "label": "ARCHITECTURE.md", "sublabel": "farol em texto · stable IDs", "row": 1, "col": 4, "tag": "stable IDs"}
+  ],
+  "boundaries": [
+    {"kind": "region", "label": "Storage", "wraps": ["sqlite", "sqlite-fts5", "sqlite-vec", "embedding-model", "catalog-yaml"]},
+    {"kind": "region", "label": "Spec docs (source-of-truth)", "wraps": ["prd-md", "spec-md", "roadmap-md", "discoveries-md", "architecture-md"]}
+  ],
+  "connections": [
+    {"from": "catalog-yaml", "to": "sqlite", "label": "load", "route": "orthogonal-v", "via": [[1220, 80], [180, 80]]},
+    {"from": "sqlite", "to": "sqlite-fts5", "label": "FTS5 virtual table"},
+    {"from": "sqlite", "to": "sqlite-vec", "label": "vec virtual table", "route": "orthogonal-v", "via": [[180, 80], [640, 80]]},
+    {"from": "embedding-model", "to": "sqlite-vec", "label": "writes 384d"}
+  ]
+}

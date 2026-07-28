@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Layer 4b — Produto (Pipeline)",
+    "subtitle": "Memory Studio · PRD v3.4 · Augmenter + Search + Catalog + Match",
+    "output": ".specs/architecture/layer-produto-pipeline.html"
+  },
+  "layout": {"mode": "grid", "origin": [80, 100], "cols": 4, "gapX": 60, "gapY": 60, "cellW": 260, "cellH": 100},
+  "components": [
+    {"id": "augmenter", "type": "backend", "label": "Augmenter", "sublabel": "byte-string determinístico", "row": 0, "col": 0, "tag": "core ⚡"},
+    {"id": "search", "type": "backend", "label": "Search", "sublabel": "FTS5 + vec + RRF + tiebreak D-006", "row": 0, "col": 1, "tag": "core ⚡"},
+    {"id": "catalog", "type": "backend", "label": "Catalog", "sublabel": "YAML → SQLite + embed", "row": 0, "col": 2, "tag": "ingest"},
+    {"id": "cache", "type": "backend", "label": "Cache", "sublabel": "SHA256(byte-string) · cache_control:ephemeral", "row": 0, "col": 3, "tag": "hot"},
+    {"id": "social-detector", "type": "backend", "label": "Social Detector", "sublabel": "regex bypass (v1 promoted)", "row": 1, "col": 0, "tag": "guard"},
+    {"id": "match-script", "type": "backend", "label": "Match Script", "sublabel": "intel + prompt + catalog (Phase 6)", "row": 1, "col": 1, "tag": "Phase 6"}
+  ],
+  "boundaries": [
+    {"kind": "region", "label": "Memory Studio MVP — Pipeline", "wraps": ["augmenter", "search", "catalog", "cache", "social-detector", "match-script"]}
+  ],
+  "connections": [
+    {"from": "augmenter", "to": "search", "label": "retrieve"},
+    {"from": "augmenter", "to": "cache", "label": "lookup", "route": "orthogonal-v", "via": [[200, 80], [1040, 80]]},
+    {"from": "augmenter", "to": "social-detector"},
+    {"from": "match-script", "to": "augmenter", "label": "suffix inject"},
+    {"from": "match-script", "to": "search", "label": "boost with intel"}
+  ]
+}

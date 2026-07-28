@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Layer 3 — Phase 0 (Env Validation)",
+    "subtitle": "Memory Studio · PRD v3.4 · 1-2h setup antes de Phase 1",
+    "output": ".specs/architecture/layer-phase0.html"
+  },
+  "layout": {"mode": "grid", "origin": [120, 100], "cols": 3, "gapX": 80, "gapY": 60, "cellW": 280, "cellH": 100},
+  "components": [
+    {"id": "node-22", "type": "cloud", "label": "Node 22 LTS", "sublabel": "runtime", "row": 0, "col": 0, "tag": "Phase 0"},
+    {"id": "sqlite-extensions", "type": "database", "label": "SQLite FTS5 + vec", "sublabel": "extensões compiladas e carregáveis", "row": 0, "col": 1, "tag": "Phase 0"},
+    {"id": "onnx-embedding", "type": "cloud", "label": "ONNX Runtime", "sublabel": "onnxruntime-node · compilação OS-specific", "row": 0, "col": 2, "tag": "Phase 0"}
+  ],
+  "boundaries": [
+    {"kind": "region", "label": "Phase 0 — Environment Validation", "wraps": ["node-22", "sqlite-extensions", "onnx-embedding"]}
+  ],
+  "connections": [
+    {"from": "node-22", "to": "sqlite-extensions", "label": "loads"},
+    {"from": "node-22", "to": "onnx-embedding", "label": "loads", "route": "orthogonal-v", "via": [[240, 80], [840, 80]]}
+  ]
+}
