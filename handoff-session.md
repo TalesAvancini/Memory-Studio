@@ -1,13 +1,13 @@
 ---
-session_end: 2026-07-28-final-v3
+session_end: 2026-07-28-final-v4
 author: Claude/M3-CLI (continuação pós-compactação)
 audience: agentes futuros (sessão fresca, contexto compactado) + humano (revisão)
 type: end-of-session-handoff
 prev_handoff: archive_handoff/handoff-session-2026-07-27.md
-update_note: "v3 do handoff 2026-07-28. Supera v2 (que terminou com ROADMAP v3 + SPEC v2 + 9 discoveries resolvidas). Esta v3 cobre: (a) MiMo analysis aplicado (§16.4 decisions + reranker removed + Phase 0 + estimates), (b) BACKLOG com 12 entradas pós-MVP, (c) Branch B removido (single branch, Phase 6b mandatory), (d) PLAN sync com ROADMAP v4, (e) POC reframe (hot path overhead PRIMARY vs latency trick SECONDARY), (f) fast agent = MiniMax-M2.7-highspeed (sem fallback Anthropic), (g) .env.example lifecycle + .gitignore hardening."
+update_note: "v4 do handoff 2026-07-28. Substitui v3 (que documentava MiMo + Branch B removal + POC reframe + MiniMax). Esta v4 é diferente: DECLARAÇÃO DE FRACASSO. O produto Memory Studio (PRD/PLAN/SPEC/ROADMAP) está pronto, mas o farol arquitetural falhou em renderizar como sub-diagramas por confusão entre meta-tools e arquitetura do produto. PRINCIPAIS APRENDIZADOS para sessões futuras: (1) auto-grill é validation tool, NÃO parte do produto, NÃO uma phase no roadmap, NÃO uma sub-diagram no farol. (2) Meta-tools (tlc-roadmap-loop, auto-grill, verifier, MiMo) vivem em .claude/skills/ e .agents/skills/, NÃO no farol do produto. (3) Spec docs (PRD/SPEC/ROADMAP) são meta-documentação, NÃO componentes runtime. (4) Farol do produto = External + Phase 0 env + Produto (UI/Server/SDK/Augmenter/Search/Cache/Audit/Fast Agent/Catalog) + Storage (SQLite/FTS5/vec/ONNX/YAML) — só runtime."
 ---
 
-# Handoff de sessão — 2026-07-28 (final v3)
+# Handoff de sessão — 2026-07-28 (final v4 — DECLARAÇÃO DE FRACASSO)
 
 ## TL;DR
 
