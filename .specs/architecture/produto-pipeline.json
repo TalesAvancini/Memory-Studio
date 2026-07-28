@@ -6,7 +6,7 @@
     "subtitle": "Memory Studio · PRD v3.4 · Augmenter + Search + Catalog + Match",
     "output": ".specs/architecture/layer-produto-pipeline.html",
     "visual_preset": "classic",
-    "quality_profile": "standard"
+    "quality_profile": "showcase"
   },
   "layout": {
     "mode": "grid",

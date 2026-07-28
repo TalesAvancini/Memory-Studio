@@ -6,7 +6,7 @@
     "subtitle": "Memory Studio · PRD v3.4 · Boundary human/machine",
     "output": ".specs/architecture/layer-external.html",
     "visual_preset": "classic",
-    "quality_profile": "standard"
+    "quality_profile": "showcase"
   },
   "layout": {
     "mode": "grid",

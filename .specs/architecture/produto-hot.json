@@ -6,7 +6,7 @@
     "subtitle": "Memory Studio · PRD v3.4 · UI + Server + Audit + Fast Agent",
     "output": ".specs/architecture/layer-produto-hot.html",
     "visual_preset": "classic",
-    "quality_profile": "standard"
+    "quality_profile": "showcase"
   },
   "layout": {
     "mode": "grid",

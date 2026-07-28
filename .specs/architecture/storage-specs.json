@@ -6,7 +6,7 @@
     "subtitle": "Memory Studio · PRD v3.4 · SQLite + YAML + ONNX (runtime data)",
     "output": ".specs/architecture/layer-storage-specs.html",
     "visual_preset": "classic",
-    "quality_profile": "standard"
+    "quality_profile": "showcase"
   },
   "layout": {
     "mode": "grid",

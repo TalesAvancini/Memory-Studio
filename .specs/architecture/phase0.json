@@ -6,7 +6,7 @@
     "subtitle": "Memory Studio · PRD v3.4 · 1-2h setup antes de Phase 1",
     "output": ".specs/architecture/layer-phase0.html",
     "visual_preset": "classic",
-    "quality_profile": "standard"
+    "quality_profile": "showcase"
   },
   "layout": {
     "mode": "grid",
