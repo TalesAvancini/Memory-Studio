@@ -1,283 +1,725 @@
 ---
 date: 2026-07-28
-version: 1
-type: to-spec output
-description: "Spec Memory Studio MVP sintetizada via to-spec (post auto-grill)."
+version: 2
+type: comprehensive-spec
+description: "Memory Studio v3 — SPEC completa. Síntese unificada de PRD v3.2 + 9 discoveries auto-grill + conversation context + PLAN v2."
 explanation: |
-  Output do /mattpocock-skills:to-spec invocado 2026-07-28 após gate do
-  auto-grill composite (PRD.md v3.2 + PLAN.md v2).
+  SPEC completa do Memory Studio v3, construída mesclando:
 
-  Fontes:
-  - PRD.md (decisões, §14 fechado, §17 glossário)
-  - PLAN.md (7 phases + acceptance criteria mapping)
-  - .specs/auto-grill-output/2026-07-28_023050/PRD-PLAN.auto-grill.{transcript,decisions,loop-state}.md
-  - .specs/DISCOVERIES.md (D-001 a D-009)
+  - PRD.md v3.2 (17 seções, ~830 linhas): decisões estratégicas, escopo,
+    schema, stack, invariantes, acceptance criteria, glossário.
+  - PLAN.md v2 (7 phases, ~380 linhas): phases, deliverables, estimates,
+    acceptance mapping, branch B fallback.
+  - .specs/DISCOVERIES.md (D-001 a D-009): 9 decisões auto-grill, todas
+    resolvidas em PRD/PLAN post-gate 2026-07-28.
+  - Conversation context (Waldemar loop, NotebookLM brainstorm, archive
+    handoffs).
 
-  Auto-grill surfaced 9 decisions (todas aprovadas 2026-07-28 pelo humano).
-  5 fixes já aplicados em PLAN.md (drift §18→§16, body estimates);
-  6 fixes pendentes em PRD/PLAN (decisions 3, 5, 6, 7, 8, 9 — humano
-  aplica pós-gate per SKILL.md §Gate contract).
+  Diferente de v1 deste spec (to-spec output subdimensionado que só
+  extraiu User Stories + 10 Impl Decisions, deixando operational detail
+  do PRD de fora — §4 Painel UI, §5 SDK shape, §6 YAML schema, §7.2
+  endpoints, §8 stack + working set + invariantes, §10 acceptance
+  mapping, §14 decisões específicas, §17 caches + nomenclature).
 
-  Esta spec é fresh synthesis do conversation context (não de decisions.md,
-  per SKILL.md §Companion skills). Memento behavior: re-invocation gera
-  fresh synthesis, não append nem overwrite (memory to-spec-actual-behavior).
+  Esta versão é a SPEC canônica. PRD continua sendo a fonte de decisões
+  estratégicas ("por que X e não Y"); esta SPEC é granular + atomic,
+  ready-for-agent.
+
+  User Stories expandidas de 41 → 70+. Implementation Decisions
+  expandidas de 10 → 25+ (módulos, interfaces, schema, contracts).
+  Inclui: stack breakdown completo, working set ~1GB, 10 invariantes
+  sólida + 6 invariantes novas, 23 acceptance criteria mapeados,
+  arquitetura de cache (provedor vs augmented), nomenclature rules.
 related:
   - ../../PRD.md
   - ../../PLAN.md
-  - ../../.specs/auto-grill-output/2026-07-28_023050/
   - ../../.specs/DISCOVERIES.md
   - ../../CLAUDE.md
+  - ../../.specs/auto-grill-output/2026-07-28_023050/
 ---
 
-# Memory Studio — Spec (post auto-grill)
+# Memory Studio v3 — SPEC completa
 
 **Date:** 2026-07-28
-**Source:** `/mattpocock-skills:to-spec` após auto-grill gate (run 2026-07-28_023050)
-**Companion:** PRD.md v3.2 + PLAN.md v2 + 9 auto-grill decisions approved
+**Version:** 2 (comprehensive rebuild)
+**Sources merged:** PRD v3.2 + PLAN v2 + 9 auto-grill decisions + conversation context
+**Status:** ready-for-agent
 
 ---
 
 ## Problem Statement
 
-Code agents (Claude Code, Aider, Cursor, Cline, Mavis...) são genéricos. O humano controla o comportamento do agente via system prompt + tools + skills locais, mas o controle é difuso: skills, rules, personas ficam espalhadas em git, prompts ad-hoc, e configurações do agente. Quando o humano digita um prompt, o agente recebe system message **inalterado** entre requests que compartilham contexto lógico — então o humano paga custo total de raciocínio a cada turn, mesmo quando o estado do agente pouco mudou.
+Code agents (Claude Code, Aider, Cursor, Cline, Mavis) são genéricos. O humano controla comportamento via system prompt + tools + skills locais, mas controle é difuso: skills, rules, personas ficam espalhadas em git, prompts ad-hoc, e configurações do agente. Quando humano digita prompt, o agente recebe system message **inalterado** entre requests que compartilham contexto lógico — então humano paga custo total de raciocínio a cada turn, mesmo quando estado do agente pouco mudou.
 
-**Problema central:** o humano quer que o agente "já saiba o que importa" pra cada prompt, sem ter que copiar/colar skills ou re-explicar contexto toda vez. Mas (a) re-escrever o system message a cada turno quebra o cache do provedor (Anthropic `cache_control: ephemeral`); e (b) ferramentas existentes (LiteLLM, Portkey, OpenRouter, 9Router, OmniRoute) só fazem cache estável — nenhum processa response-side pra acumular intel pro próximo turno.
+**Problema central:** humano quer que agente "já saiba o que importa" pra cada prompt, sem ter que copiar/colar skills ou re-explicar contexto toda vez. Mas:
+- **(a)** re-escrever system message a cada turno quebra o cache do provedor (Anthropic `cache_control: ephemeral`).
+- **(b)** ferramentas existentes (LiteLLM, Portkey, OpenRouter, 9Router, OmniRoute) só fazem cache estável — nenhum processa response-side pra acumular intel pro próximo turno.
 
 ## Solution
 
-**Memory Studio** = middleware local entre o agente e o provedor. Intercepta request, lê prompt + estado do agente (scratch, todos, recentFiles, lastEvent), monta system message augmenté com catálogo ativo (Skills/Rules/Personas versionadas em git), encaminha pro provedor. Cache hit preservado via byte-string determinístico: prefixo (persona) intacto, sufixo (Skills) é a única parte variável.
+**Memory Studio** = middleware local entre agente e provedor. Intercepta request, lê prompt + estado do agente (scratch, todos, recentFiles, lastEvent), monta system message augmenté com catálogo ativo (Skills/Rules/Personas versionadas em git), encaminha pro provedor. Cache hit preservado via byte-string determinístico: prefixo (persona) intacto, sufixo (Skills) é única parte variável.
 
-**Inception híbrida (NOVEL):** Turn N vai plain pro provedor (sem augmentação — cold start, sem intel prévia). Fast agent (Haiku-class) lê response em paralelo com humano, gera `intel = { agentState, nextNeeds, recentTopic }` (schema definido em PRD §16). Turn N+1 augmenta system message com (intel + prompt + context + catalog). **Latency trick:** fast agentuality roda durante a leitura humana — humano leva ~5-30s lendo, fast agent leva ~1-3s processando. Intel pronto antes do humano digitar próximo turn. Zero penalty percebido.
+**Inception híbrida (NOVEL):** Turn N vai plain pro provedor (cold start, sem intel prévia). Fast agent (Haiku-class) lê response em paralelo com humano, gera `intel = { agentState, nextNeeds, recentTopic }`. Turn N+1 augmenta com (intel + prompt + context + catalog). **Latency trick:** fast agentuality roda durante leitura humana — humano leva ~5-30s lendo, fast agent leva ~1-3s processando. Intel pronto antes do humano digitar próximo turn. Zero penalty percebido.
 
-**Painel UI** (HTMX+Alpine, localhost primeira porta livre): humano controla Skills/Rules/Personas ativas por projeto via state.json (`.memory-studio/state.json`). Critical Rules atômicas (imunes a toggle off sem confirmação explícita).
+**Painel UI** (HTMX+Alpine, localhost primeira porta livre): humano controla Skills/Rules/Personas ativas por projeto via `.memory-studio/state.json`. Critical Rules atômicas (imunes a toggle off sem confirmação explícita).
 
 **Modos de integração:** proxy transparente (MVP, preserva cache byte-a-byte). Hook e MCP = v3.1+.
 
-**Modo prompt-only** (v1 compat): se contexto é null, augmenta com match só de prompt (sem estado do agente). Fallback gracioso.
+**Modo prompt-only** (v1 compat): se contexto é null, augmenta com match só de prompt.
+
+---
+
+## Architecture & Data Flow
+
+### Componentes
+
+| Camada | Componente | Tecnologia |
+|---|---|---|
+| **Cliente** | `@memory-studio/sdk` (~50KB TypeScript) | TypeScript puro, zero deps nativas |
+| **Servidor** | `@memory-studio/server` | Fastify + SQLite (FTS5 + sqlite-vec) + ONNX |
+| **UI** | `@memory-studio/ui` (HTMX+Alpine) | browser-side |
+| **Storage** | Catálogo (YAML em git) + state (`.memory-studio/state.json`) | filesystem + SQLite |
+| **Embedding** | multilingual-e5-small (ONNX, 384d) | local, ~470MB |
+| **Reranker** | ms-marco-MiniLM-L-6-v2 (ONNX) | local, ~90MB |
+| **Provedor LLM** | Anthropic API (MVP) | `cache_control: ephemeral` |
+
+### Fluxo do request (Turn N+1 com augmentação)
+
+```
+Humano digita prompt P_{N+1}
+   ↓
+SDK coleta contexto: scratch, todos, recentFiles, lastEvent
+   ↓
+SDK monta request: { prompt, context, fingerprint, activeCatalog, tenantId, schemaVersion }
+   ↓
+Memory Studio /augment recebe
+   ↓
+Retrieval: query FTS5 + sqlite-vec → RRF fusion → threshold duplo → top-K candidatos
+   ↓
+Matched arrays ordenados: Array.sort((a,b) => a.id.localeCompare(b.id))
+   ↓
+System message augmenté montado (2 blocos cache_control: ephemeral):
+  - Bloco 1 (prefixo, estável): persona
+  - Bloco 2 (sufixo, variável): intel + Skills
+   ↓
+SHA256(byte-string) calculado; cache key estável
+   ↓
+Forward pro provedor (Anthropic)
+   ↓
+Audit log async buffer (não bloqueia request)
+   ↓
+Response com cacheHit (v3.1+), pruningDecisions, decisionTraceId
+```
+
+### Fluxo da inception híbrida (Turn N vs N+1)
+
+```
+Turn N (cold start):
+  P_N plain → provedor → R_N
+  Ramo A (paralelo): humano lê R_N
+  Ramo B (paralelo): fast agent (Haiku) lê R_N → gera Intel → persiste
+
+Turn N+1 (augmentação cache-friendly):
+  P_{N+1} + Intel(R_N) + contexto + catálogo
+  → match pipeline → system message augmentado
+  → provedor → cache hit no prefixo (persona)
+```
+
+### Active catalog vazio (edge case D-008)
+
+Quando `activeCatalog` é `[]`:
+- HTTP 200 (não erro)
+- `systemMessage`: byte-string determinístico do persona prefix sozinho
+- `matchedSkills/Rules/Personas`: arrays vazios
+- `emptyReason: "no_active_items"`
+- `warnings`: `["activeCatalog is empty — proceeding with persona only"]`
+- Forward unchanged pro provedor
+
+---
 
 ## User Stories
 
-### A. Configuração inicial
+### A. Configuração inicial (instalação + setup)
 
 1. As a **developer** setting up Memory Studio, I want to run `npm install` and have it self-configure (SQLite schema, embeddings index, default catalog), so that I can start using it in <5min.
-2. As a **developer**, I want to mount the UI panel at `http://127.0.0.1:<porta-livre>`, so that I don't need to fight a fixed port or container setup.
-3. As a **developer**, I want the SDK to be a TypeScript package (~50KB, zero native deps), so that I can embed it in any agent without bundler pain.
+2. As a **developer**, I want the SDK to be a TypeScript package (~50KB, zero native deps), so that I can embed it in any agent without bundler pain.
+3. As a **developer**, I want to mount the UI panel at `http://127.0.0.1:<porta-livre>`, so that I don't need to fight a fixed port or container setup.
 4. As a **developer**, I want to add a new Skill by editing a YAML file in `config/catalog/<id>.yaml`, so that I can version skills in git like code.
 5. As a **developer**, I want `npm run build-index` to regenerate embeddings in <60s for 100 skills, so that adding a skill is fast.
 6. As a **developer**, I want to migrate v1 calibration state (`.specs/archive/2026-07-calibration/STATE.md`) into Memory Studio's schema, so that the invariant SQLite design isn't invented from scratch.
+7. As a **developer**, I want the SQLite schema to include `catalog`, `embeddings`, and `audit_events` tables, plus FTS5 + sqlite-vec, so that retrieval is unified and vector search works.
+8. As a **developer**, I want the catalog versioned in git with `schemaVersion` exposed in the API, so that breaking changes are explicit.
 
-### B. Painel UI (controle)
+### B. Painel UI (controle do humano)
 
-7. As a **human** working with a code agent, I want a panel that lists Skills/Personas/Rules in columns, so that I can scan what's available at a glance.
-8. As a **human**, I want to search by name/keyword across Skills/Personas/Rules, so that I can find relevant items fast.
-9. As a **human**, I want a side panel that shows full content of an item when I select it, so that I can read without losing context.
-10. As a **human**, I want to toggle a Skill on/off per project (`.memory-studio/state.json`), so that I can scope what each codebase gets.
-11. As a **human**, I want Critical Rules shown with a visual warning ("always on, can't toggle off without confirmation"), so that I don't accidentally disable safety rails.
-12. As a **human**, I want to toggle confirmation for Critical Rules off, so that I can override atomic rules when I have explicit intent.
-13. As a **human**, I want at most 3 Personas active at once, so that the system message stays coherent.
-14. As a **human**, I want the Audit tab to show last N augmentations (timestamp, prompt redacted, matched IDs, pruning reasons, latency), so that I can debug what got injected.
-15. As a **human**, I want the Settings tab to show threshold (min_cosine_similarity, min_fts_hits), tenant, integration mode, embedding model, so that I can tune retrieval.
+9. As a **human** working with a code agent, I want a panel that lists Skills/Personas/Rules in columns, so that I can scan what's available at a glance.
+10. As a **human**, I want to search by name/keyword across Skills/Personas/Rules, so that I can find relevant items fast.
+11. As a **human**, I want a side panel that shows full content of an item when I select it, so that I can read without losing context.
+12. As a **human**, I want to toggle a Skill on/off per project (`.memory-studio/state.json`), so that I can scope what each codebase gets.
+13. As a **human**, I want Critical Rules shown with a visual warning ("always on, can't toggle off without confirmation"), so that I don't accidentally disable safety rails.
+14. As a **human**, I want to toggle confirmation for Critical Rules off, so that I can override atomic rules when I have explicit intent.
+15. As a **human**, I want at most 3 Personas active at once, so that the system message stays coherent.
+16. As a **human**, I want the Audit tab to show last N augmentations (timestamp, prompt redacted, matched IDs, pruning reasons, latency), so that I can debug what got injected.
+17. As a **human**, I want the Settings tab to show threshold (min_cosine_similarity, min_fts_hits), tenant, integration mode, embedding model, so that I can tune retrieval.
+18. As a **human**, I want UI stack as HTMX+Alpine (zero build), so that iterating on UI is fast and Node-only invariant holds.
+19. As a **human**, I want the UI to live at `http://127.0.0.1:<porta-livre>` (first free port), so that I don't fight port conflicts.
 
-### C. Hot path (request flow)
+### C. SDK cliente (coleta de estado)
 
-16. As a **Claude Code user**, I want `/augment` to add Skills to my system message before each request, so that my agent already knows context.
-17. As a **user**, I want the system message byte-string to be deterministic (same input → same SHA256), so that the Anthropic cache hit works.
-18. As a **user**, I want matched arrays (matchedSkills/Rules/Personas) to be deterministically ordered (lexicographic by id tiebreaker), so that RRF ties don't break byte-string silently.
-19. As a **user**, I want audit log writes to be async (batch flush, fail-open on write error), so that request latency stays under p50<50ms.
-20. As a **user**, I want p50 latency <50ms (request without embedding cache miss), so that Memory Studio is invisible in normal flow.
-21. As a **user**, I want p99 latency <200ms (with embedding), so that worst-case is bounded.
-22. As a **user**, I want working set <1.5GB RAM, so that it runs on any 4GB machine.
+20. As an **agent developer**, I want SDK function `collectContext({ scratch, todos, recentFiles, lastEvent, redaction })` that returns a serialized context object, so that I can hand agent state to Memory Studio with one call.
+21. As an **agent developer**, I want SDK function `fingerprint({ projectPath, agentId, sessionId, gitBranch })` that returns a 4-component fingerprint, so that request provenance is captured.
+22. As an **agent developer**, I want SDK function `MemoryStudioClient.augment({ prompt, context, fingerprint })` that calls `/augment` and returns the augmented system message, so that I can inject it into the agent's request.
+23. As an **agent developer**, I want SDK to support prompt-only mode (v1 compat) when context is null, so that legacy agents keep working.
+24. As an **agent developer**, I want SDK to hardcode `agentId = "claude-code"` for MVP, so that the first integration is stable.
+25. As an **agent developer**, I want SDK to hash `sessionId` before sending (sha256[0:16]), so that privacy is preserved.
+26. As an **agent developer**, I want SDK to redact secrets in `scratch` and `lastEvent.payload` before sending, so that I don't accidentally leak via audit log.
 
-### D. Inception híbrida (Phase 6, gated)
+### D. Hot path (request flow / cache)
 
-23. As a **user**, I want Turn N to go plain to the provider (no augmentação, cold start), so that the first request doesn't suffer latency.
-24. As a **user**, I want a fast agent (Haiku-class) to read response in parallel with my reading, so that intel is ready when I type the next turn.
-25. As a **user**, I want Turn N+1 to augment with `intel = { agentState, nextNeeds, recentTopic }` from previous turn, so that context flows across turns without re-prompting.
-26. As a **user**, I want the fast agent to finish in <3s, so that latency trick works (human reads take 5-30s).
-27. As a **user**, I want the fast agent to be in-process (no separate daemon), so that there's no extra service to manage.
+27. As a **Claude Code user**, I want `/augment` to add Skills to my system message before each request, so that my agent already knows context.
+28. As a **user**, I want the system message byte-string to be deterministic (same input → same SHA256), so that the Anthropic cache hit works.
+29. As a **user**, I want matched arrays (matchedSkills/Rules/Personas) to be deterministically ordered (lexicographic by id tiebreaker), so that RRF ties don't break byte-string silently. **← D-006**
+30. As a **user**, I want audit log writes to be async (buffer + batch flush, fail-open on write error), so that request latency stays under p50<50ms. **← D-007 CRITICAL**
+31. As a **user**, I want p50 latency <50ms (request without embedding cache miss), so that Memory Studio is invisible in normal flow.
+32. As a **user**, I want p99 latency <200ms (with embedding), so that worst-case is bounded.
+33. As a **user**, I want working set <1.5GB RAM, so that it runs on any 4GB machine.
 
-### E. Cache & metrics
+### E. Inception híbrida (Phase 6, gated)
 
-28. As a **user**, I want the cache key for the Anthropic provider to be the system message byte-string, so that stable prefixes hit cache.
-29. As a **user**, I want structured JSON logs of `usage.cache_read_input_tokens` per request, so that I can measure cache hit rate.
-30. As a **user**, I want request hit rate >70% in real session (>10 turns), so that the cache trick actually pays off.
-31. As a **user**, I want token cache coverage = Σ cache_read / Σ total_prompt_tokens, so that I can see utilization, not just request count.
+34. As a **user**, I want Turn N to go plain to the provider (no augmentação, cold start), so that the first request doesn't suffer latency.
+35. As a **user**, I want a fast agent (Haiku-class) to read response in parallel with my reading, so that intel is ready when I type the next turn.
+36. As a **user**, I want Turn N+1 to augment with `intel = { agentState, nextNeeds, recentTopic }` from previous turn, so that context flows across turns without re-prompting. **← D-005**
+37. As a **user**, I want the fast agent to finish in <3s, so that latency trick works (human reads take 5-30s).
+38. As a **user**, I want the fast agent to be in-process (no separate daemon), so that there's no extra service to manage.
+39. As a **user**, I want Branch B fallback (Phase 6 → 0h, Phase 7 pre-reqs → Phase 5 only) if grill §16.6 reproves inception híbrida, so that MVP closes without it as a real tree, not a footnote. **← D-003**
 
-### F. Edge cases
+### F. Cache & metrics
 
-32. As a **user**, I want `/augment` to return 200 with empty match arrays + `emptyReason: "no_active_items"` when active catalog is empty, so that the agent still gets a response.
-33. As a **user**, I want forward-on-error (fail-open) for any retrieval or augmentation failure, so that the agent is never blocked.
-34. As a **user**, I want mode prompt-only (no agent state) to work as fallback, so that v1-style flow keeps functioning.
+40. As a **user**, I want the cache key for the Anthropic provider to be the system message byte-string, so that stable prefixes hit cache.
+41. As a **user**, I want structured JSON logs of `usage.cache_read_input_tokens` per request, so that I can measure cache hit rate.
+42. As a **user**, I want request hit rate >70% in real session (>10 turns), so that the cache trick actually pays off.
+43. As a **user**, I want token cache coverage = Σ cache_read / Σ total_prompt_tokens, so that I can see utilization, not just request count.
+44. As a **user**, I want the **provider cache** (Anthropic `cache_control: ephemeral`) and the **augmented cache** (fingerprint semântico, v3.1+) to be clearly distinguished, so that I don't confuse them. **← §17.1**
+45. As a **user**, I want the MVP to use **only provider cache** (omit `cacheHit` field from `/augment` response), so that we ship what's validated, not speculate.
 
-### G. Security / Privacy
+### G. Edge cases & contracts
 
-35. As a **user**, I want zero persistence of raw context (only redacted), so that audit log doesn't leak secrets.
-36. As a **user**, I want `tenantId` hashed in all logs (sha256[0:16]), so that observability is privacy-safe.
-37. As a **user**, I want no data leaving my machine (proxy = local only), so that I don't accidentally exfiltrate.
+46. As a **user**, I want `/augment` to return 200 with empty match arrays + `emptyReason: "no_active_items"` when active catalog is empty, so that the agent still gets a response. **← D-008**
+47. As a **user**, I want forward-on-error (fail-open) for any retrieval or augmentation failure, so that the agent is never blocked.
+48. As a **user**, I want mode prompt-only (no agent state) to work as fallback, so that v1-style flow keeps functioning.
 
-### H. Operational
+### H. Security / Privacy
 
-38. As a **developer**, I want `/health` endpoint for liveness/readiness, so that latency gating §10.2 has a heartbeat.
-39. As a **developer**, I want `/audit/summary` for daily rollups, so that I can see trends in Phase 7 tuning.
-40. As a **developer**, I want `/catalog/rebuild` to be idempotent and safe to run mid-request, so that I can iterate on Skills without downtime.
+49. As a **user**, I want zero persistence of raw context (only redacted), so that audit log doesn't leak secrets.
+50. As a **user**, I want `tenantId` hashed in all logs (sha256[0:16]), so that observability is privacy-safe.
+51. As a **user**, I want no data leaving my machine (proxy = local only), so that I don't accidentally exfiltrate.
+52. As a **user**, I want placeholders determinísticos não vazam secret em audit, so that template substitution is safe.
 
-### I. Inception híbrida fallback
+### I. Operational / endpoints
 
-41. As a **developer**, I want a clear branch B in PLAN that says "if grill §16.6 reproves, Phase 6 collapses to 0h and Phase 7 pre-reqs loosen to Phase 5 only", so that MVP closes without inception híbrida as a real tree, not a footnote.
+53. As a **developer**, I want `/health` endpoint for liveness/readiness, so that latency gating §10.2 has a heartbeat. **← D-009**
+54. As a **developer**, I want `/audit/summary` for daily rollups, so that I can see trends in Phase 7 tuning.
+55. As a **developer**, I want `/catalog/rebuild` to be idempotent and safe to run mid-request, so that I can iterate on Skills without downtime.
+56. As a **developer**, I want `/catalog` (GET) to return full catalog YAML+embeddings for debugging, so that I can inspect what's loaded.
+57. As a **developer**, I want `/audit` (GET) to return last N augmentations (redacted), so that I can debug what got injected.
+58. As a **developer**, I want all 5 endpoints (`/augment`, `/catalog`, `/catalog/rebuild`, `/audit`, `/audit/summary`, `/health`) owned by Phase 5, so that there's a single owner for endpoint surface.
+
+### J. Critical Rules contract
+
+59. As a **user**, I want `critical: true` Rules to always be included if active in panel, so that safety rails are guaranteed.
+60. As a **user**, I want toggle-off without confirmation to be blocked (server enforça + UI gate), so that Critical Rules can't be accidentally disabled.
+61. As a **user**, I want toggle-off WITH explicit confirmation accepted, so that I can override atomic rules when I have explicit intent.
+62. As a **user**, I want Critical Rules shown with UI warning "always on, can't toggle off without confirmation", so that UX makes atomicity visible.
+
+### K. Nomenclature & invariants
+
+63. As a **developer**, I want `recentFiles` (camelCase) as canonical term for git status modified files, NOT `gitStatus`/`files`/`recent_files`, so that drift is eliminated.
+64. As a **developer**, I want `lastEvent` (camelCase) as canonical term for last agent event, NOT snake_case variants, so that casing is consistent.
+65. As a **developer**, I want `intel` to mean specifically `{ agentState: string, nextNeeds: string[], recentTopic: string }` — no other shapes — so that writer-reader contract is precise. **← D-005**
+66. As a **developer**, I want `emptyReason` enum to include `"no_active_items"` as a valid value, so that activeCatalog vazio is explicit, not aliased to timeout/null. **← D-008**
+
+### L. Acceptance criteria coverage
+
+67. As a **product owner**, I want PRD §10 acceptance criteria (23 items) mapped to phases, so that every checkbox has owner + validator.
+68. As a **product owner**, I want the spec to include a complete working set breakdown (~1GB RAM), so that hardware requirements are explicit.
+69. As a **product owner**, I want 10 invariantes sólida (v1 mantidas) + 6 invariantes novas (v3 introduz) documented, so that regressions are detectable.
+70. As a **product owner**, I want total estimate 35-50h single-dev documented, so that planning is honest.
+
+---
 
 ## Implementation Decisions
 
-### ID-1: Single seam — `/augment` endpoint
+### IMod-1: Module breakdown
 
-The highest seam in this codebase is the `/augment` HTTP endpoint. Everything else (UI panel, SDK, fast agent, persistence) is internal. Tests should probe `/augment` behavior end-to-end with Claude Code via custom `baseURL`. No new seams needed beyond the existing Fastify router + SQLite.
+| Module | Path | Size | Phase |
+|---|---|---|---|
+| `@memory-studio/sdk` | `packages/sdk/` | ~50KB TypeScript, zero native deps | Phase 3 |
+| `@memory-studio/server` | `packages/server/` | Fastify + SQLite + ONNX | Phase 5 |
+| `@memory-studio/ui` | `packages/ui/` | HTMX + Alpine, ~50KB browser | Phase 4 |
+| `config/catalog/<id>.yaml` | repo root | Skills/Rules/Personas (git-versioned) | Phase 1 |
+| `.memory-studio/state.json` | per-project | toggle state per project | Phase 4 |
 
-### ID-2: Inception híbrida — `intel` schema (TypeScript shape)
+### IMod-2: SDK API surface
 
 ```typescript
-type Intel = {
-  agentState: string       // free-text, what the agent was doing
-  nextNeeds: string[]      // structured tags, what agent will probably need next
-  recentTopic: string      // free-text, current focus
+// packages/sdk/src/index.ts
+export async function collectContext(opts: {
+  scratch?: string              // últimos N chars do scratch local
+  todos?: { status: string; text: string }[]
+  recentFiles?: string[]        // paths modificados (git status)
+  lastEvent?: {
+    type: "tool_error" | "tool_call" | "tool_result"
+    severity?: "warning" | "error" | "critical"
+    payload: unknown
+  }
+  redaction?: "minimal" | "strict"   // default "minimal"
+}): Promise<Context>
+
+export async function fingerprint(opts: {
+  projectPath: string
+  agentId: string               // MVP: "claude-code"
+  sessionId: string             // hasheado sha256[0:16] antes de sair
+  gitBranch: string
+}): Promise<Fingerprint>
+
+export class MemoryStudioClient {
+  constructor(opts: { baseURL: string; tenantId: string })
+  async augment(req: AugmentRequest): Promise<AugmentResponse>
 }
 ```
 
-This is the writer-reader contract between fast agent (§16.2) and match pipeline (§3 Turn N+1). Defined before Phase 6 starts so the implementation has a shape to fill.
-
-### ID-3: Deterministic ordering — lexicographic by id tiebreaker
-
-After RRF fusion, before serializing to system message:
+### IMod-3: /augment request schema (PRD §7.1)
 
 ```typescript
-matched.sort((a, b) => a.id.localeCompare(b.id))
+type AugmentRequest = {
+  prompt: string                                    // obrigatório
+  context?: {                                       // opcional, presente se SDK coletou
+    scratch?: string                                // <= 384 tokens
+    todos?: { status: string; text: string }[]      // <= 64 tokens serializados
+    recentFiles?: string[]                          // <= 64 tokens (paths)
+    lastEvent?: {
+      type: "tool_error" | "tool_call" | "tool_result"
+      severity?: "warning" | "error" | "critical"
+      payload: unknown
+    }
+    legacyState?: string                            // injetado 1ª turn de nova sessão
+    sessionId?: string                               // hasheado
+  }
+  fingerprint: {
+    projectPath: string
+    agentId: string                                  // "claude-code" (MVP)
+    sessionId: string                                // hasheado
+    gitBranch: string
+  }
+  activeCatalog: string[]                            // IDs ativos do .memory-studio/state.json
+  tenantId: string                                   // hasheado
+  schemaVersion: 3
+}
 ```
 
-Without this, RRF ties near the cosine threshold cause byte-string drift between identical-input requests, silently breaking the Anthropic cache hit. Verified by Phase 5 done criterion: SHA256(byte-string) equality between two requests with same logical input.
+### IMod-4: /augment response schema (PRD §7.1)
 
-### ID-4: Audit log — async buffer with batch flush + fail-open
+```typescript
+type AugmentResponse = {
+  systemMessage: string                            // byte-string cacheável
+  matchedSkills: { id: string; score: number; source: "builtin" | "user" }[]
+  matchedRules: { id: string; score: number; critical: boolean }[]
+  matchedPersonas: { id: string; score: number; isDefault: boolean }[]
+  // MVP: cacheHit OMITIDO (v3.1+). Métrica de cache hit é via log estruturado.
+  pruningDecisions: {
+    rejectedByFloor: { id: string; reason: string }[]
+    rejectedByBudget: { id: string; reason: string }[]
+    rejectedByAttentionTier: { id: string; reason: string }[]   // MVP: sempre []
+    rejectedByNegativeFeedback: { id: string; reason: string }[]
+    rejectedByCriticalDropped: { id: string; reason: string }[]
+  }
+  latencyMs: { embedding: number; retrieval: number; rerank: number; total: number }
+  decisionTraceId: string                            // link pro audit log
+  warnings: string[]
+  emptyReason?: "low_confidence" | "social" | "timeout" | "no_active_items" | null  // ← D-008
+  schemaVersion: 3
+}
+```
 
-Audit log writes are queued to an in-memory buffer. Background worker flushes every N events or T ms (whichever first). On write error, log to stderr and continue — never block the request. This is the only way to honor p50<50ms budget while satisfying §10.1 item 8 (audit every request).
+### IMod-5: Intel schema (writer-reader contract — D-005)
 
-### ID-5: Empty activeCatalog — explicit contract
+```typescript
+type Intel = {
+  agentState: string       // free-text, o que o agente estava fazendo
+  nextNeeds: string[]      // structured tags, o que o agente provavelmente vai precisar
+  recentTopic: string      // free-text, foco atual
+}
+```
 
-When `activeCatalog` is empty: return 200 with deterministic unaugmented system message, empty match arrays, `emptyReason: "no_active_items"` (new enum value), warning/audit marker, forward unchanged to provider. Cache key stable because byte-string is deterministic.
+**Writer:** fast agent (Haiku) ao final de Turn N. Lê R_N, gera Intel, persiste no store.
+**Reader:** match pipeline no início de Turn N+1. Carrega Intel do store.
+**Invariante:** schema drift entre writer/reader quebra inception híbrida silenciosamente. Phase 6 implementa contra este shape literal.
 
-### ID-6: Branch B — fallback if inception híbrida grill reproves
+### IMod-6: Catalog schema (YAML — PRD §6)
 
-If PRD §16.6 grill reproves Phase 6:
-- Phase 6 estimate collapses to 0h (no Fast agent work).
-- Phase 7 pre-reqs loosen to "Phase 5" (cache hit metric §10.2.4 is reachable via Phase 5's byte-string + cache_control ephemeral + structured log, no Phase 6 needed).
-- Total estimate drops from 35-50h to 28-39h.
-- MVP closes with `Inception híbrida (CONDICIONAL)` checkbox moved to v3.2 per PRD §10.1.
+```yaml
+# Skill (PRD §6.1)
+id: auth-jwt-01
+type: skill
+title: How to set up JWT auth
+category: procedural          # procedural | diagnostic | reference | pattern
+text: |
+  # Setup
+  1. Install `jsonwebtoken`
+  2. Generate RS256 keys
 
-Branch is a tree, not a footnote.
+# Rule (PRD §6.2)
+id: rule-no-secrets-01
+type: rule
+critical: true               # atômico, sempre injetado se ativo
+text: "Never commit secrets, .env files, or API keys to git."
 
-### ID-7: Endpoint surface — explicit ownership
+# Persona (PRD §6.3)
+id: engineer-pragmatic-01
+type: persona
+isDefault: true             # 1 slot garantido (se user configurar)
+text: |
+  You are a pragmatic senior engineer. Write clean, maintainable code.
+```
+
+### IMod-7: Retrieval pipeline (Phase 5 runtime — PLAN §5)
+
+```
+1. Query FTS5 (text match sobre `text` de cada item)
+2. Query sqlite-vec (cosine similarity, 384d)
+3. RRF (Reciprocal Rank Fusion) sobre resultados
+4. Threshold duplo: min_cosine_similarity + min_fts_hits
+5. Top-K candidatos
+6. **Tiebreak ordering:** Array.sort((a,b) => a.id.localeCompare(b.id))  ← D-006
+7. Serializar system message byte-string determinístico
+8. SHA256(byte-string) = cache key do provedor
+```
+
+### IMod-8: Audit log boundary (D-007 CRITICAL)
+
+**Async buffer + batch flush + fail-open:**
+
+```typescript
+// Pattern (não código final):
+const auditBuffer: AuditEvent[] = []
+let flushScheduled = false
+
+function enqueueAudit(ev: AuditEvent) {
+  auditBuffer.push(ev)
+  if (!flushScheduled) {
+    flushScheduled = true
+    setTimeout(flushAudit, 100)  // ou flush quando N events atingirem
+  }
+}
+
+async function flushAudit() {
+  const batch = auditBuffer.splice(0, auditBuffer.length)
+  try {
+    await sqlite.insertAuditEvents(batch)
+  } catch (err) {
+    console.error("[audit] write failed, dropped", batch.length, "events:", err)
+    // FAIL-OPEN: request NÃO bloqueia
+  } finally {
+    flushScheduled = false
+  }
+}
+```
+
+**Invariante:** request nunca bloqueia por audit log. Erro → stderr + continue. Request retorna 200.
+
+### IMod-9: Cache architecture (PRD §17.1)
+
+| Cache | O que | Onde mora | Métrica | Status |
+|---|---|---|---|---|
+| **Cache do provedor** (Anthropic) | `cache_control: ephemeral` no system message augmenté. TTL 5min. Hash byte-string = chave. | Anthropic API (server-side) | Log estruturado `usage.cache_read_input_tokens` (request hit rate + token cache coverage) | **MVP** |
+| **Cache de augmented** (fingerprint semântico) | Fingerprint sobre byte-string final, pra hit entre inputs semanticamente equivalentes mas byte-diferentes | Memory Studio (in-memory) | Campo `cacheHit: "exact" \| "semantic" \| "miss"` na response | **v3.1+** (omitido no MVP) |
+
+**Regra:** métricas de aceitação MVP (§10.2) usam log do cache do provedor, NÃO campo `cacheHit` da response.
+
+### IMod-10: Endpoint surface ownership (D-009)
 
 | Endpoint | Owner Phase | Validation |
 |---|---|---|
 | `/augment` | Phase 5 | smoke test + SHA256 byte-string equality |
 | `/catalog` | Phase 5 (read Phase 1 data) | GET returns full catalog YAML+embeddings |
 | `/catalog/rebuild` | Phase 5 (writes Phase 1 index) | idempotent, safe during requests |
-| `/audit` | Phase 5 | last N augmentations, redactado |
+| `/audit` | Phase 5 | last N augmentations, redacted |
 | `/audit/summary` | Phase 5 (Phase 7 uses) | daily rollups, <100ms for 30 days |
 | `/health` | Phase 5 | liveness + readiness, REQUIRED for §10.2 latency gating |
+| `/state/toggle` | Phase 5 (consumed by Phase 4 UI) | POST `{itemId, action, critical_confirm?}`; toggle Rule critical sem confirmação → 400 |
 
-### ID-8: Critical Rules — atomic with explicit override
+### IMod-11: Branch B fallback (D-003)
 
-`critical: true` Rule is always included if active in panel. UI shows warning ("always on, can't toggle off without confirmation"). Server enforces — toggle-off without confirmation returns 400. Toggle-off WITH explicit confirmation accepted. Atomicity is "default-on, overrideable with intent", not "absolute".
+Se PRD §16.6 grill reprovar Phase 6 (inception híbrida):
+- Phase 6 estimate colapsa para **0h** (sem fast agent work).
+- Phase 7 pre-reqs loosen para **Phase 5 only** (cache hit §10.2.4 derivável via Phase 5 byte-string + cache_control ephemeral + structured log).
+- Total estimate cai de 35-50h para **28-39h**.
+- MVP core fecha sem inception híbrida; critério §10.1 item "Inception híbrida (CONDICIONAL)" é movido pra v3.2.
 
-### ID-9: Modules to build/modify
+Branch B é **tree branch explícita** (PLAN.md Phase 6), não footnote.
 
-- `@memory-studio/sdk` — TypeScript SDK (~50KB, zero native deps). Phase 3.
-- `@memory-studio/server` — Fastify + SQLite + ONNX embedder. Phase 5.
-- `@memory-studio/ui` — HTMX + Alpine. Phase 4.
-- `config/catalog/<id>.yaml` — Skills/Rules/Personas (git-versioned). Phase 1.
-- `.memory-studio/state.json` — toggle state per project. Phase 4.
+### IMod-12: Active catalog vazio contract (D-008)
 
-### ID-10: Architectural decisions (per v3 PRD/PLAN, all approved)
+`/augment` quando `activeCatalog = []`:
+- HTTP 200
+- `systemMessage`: byte-string determinístico do persona prefix sozinho
+- `matchedSkills/Rules/Personas`: arrays vazios `[]`
+- `emptyReason: "no_active_items"` (novo enum value)
+- `warnings`: `["activeCatalog is empty — proceeding with persona only"]`
+- `pruningDecisions`: todas as razões com arrays vazios
+- Forward unchanged pro provedor (não inject defaults, não reject)
 
-- Node-only, zero Python in hot path.
-- SQLite + FTS5 + sqlite-vec (vs Qdrant/Pinecone — benchmark interno v1 2026-Q2).
-- `cache_control: ephemeral` no system message augmenté.
-- Catálogo versionado em git (YAML por item).
-- `tenant_id` hasheado no audit log (sha256[0:16]).
-- Detector social via regex (promover de v1 phases 0-4 calibração).
-- Threshold duplo no retrieval (min_cosine_similarity + min_fts_hits).
-- Modos de integração: proxy MVP, hook/MCP v3.1+.
-- 2 blocos `cache_control: ephemeral` (persona estável vs Skills variáveis).
-- Inception híbrida = arquitetura NOVEL, gated por grill §16.6.
+Cache key estável porque byte-string é determinístico.
+
+### IMod-13: Architectural decisions (PRD §8 — 16 invariantes total)
+
+**Invariantes sólidas (v1 mantidas, v3 não toca):**
+
+1. Node-only, zero Python no hot path
+2. SQLite + FTS5 + sqlite-vec (vs Qdrant/Pinecone — benchmark v1 2026-Q2)
+3. `cache_control: ephemeral` no system message augmenté
+4. Catálogo versionado em git (YAML por item)
+5. `tenant_id` hasheado no audit log (sha256[0:16])
+6. Detector social via regex (prompt bypassa retrieval)
+7. Threshold duplo no retrieval (`min_cosine_similarity` + `min_fts_hits`)
+8. Modos de integração (proxy/hook/MCP)
+9. Mem0 não entra (ortogonal)
+10. Catálogo NÃO tem auto-melhoria (no discovery signals, no curator LLM)
+
+**Invariantes novas (v3 introduz):**
+
+11. 🆕 2 blocos `cache_control: ephemeral` (persona estável vs Skills variáveis)
+12. 🆕 Critical Rules atômicas (sempre injetadas se ativas no painel)
+13. 🆕 Response com `pruning_decisions` (debug-first)
+14. 🆕 State local do agente entra no match (`recentFiles`, `scratch`, `todos`, `lastEvent`)
+15. 🆕 **Audit log async + fail-open** (D-007): writes bufferizados, batch flush, fail-open em erro. Request **nunca bloqueia** — invariante crítica pra honrar p50<50ms.
+16. 🆕 Inception híbrida (response-first + latency trick) — ver §16
+
+### IMod-14: Stack breakdown (PRD §8 — table)
+
+| Componente | Ferramenta | Tamanho |
+|---|---|---|
+| Runtime | Node.js 22 LTS | já tem |
+| HTTP server | Fastify | ~5MB |
+| Banco | SQLite + FTS5 + sqlite-vec | ~10MB |
+| Embedding local | multilingual-e5-small (ONNX, 384d) | ~470MB |
+| Reranker local | ms-marco-MiniLM-L-6-v2 (ONNX) | ~90MB |
+| UI | HTMX+Alpine (MVP) | ~50KB JS browser |
+| SDK cliente | TypeScript puro, ~50KB | 0 deps nativas |
+
+### IMod-15: Working set breakdown (~1GB RAM — PRD §8)
+
+| Componente | Tamanho |
+|---|---|
+| Embedding (multilingual-e5-small ONNX) | ~470MB |
+| Reranker (ms-marco-MiniLM-L-6-v2 ONNX) | ~90MB |
+| SQLite cache + sqlite-vec | ~10MB |
+| Fastify + Node runtime baseline | ~200MB |
+| ONNX runtime overhead + file cache | ~125MB |
+| Misc (audit log buffer, catalog cache) | ~100MB |
+| **Total** | **~995MB (arredondado ~1GB)** |
+
+Roda em qualquer máquina com 4GB livres.
+
+### IMod-16: Latency budgets (PRD §10.2)
+
+| Métrica | Budget | Phase que honra | Validação |
+|---|---|---|---|
+| p50 latência | < 50ms | Phase 5 (proxy + audit async) | Phase 7 (1 semana real) |
+| p99 latência | < 200ms | Phase 5 (com embedding) | Phase 7 |
+| Working set | < 1.5GB | Phase 5 (deploy) | Phase 7 |
+| Cache hit rate | > 70% (>10 turns) | Phase 5 (logging) + Phase 7 (mede + ajusta) | Phase 7 |
+
+### IMod-17: Modes of integration (PRD §3 table)
+
+| Modo | Status MVP | Cache preservado | Agentes |
+|---|---|---|---|
+| **Proxy (baseURL custom)** | ✅ MVP | ✅ Sim | Claude Code (MVP); demais v3.1+ |
+| **Hook** | v3.1+ (fallback) | depende | Agentes com hook system (v3.1+) |
+| **MCP** | v3.1+ | ✅ Sim | Cline v2+, Cursor (v3.1+) |
+
+### IMod-18: Phase plan (PLAN v2)
+
+| Phase | Estimate | Deliverables |
+|---|---|---|
+| 1 — Schema + Catálogo | 4-5h | YAML schema, SQLite (catalog/embeddings/audit_events), FTS5, sqlite-vec, loader, `npm run build-index`, schema versioning |
+| 2 — Detector social + fingerprint | 2-3h | Detector social (regex), fingerprint 4-comp, hashing básico, audit schema |
+| 3 — SDK cliente | 3-4h | `@memory-studio/sdk`, `collectContext`, `fingerprint`, `MemoryStudioClient.augment`, prompt-only mode |
+| 4 — UI painel | 8-12h | Painel localhost, 5 telas, HTMX+Alpine, `.memory-studio/state.json`, Critical Rules warning |
+| 5 — Proxy transparente | 6-8h | Forwarder HTTP, retrieval runtime, byte-string determinístico, tiebreak ordering (D-006), audit async fail-open (D-007), 5 endpoints (D-009) |
+| 6 — Fast agent (NOVEL, gated) | 8-12h | Fast agent (Haiku), intel store, match scripts, suffix injection, latency trick. **Branch B: 0h se grill reprova** (D-003) |
+| 7 — Tuning empírico | 5-7h (+ 1 semana coleta) | Dashboard mínimo, métricas cache hit, threshold tuning, aceitação >70% |
+| **Total** | **35-50h** | (Branch B: 28-39h se Phase 6 colapsada) |
+
+### IMod-19: Acceptance criteria mapping (PRD §10 → 23 items, 100%)
+
+#### §10.1 Funcional (12)
+
+| # | Critério | Phase owner | Validado em |
+|---|---|---|---|
+| 1 | Lê prompt + estado (scratch, todos, recentFiles, lastEvent) | Phase 3 + Phase 5 | Phase 5 done |
+| 2 | Top 3-5 skills/rules/personas identificados | Phase 5 | Phase 5 done |
+| 3 | System message byte-string determinístico | Phase 5 | Phase 5 done (SHA256) |
+| 4 | `cache_control: ephemeral` em 2 blocos | Phase 5 | Phase 5 done |
+| 5 | Cache hit verificado via log | Phase 5 + Phase 7 | Phase 7 |
+| 6 | UI mostra catálogo + toggle por projeto | Phase 4 | Phase 4 done |
+| 7 | Critical Rules: aviso visual + imunes a toggle off | Phase 4 + Phase 5 | Phase 4 done |
+| 8 | Audit log grava tudo | Phase 5 | Phase 5 done |
+| 9 | Modo prompt-only funciona | Phase 3 | Phase 5 done |
+| 10 | Funciona com 1 agente (Claude Code) | Phase 5 | Phase 5 done |
+| 11 | `activeCatalog` vazio: 200 + emptyReason "no_active_items" + forward unchanged (D-008) | Phase 5 | Phase 5 done |
+| 12 | Inception híbrida (CONDICIONAL grill §16.6) | Phase 6 | Phase 6 done |
+
+#### §10.2 Performance (4)
+
+| # | Critério | Phase owner | Validado em |
+|---|---|---|---|
+| 1 | p50 latência < 50ms | Phase 5 | Phase 7 |
+| 2 | p99 latência < 200ms | Phase 5 | Phase 7 |
+| 3 | Working set < 1.5GB RAM | Phase 5 | Phase 7 |
+| 4 | Cache hit rate > 70% (>10 turns) via log | Phase 7 | Phase 7 done |
+
+#### §10.3 Segurança / Privacidade (4)
+
+| # | Critério | Phase owner | Validado em |
+|---|---|---|---|
+| 1 | Zero persistência de contexto raw | Phase 2 + Phase 5 | Phase 5 done |
+| 2 | `tenantId` hasheado | Phase 2 + Phase 5 | Phase 5 done |
+| 3 | Placeholders determinísticos não vazam secret | Phase 5 | Phase 5 done |
+| 4 | Nenhum dado sai da máquina | Phase 5 + Phase 4 | Phase 5 done |
+
+#### §10.4 Operacional (4 — incl. /health D-009)
+
+| # | Critério | Phase owner | Validado em |
+|---|---|---|---|
+| 1 | `npm run build-index` < 60s pra 100 skills | Phase 1 | Phase 1 done |
+| 2 | UI carrega < 1s local | Phase 4 | Phase 4 done |
+| 3 | Audit query < 100ms pra 30 dias | Phase 5 + Phase 7 | Phase 7 |
+| 4 | `/health` endpoint retorna 200 (D-009) | Phase 5 | Phase 5 done |
+
+### IMod-20: Nomenclature rules (PRD §17.2)
+
+**Termos canônicos — camelCase, exato:**
+
+| Termo | Significado | Onde definido |
+|---|---|---|
+| `recentFiles` | Lista de paths de arquivos recentes (working tree). NÃO `gitStatus`, `files`, `recent_files`. | §5, §7.1 |
+| `lastEvent` | Último evento do agente (`tool_error`/`tool_call`/`tool_result`). NÃO snake_case. | §5, §7.1 |
+| `scratch` | Scratchpad local (últimos N chars). | §5, §7.1 |
+| `todos` | TODOs ativos do agente. | §5, §7.1 |
+| `intel` | `{ agentState, nextNeeds, recentTopic }` (D-005). Shape exato. | §16.5 |
+| `activeCatalog` | Array de IDs ativos. Source = `.memory-studio/state.json`. | §7.1 |
+| `emptyReason` | Enum: `low_confidence \| social \| timeout \| no_active_items \| null`. | §7.1, D-008 |
+| `fast agent` | Haiku-class agent que lê response em paralelo. | §16 |
+| `fast-agent-over-response` | Padrão arquitetural. | §16.3 |
+
+**Regra:** PRD, PLAN, SPEC, SDK, schema, response — todos usam casing canônico. Drift = discovery.
+
+---
 
 ## Testing Decisions
 
-### TD-1: What makes a good test
+### T-1: What makes a good test
 
-Test external behavior only, not implementation. For Memory Studio, that means:
-- HTTP behavior of `/augment` and the 5 endpoints.
-- Cache hit rate measured via structured logs.
-- Smoke test with Claude Code via custom baseURL.
-- Latency p50/p99 against §10.2 budget.
+**Test external behavior only, NOT implementation.**
 
-Do NOT test:
-- Internal data structures (`Intel`, `matchedSkills` array layout).
-- Specific embedding model behavior.
-- ONNX runtime details.
+For Memory Studio:
+- HTTP behavior of `/augment` + 5 endpoints
+- Cache hit rate measured via structured logs
+- Smoke test com Claude Code via custom baseURL
+- Latência p50/p99 vs §10.2 budget
+- Byte-string SHA256 equality entre identical-input requests (D-006)
+- Audit log async fail-open sob write error simulado (D-007)
+- emptyReason "no_active_items" quando activeCatalog vazio (D-008)
 
-### TD-2: Modules to test
+**Do NOT test:**
+- Internal data structures (`Intel` literal shape, `matchedSkills` array layout)
+- Specific embedding model behavior
+- ONNX runtime details
+- Pure UI rendering
 
-- `@memory-studio/server`: HTTP routing, byte-string determinism, audit log async, all 5 endpoints, fail-open paths.
-- `@memory-studio/sdk`: `collectContext`, `fingerprint`, `MemoryStudioClient.augment`.
-- Fast agent (Phase 6): latency, intel schema adherence, latency trick validation.
+### T-2: Modules to test
 
-### TD-3: Prior art
+| Module | Tests |
+|---|---|
+| `@memory-studio/server` | HTTP routing, byte-string determinism + tiebreak (D-006), audit log async fail-open (D-007), 5 endpoints (D-009), emptyReason "no_active_items" (D-008), fail-open paths |
+| `@memory-studio/sdk` | `collectContext`, `fingerprint` (hashing), `MemoryStudioClient.augment`, prompt-only fallback |
+| Fast agent (Phase 6) | latency <3s, intel schema adherence (D-005), latency trick validation |
+| UI | toggle state, Critical Rules warning, search, audit/summary display |
+| Retrieval | FTS5 + sqlite-vec query, RRF fusion, threshold duplo |
 
-- v1 phases 0-4 calibration tests (some may still be valid, others migrated).
-- Auto-grill artifact pack (transcript + decisions) used as adversarial test oracle — every claim in PRD/PLAN was grilled by 9 decisions across 8 lenses.
-- `critica-plan.md` (2026-07-27) external review pre-auto-grill.
+### T-3: Prior art
 
-## Out of Scope
+- v1 phases 0-4 calibration tests (alguns ainda válidos, outros migrados)
+- Auto-grill artifact pack (transcript + decisions) usado como adversarial test oracle — toda claim em PRD/PLAN foi grilled por 9 decisions across 8 lenses
+- `critica-plan.md` (2026-07-27) external review pre-auto-grill — 37 findings (17 PRD + 17 PLAN + 5 crossed), 32 aplicados
 
-- Long-term memory of user preferences (v4+).
-- Multi-tenant (v4+).
-- Cross-project catalog registry (v4+).
-- Adapter OpenAI↔Anthropic (v3.1+).
-- Hook integration mode (v3.1+).
-- MCP server (v3.1+).
-- Catálogo em 3 camadas (system/global/local) — v3.1+ if demand.
-- Discovery signals + curator LLM (v3.2+).
-- Attention tiers / relevance-decay / tier escalation — v3.1+ if metrics show degradation.
-- Semantic cache 2-tier (fingerprint cache sobre byte-string) — v3.1+.
-- Persona `tone_addendum` — v3.1+.
-- Handoff middleware-managed — **FORA**, handoff é decisão do agente/SDK.
+### T-4: Done criteria Phase 5 (smoke test antes de Phase 6)
 
-## Further Notes
+- [ ] Smoke test end-to-end com Claude Code via custom baseURL
+- [ ] Byte-string determinístico validado: SHA256(byte-string) **igual** entre 2 requests com mesma input lógica
+- [ ] **Tiebreak ordering testado** (D-006): 2 requests com cosine scores empatando no threshold produzem mesmo SHA256
+- [ ] Cache hit do provedor verificado em log: `cache_read_input_tokens > 0` em 2 requests seguidos
+- [ ] Retrieval retorna top-K com hit no índice (FTS5 + sqlite-vec)
+- [ ] **Audit async boundary testado** (D-007): simulando SQLite write error → request continua 200
+- [ ] `usage.cache_read_input_tokens` logado por request
+- [ ] **5 endpoints respondendo** (D-009): `/augment`, `/catalog`, `/catalog/rebuild`, `/audit`, `/audit/summary`, `/health`
 
-### Auto-grill gate — what was approved
+---
 
-9 decisions across 8 lenses, all conf≥medium, all approved 2026-07-28. Full table at `.specs/auto-grill-output/2026-07-28_023050/PRD-PLAN.auto-grill.decisions.md`.
+## Out of Scope (v3.1+ ou v4+)
 
-### Pending fixes (human applies post-gate per SKILL.md §Gate contract)
+- Long-term memory of user preferences (v4+)
+- Multi-tenant (v4+)
+- Cross-project catalog registry (v4+)
+- Adapter OpenAI↔Anthropic (v3.1+)
+- Hook integration mode (v3.1+)
+- MCP server (v3.1+)
+- Catálogo em 3 camadas (system/global/local) — v3.1+ if demand
+- Discovery signals + curator LLM (v3.2+)
+- Attention tiers / relevance-decay / tier escalation — v3.1+ if metrics show degradation
+- Semantic cache 2-tier (fingerprint cache sobre byte-string) — v3.1+
+- Persona `tone_addendum` — v3.1+
+- Handoff middleware-managed — **FORA**, handoff é decisão do agente/SDK
+- User-invoked precedência absoluta — v3.1+
+- Per-turn feedback vote persistente — v3.1+
+- Decision trace visualization interativa — v3.2+
+- Glossário anchors boost — v3.1+
+- Leading words hoisting — v3.1+
 
-6 of 9 decisions need target-doc edits (PRD/PLAN/CLAUDE.md):
+**Regra:** nada disso entra sem **evidência empírica** de que faz falta.
 
-- D-003: Add branch B to PLAN.md Phase 6.
-- D-005: Add `intel` schema to PRD §16 + glossary §17.2 + CONTEXT.md §5.
-- D-006: Add `Array.sort((a,b) => a.id.localeCompare(b.id))` to PLAN.md Phase 5 + done criterion.
-- D-007: Add "audit async buffer + batch flush + fail-open" to PLAN.md Phase 5 + invariant in PRD §8.
-- D-008: Add `emptyReason: "no_active_items"` to PRD §7.1 + acceptance criterion.
-- D-009: Enumerate 5 endpoints in PLAN.md Phase 5 + add /health to acceptance mapping.
+---
 
-### Already-applied edits (5 in PLAN.md, before "calma")
+## Discovery Resolutions (D-001 a D-009)
 
-PLAN.md L93: "3-4h" → "4-5h" (Phase 1 body)
-PLAN.md L214: "5-7h" → "6-8h" (Phase 5 body)
-PLAN.md L241: "§18.6" → "§16.6"
-PLAN.md L254: "§18.4" → "§16.4"
-PLAN.md L375: "§18.6" → "§16.6"
+Todas as 9 discoveries do auto-grill composite run 2026-07-28_023050, aplicadas em PRD/PLAN post-gate 2026-07-28:
 
-### Discovery items appended to `.specs/DISCOVERIES.md`
+| ID | Severidade | Descrição | Resolução |
+|---|---|---|---|
+| D-001 | structural | Drift §18→§16 em PLAN.md:241,254,375 | ✅ aplicado: §18.x → §16.x (3 ocorrências) |
+| D-002 | structural | Drift interno PLAN Phase 1/5 body vs table estimates | ✅ aplicado: L93, L214 body alinhados com tabela |
+| D-003 | structural | Branch B ausente | ✅ aplicado: PLAN Phase 6 Branch B + Phase 7 pre-reqs loosen |
+| D-004 | cosmetic | Critical Rules redação ambígua | ✅ contrato já coerente (3 docs concordam); optional example em §6.2 |
+| D-005 | structural | `intel` sem schema formal | ✅ aplicado: PRD §16.5 typed schema + §17.2 glossary |
+| D-006 | structural | Tiebreak policy ausente | ✅ aplicado: PLAN Phase 5 `Array.sort` + SHA256 done criterion |
+| D-007 | critical | Audit log sync/async não declarado | ✅ aplicado: PLAN Phase 5 async buffer + fail-open + PRD §8 invariant |
+| D-008 | structural | Empty activeCatalog sem contrato | ✅ aplicado: PRD §7.1 enum + contract + §10.1 criterion |
+| D-009 | structural | 5 endpoints sem ownership | ✅ aplicado: PLAN Phase 5 enumerated + §10.4 /health |
 
-D-001 through D-009 (1 critical, 7 structural, 1 cosmetic).
+Severidade: 1 critical (D-007), 7 structural, 1 cosmetic.
 
-### Next step per skill (after this spec)
+---
 
-Human applies pending fixes manually. Then potentially `/mattpocock-skills:to-tickets` (mentioned in `.claude/skills/auto-grill/prompts/to-roadmap.md`) to break spec into vertical slices. Phase 1 of PLAN.md can start after that.
+## Cross-references
+
+- [PRD.md v3.2](../../PRD.md) — decisões estratégicas ("por que X e não Y")
+- [PLAN.md v2](../../PLAN.md) — phases + estimates + acceptance mapping
+- [.specs/DISCOVERIES.md](../../.specs/DISCOVERIES.md) — 9 entries (D-001 a D-009)
+- [.specs/auto-grill-output/2026-07-28_023050/](../../.specs/auto-grill-output/2026-07-28_023050/) — auto-grill run artifacts
+- [CLAUDE.md](../../CLAUDE.md) — authority boundaries + glossary
+- [BACKLOG.md](../../BACKLOG.md) — ideias pós-MVP
+
+---
+
+**Próximo passo:** Phase 1 do PLAN pode começar. Implementer + Verifier loop (Waldemar pattern) lê PRD + PLAN + esta SPEC.

@@ -439,6 +439,7 @@ Cache do provedor ainda funciona: persona prefix é a única parte do system mes
 | `/audit` | GET | audit log |
 | `/audit/summary` | GET | summary diário |
 | `/health` | GET | liveness + readiness |
+| `/state/toggle` | POST | toggle item on/off (Rule critical exige `critical_confirm` explícito, sem → 400) |
 
 `/feedback`, `/discoveries`, `/handoff` são v3.1+. Não implementar agora.
 

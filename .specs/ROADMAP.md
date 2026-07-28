@@ -1,49 +1,537 @@
 ---
-date: 2026-07-24
-version: 1
-description: "Roadmap placeholder. Roadmap real do Memory Studio só existe APÓS PRD fechado (via grill-with-docs)."
+date: 2026-07-28
+version: 3
+status: ready-for-tlc-loop
+type: roadmap
+description: "Memory Studio v3 — ROADMAP com 10 phases (sub-milestone a/b). Input do tlc-roadmap-loop."
 explanation: |
-  ROADMAP.md antigo (9 phases Memory Studio) foi movido pra
-  `.specs/archive/2026-07-calibration/ROADMAP.md`. Aquelas phases foram
-  **exercício de calibração** da skill `tlc-roadmap-loop`, não entrega
-  do produto.
+  v3 substitui v2 (5 milestones) após INADEQUATE verdict do verifier
+  sub-agent 2026-07-28. Splits aplicados:
 
-  Roadmap real só existe após PRD fechado. Por enquanto: placeholder
-  apontando pro próximo passo (grill-with-docs → PRD).
+  - M0 (Foundation) → Phase 1 + Phase 2
+  - M1 (SDK + UI) → Phase 3 + Phase 4
+  - M2 (Proxy + Audit) → Phase 5a + Phase 5b
+  - M3 (Inception híbrida) → Phase 6a + Phase 6b (Branch A/B conditional)
+  - M4 (Tuning) → Phase 7a + Phase 7b
+
+  Cada phase = 1-3h de trabalho single-dev, EXCETO Phase 1 (Catalog + Index, 4-5h —
+  FTS5 + sqlite-vec + schema versioning + build-index perf são intrinsicamente
+  bundleados), Phase 4 (UI, 8-12h) e Phase 6b Branch A (8-12h) que são
+  intrinsecamente maiores. Phases
+  com split (5a/5b, 6a/6b, 7a/7b) podem ser executadas em sequência
+  dentro do mesmo dia.
+
+  Granularidade "phase" casa com `tlc-roadmap-loop`: sub-agente processa
+  1 phase por vez, gera SPEC atômica, Implementer + Verifier (Waldemar)
+  executa.
+
+  Fixes do verifier aplicados:
+  1. Phase split (M0-M4 → Phase 1-10)
+  2. 7 acceptance criteria PRD §10 adicionados ao Done
+  3. Scope narrowed (M0 só index, M2 só runtime, M1 só SDK/UI não catalog)
+  4. D-001, D-002, D-004 rastreáveis
+  5. Gate anchor: §16.7 canonical (§16.6 é stale por causa do §16.5 insert)
+  6. Estimates labeled (raw vs canonical)
+  7. Termos vagos substituídos por evidência objetiva
+  8. Endpoint count: 6 total (5 auxiliary + /augment)
+
+  Companion: SPEC.md, PRD.md, PLAN.md.
 related:
-  - ./archive/2026-07-calibration/ROADMAP.md
-  - ./STATE.md
+  - ../scratch/memory-studio/spec.md
+  - ../../PRD.md
   - ../../PLAN.md
-  - ../../History.md
+  - ../../.specs/DISCOVERIES.md
+  - ../../CLAUDE.md
 ---
 
-# Roadmap: Memory Studio
+# Memory Studio v3 — ROADMAP
 
-> **Status:** placeholder. Roadmap real = pós-PRD (grill-with-docs).
+**Date:** 2026-07-28
+**Version:** 3
+**Input to:** `tlc-roadmap-loop` (sub-agentes em sequência)
+**Companion:** [SPEC.md](../scratch/memory-studio/spec.md), [PRD.md](../../PRD.md), [PLAN.md](../../PLAN.md)
 
-## Próximo passo (única phase vigente)
+---
 
-#### Phase — PRD via grill-with-docs [ ]
+## Meta-conventions (apply across all phases)
 
-**Phase slug:** `prd-via-grill-with-docs`
-**Done when:** PRD final do MVP Memory Studio escrito, ambiguidades eliminadas, escopo/exclusões/critérios de done definidos. Documento commitado em `.specs/PRD.md` (ou similar — nome a decidir na execução).
+1. **Estimates:** tabela canônica (PRD §9 / PLAN §Total) reporta 35-50h. Raw arithmetic com phase splits = 39-52h (overhead de sub-agent setup + integration). Cada phase reporta raw.
+2. **Estimates convention:** tabela canônica, body descritivo (D-002 resolution).
+3. **Section refs:** ZERO `§18.x` em PRD/PLAN/SPEC/ROADMAP (D-001 resolution). Stale ref = blocker.
+4. **Casing:** camelCanônico per SPEC §IMod-20. `recentFiles`, `lastEvent`, `intel`, `activeCatalog`, `emptyReason`. Drift = discovery.
+5. **Cache distinction:** MVP usa **só cache do provedor** (Anthropic `cache_control: ephemeral`). Cache de augmented (fingerprint semântico) é v3.1+ omitido — não medir nem expor no MVP (PRD §17.1).
+6. **Security default:** zero raw persistence, `tenantId` hasheado, placeholders determinísticos não vazam secret, proxy local-only.
+7. **Fail-open:** todo erro de retrieval/augmentation/audit → forward unchanged, request 200, log em stderr.
+8. **Branch B at Phase 6b:** se grill §16.7 reprovar inception híbrida, Phase 6b colapsa pra 0h; Phase 7b pre-reqs loosened pra Phase 5 only.
 
-**Depends on:** nenhum
+---
 
-- [ ] Instalar/verificar skill `grill-with-docs` (plugin `mattpocock/skills`)
-- [ ] Rodar grill sobre: `PLAN.md`, `CLAUDE.md`, `archive_handoff/handoff-session-2026-07-23.md`, `History.md`
-- [ ] Iterar até ambiguidades eliminadas
-- [ ] Commitar PRD final
-- [ ] Marcar nova era `2026-07-prd-ready/` com STATE.md atualizado
+## Sequência
 
-## Próxima era (após PRD)
+```
+Phase 1 ──┬──> Phase 2 ──┐
+          │              │
+          ├──> Phase 3 ──┼──> Phase 4 ──┐
+          │              │              │
+          │              ├──────────────┴──> Phase 5a ──> Phase 5b ──┬──> Phase 6a ──> Phase 6b ──┐
+          │              │                                          │                              │
+          └──> Phase 2 ──┘                                          └──> Phase 7a ──> Phase 7b ──┘
+```
 
-Depois do PRD fechado, criar era `2026-07-prd-ready/` com:
+**Paralelização:** Phase 3 + 4 paralelizáveis (Phase 3 = consumido externo por agentes; Phase 4 só depende de Phase 1; nenhum bloqueia o outro internamente). Phase 5a + 5b sequenciais (mesmo phase técnica). Phase 7a pode começar após Phase 5b (não bloqueia em 6b).
 
-- `STATE.md` novo (PRD fechado, autorizando produção do Memory Studio)
-- `ROADMAP.md` novo (phases derivadas do PRD)
-- Briefs de implementação por phase
+---
 
-## Era anterior (calibração)
+## Phase 1 — Catalog + Schema + Index
 
-Ver `.specs/archive/2026-07-calibration/ROADMAP.md` para histórico das 9 phases que serviram pra calibrar a skill `tlc-roadmap-loop`.
+**Goal:** catálogo constrói localmente; retrieval index populado; YAML schema versionado.
+
+**Scope:**
+- SPEC §IMod-6 (YAML schema: Skill/Rule/Persona)
+- SPEC §IMod-13 (invariantes sólida: 1 Node-only, 4 catálogo versionado, 5 tenant_id hasheado)
+- SPEC §IMod-14 (stack table: Node 22, Fastify, SQLite + FTS5 + sqlite-vec, multilingual-e5-small)
+- SPEC §IMod-15 (working set partial — embeddings + sqlite)
+- SPEC User Stories §A (config inicial — apenas items 1, 4, 5, 7, 8)
+
+**PRD refs:**
+- §6 Schema do catálogo (YAML versionado em git)
+- §8 Stack (Node 22, Fastify, SQLite + FTS5 + sqlite-vec, embedding 384d)
+- §10.4 item 1 (`npm run build-index` < 60s pra 100 skills)
+- §17.2 nomenclature (`recentFiles`, etc. — usado no schema do context, mas schema YAML usa type/id/text apenas)
+
+**Estimate:** 4-5h
+
+**Done criteria (cada checkbox testável):**
+- [ ] YAML schema validado: `id`, `type`, `title` (skill), `text` obrigatório; `category` enum (procedural|diagnostic|reference|pattern) pra skill; `critical: bool` pra rule; `isDefault: bool` pra persona
+- [ ] SQLite tabelas criadas: `catalog`, `embeddings`, `audit_events` com migrations versionadas
+- [ ] FTS5 virtual table sobre `text` de cada item (trigger insert/update/delete)
+- [ ] sqlite-vec virtual table 384d (multilingual-e5-small ONNX)
+- [ ] Loader YAML → SQLite idempotente (re-run não duplica)
+- [ ] `npm run build-index` regenera embeddings em <60s pra 100 skills (medido, não estimado)
+- [ ] `schemaVersion: 3` exposto em `/catalog` GET response
+- [ ] Schema versioning policy: `schemaVersion` no API; mudança breaking → bump major version
+- [ ] Zero `§18.x` refs em PRD/PLAN/SPEC/ROADMAP (D-001 cross-check)
+- [ ] **Thresholds iniciais commitados** em `.memory-studio/state.json` default: `min_cosine_similarity: 0.6`, `min_fts_hits: 2` (Phase 7a vai tunar empiricamente, valores iniciais são referência)
+
+**Output do Processador (SPEC atômica):**
+- TS shapes completos: `Skill`, `Rule`, `Persona` types
+- SQLite migration SQL + FTS5 + sqlite-vec DDL
+- `build-index` script com progress reporting
+- Loader module com error handling (YAML inválido → stderr + skip)
+
+---
+
+## Phase 2 — Detector + Fingerprint
+
+**Goal:** bypass de prompts sociais; provenance 4-componente com hashing; audit schema pronto (vazio).
+
+**Scope:**
+- Detector social (regex — invariante sólida 6 PRD §8)
+- Fingerprint 4-comp (`projectPath`, `agentId`, `sessionId` hasheado, `gitBranch`)
+- Hashing básico (`sha256[0:16]` pra `sessionId` e `tenantId`)
+- Audit log schema (estrutura, sem write runtime — esse é Phase 5b)
+- Proveniência v1: detector, fingerprint, hashing promovidos de `.specs/archive/2026-07-calibration/`
+
+**PRD refs:**
+- §5 SDK cliente (fingerprint + hashing)
+- §10.3 item 2 (`tenantId` hasheado em todos os logs)
+- §10.3 item 1 (zero persistência raw — hash substitui raw em storage)
+
+**Estimate:** 2-3h
+
+**Done criteria:**
+- [ ] Detector regex detecta lista de bypass: `["oi", "valeu", "thanks", "obrigado", "ok", "..."]` → marca `socialDetectorBypass = true`
+- [ ] Detector regex testado com 20 prompts sociais + 20 prompts reais (FP rate ≤5%)
+- [ ] `fingerprint({ projectPath, agentId, "claude-code", sessionId, gitBranch })` retorna 4-comp object com `sessionId` hasheado antes do retorno
+- [ ] Hashing function `sha256[0:16](input)` retorna string 32-char hex (validado com golden vectors)
+- [ ] Audit log schema: `audit_events` table tem colunas `id`, `ts`, `tenantId_hashed`, `fingerprint`, `matched_ids`, `pruning_reasons`, `latency_ms`, `redacted_prompt_hash`
+- [ ] Detector + fingerprint promovidos de `.specs/archive/2026-07-calibration/` (não reinventados — proveniência D-005)
+
+**Output do Processador:**
+- Detector module (TS) com regex compiled + bypass enum
+- Fingerprint module (TS) com hash helpers
+- Audit log schema migration (DDL only, no write runtime)
+
+---
+
+## Phase 3 — SDK Cliente
+
+**Goal:** agentes embed o SDK e coletam estado; SDK funciona prompt-only fallback.
+
+**Scope:**
+- SPEC §IMod-1 (module breakdown — `@memory-studio/sdk`)
+- SPEC §IMod-2 (SDK API: `collectContext`, `fingerprint`, `MemoryStudioClient.augment`)
+- SPEC §IMod-20 (nomenclature rules — garantir camelCase canônico nas exports)
+- SPEC User Stories §C (SDK functions, prompt-only mode, hardcoded agentId)
+- **Não inclui:** UI panels (Phase 4), retrieval runtime (Phase 5a)
+
+**PRD refs:**
+- §5 SDK cliente (TS shape, fingerprint 4-comp, agentId="claude-code" MVP)
+- §10.3 item 1 (zero persistência raw — SDK redacta antes de enviar)
+
+**Estimate:** 3-4h
+
+**Done criteria:**
+- [ ] `@memory-studio/sdk` package: TypeScript puro, ~50KB build size, zero deps nativas (medido)
+- [ ] `collectContext({ scratch, todos, recentFiles, lastEvent, redaction: "minimal" | "strict" })` retorna `Context` object literal
+- [ ] `Context` type inclui todos campos PRD §7.1: `scratch`, `todos`, `recentFiles`, `lastEvent`, `legacyState`, `sessionId`
+- [ ] `fingerprint({ projectPath, agentId, sessionId, gitBranch })` retorna `Fingerprint` literal
+- [ ] `MemoryStudioClient.augment({ prompt, context, fingerprint })` faz POST `/augment` e retorna `AugmentResponse`
+- [ ] Modo prompt-only: `augment({ prompt, context: null })` retorna response válida (não crasha, request enviada com `context: null`)
+- [ ] `agentId` hardcoded `"claude-code"` (MVP) — código fonte tem literal, fácil de trocar pra v3.1+
+- [ ] SDK redacta secrets em `scratch` e `lastEvent.payload` antes de serializar (regex: API keys, .env values, JWT tokens)
+- [ ] SDK tem `package.json` com `exports` field, build script ESM + CJS, type declarations
+- [ ] Test smoke: SDK roda em Node 22 sem dependências externas
+
+**Output do Processador:**
+- TS API completa (types + implementations)
+- Test suite: 5 happy-path + 3 edge-case (prompt-only, secret redaction, hashing)
+- README curto com usage example
+
+---
+
+## Phase 4 — UI Panel
+
+**Goal:** humano controla catálogo via painel; Critical Rules enforcement visível.
+
+**Scope:**
+- SPEC §IMod-1 (UI module — `@memory-studio/ui`)
+- SPEC §IMod-20 (nomenclature — `recentFiles` aparece nos tooltips da Audit tab)
+- SPEC User Stories §B (5 telas, search, side panel, toggle, Critical Rules warning, persona cap)
+- **Não inclui:** retrieval runtime (Phase 5a), audit write (Phase 5b)
+
+**PRD refs:**
+- §4 Painel UI (constraints: colunas, busca, janela lateral; HTMX+Alpine; localhost primeira porta livre)
+- §5 Onde painel vive (porta livre, não Tauri)
+- §6.2 Critical Rules contrato
+- §10.1 item 6 (UI mostra catálogo + toggle por projeto)
+- §10.1 item 7 (Critical Rules: aviso visual + imunes a toggle off)
+- §10.4 item 2 (UI carrega < 1s local)
+
+**Estimate:** 8-12h
+
+**Done criteria:**
+- [ ] UI panel em `http://127.0.0.1:<porta-livre>` (first free port discovery, scanned 41823-42823)
+- [ ] 5 telas: Skills, Rules, Personas, Audit, Settings (PRD §4)
+- [ ] Skills tab: lista colunar, busca por nome/keyword, side panel de leitura ao selecionar
+- [ ] Rules tab: lista + Critical Rules com aviso visual "always on, can't toggle off sem confirmar"
+- [ ] Personas tab: lista + cap 3 selecionáveis (UI bloqueia 4ª seleção)
+- [ ] Audit tab: lista últimas N augmentations (timestamp, prompt redactado, matched IDs, pruning reasons, latência)
+- [ ] Settings tab: threshold (`min_cosine_similarity`, `min_fts_hits`), tenant, integration mode, embedding model
+- [ ] State em `.memory-studio/state.json` por projeto (path: cwd do projeto)
+- [ ] **Toggle-off enforcement** (D-004 resolution + §10.1 item 7): POST `/state/toggle` com Rule critical + sem confirmação → 400. Com confirmação explícita → 200
+- [ ] UI mostra **exemplo explícito** (D-004): "Rule critical:true — exemplo: toggle off + digitar 'CONFIRMAR' no painel → aceito; sem confirmação → bloqueado"
+- [ ] UI carrega em <1s local (medido com cold cache + warm cache)
+- [ ] Stack: HTMX+Alpine, zero build step (HTML servido direto), templates inline
+- [ ] Layout responsive: cols Skills/Personas/Rules funcionam em 1024px+ viewport
+
+**Output do Processador:**
+- 5 HTML templates (HTMX partials)
+- Alpine.js components per tab
+- `.memory-studio/state.json` schema (TypeScript type)
+- CSS mínimo (zero framework)
+
+---
+
+## Phase 5a — API + Retrieval + Byte-string
+
+**Goal:** `/augment` smoke test com Claude Code; byte-string determinístico; cache do provedor hit.
+
+**Scope:**
+- SPEC §IMod-3 (`/augment` request schema)
+- SPEC §IMod-4 (`/augment` response schema)
+- SPEC §IMod-7 (retrieval runtime: FTS5 + sqlite-vec + RRF + tiebreak D-006)
+- SPEC §IMod-9 (cache architecture — provider cache only, MVP)
+- SPEC User Stories §C hot-path items (16-22) + §D cache items (40-45)
+- **Não inclui:** audit write runtime (Phase 5b), outros 5 endpoints (Phase 5b), inception híbrida (Phase 6)
+
+**PRD refs:**
+- §7.1 POST `/augment` (request/response structs)
+- §8 invariante sólida 3 (`cache_control: ephemeral`)
+- §8 invariante nova 11 (2 blocos `cache_control: ephemeral`)
+- §10.1 item 1 (lê prompt + estado com campos exatos: `scratch`, `todos`, `recentFiles`, `lastEvent`)
+- §10.1 item 2 (top 3-5 skills/rules/personas — **não só "top-K"**)
+- §10.1 item 3 (byte-string determinístico SHA256)
+- §10.1 item 4 (`cache_control: ephemeral` em 2 blocos)
+- §10.1 item 5 (cache hit verificado via log)
+- §10.1 item 9 (modo prompt-only)
+- §10.1 item 10 (funciona com Claude Code)
+- §14.3 modo de integração prioritário (proxy transparente)
+- §14.6 medir cache hit (request hit rate + token cache coverage)
+- §17.1 caches distinction
+
+**Estimate:** 3-4h
+
+**Done criteria (cada checkbox testável):**
+- [ ] `/augment` recebe request com **todos campos PRD §7.1** (validado: 400 se campo obrigatório ausente)
+- [ ] Retrieval retorna **exatamente 3-5 items** matched (não "top-K genérico" — assertCount ≥ 3 && ≤ 5)
+- [ ] Threshold duplo respeitado: `min_cosine_similarity` AND `min_fts_hits` ambos passam
+- [ ] **Tiebreak ordering** (D-006): `matched.sort((a,b) => a.id.localeCompare(b.id))` aplicado antes de serializar
+- [ ] **SHA256(byte-string) equality test** (D-006): 2 requests com mesma input lógica (incluindo matched arrays empatando) → mesmo SHA256
+- [ ] **Tiebreak stress test** (D-006 done criterion): 1000 requests com cosine scores aleatórios no threshold produzem mesmo SHA256 byte-string quando matched arrays são equivalentes
+- [ ] System message augmenté com **2 blocos `cache_control: ephemeral`**: bloco 1 = persona (estável), bloco 2 = Skills (variável)
+- [ ] Smoke test end-to-end com Claude Code via custom baseURL (`baseURL: http://127.0.0.1:<porta>` em `.claude/settings.json` ou env var)
+- [ ] `usage.cache_read_input_tokens > 0` em log quando mesmo persona + mesmas Skills ativas em 2 requests seguidos
+- [ ] Modo prompt-only: request com `context: null` → response 200 + matched arrays podem ser vazios
+- [ ] Latency p50 <50ms sem embedding cache miss (medido com 1000 requests sintéticos)
+- [ ] Latency p99 <200ms com embedding (medido)
+
+**Output do Processador:**
+- TS shape completo `/augment` request/response
+- Retrieval algorithm (RRF + threshold + tiebreak)
+- Smoke test script + Claude Code integration guide
+- Structured JSON logger com `usage.cache_read_input_tokens` field
+
+---
+
+## Phase 5b — Audit + Endpoints + Security
+
+**Goal:** 5 auxiliary endpoints respondendo; audit não bloqueia; security invariants honrados.
+
+**Scope:**
+- SPEC §IMod-8 (audit log async + batch flush + fail-open — D-007 CRITICAL)
+- SPEC §IMod-10 (endpoint ownership — 5 auxiliary + /augment = 6 total)
+- SPEC §IMod-12 (empty catalog contract — D-008)
+- SPEC §IMod-13 invariante 15 (audit async)
+- SPEC §IMod-13 invariantes sólida 1 (Node-only) + 5 (tenant_id hasheado)
+- SPEC User Stories §F, §G, §H, §I (edge cases, security, operational, endpoints)
+- **Não inclui:** /augment retrieval (Phase 5a), UI panels (Phase 4), inception híbrida (Phase 6)
+
+**PRD refs:**
+- §7.2 Outros endpoints (MVP) — `/catalog`, `/catalog/rebuild`, `/audit`, `/audit/summary`, `/health`
+- §8 invariante nova 15 (audit log async + fail-open)
+- §10.1 item 8 (audit log grava tudo: prompt redactado + matched IDs + pruning + latência)
+- §10.1 item 11 (`activeCatalog` vazio → 200 + `emptyReason: "no_active_items"` + forward unchanged — D-008)
+- §10.3 item 1 (zero persistência raw context)
+- §10.3 item 2 (`tenantId` hasheado)
+- §10.3 item 3 (placeholders determinísticos não vazam secret)
+- §10.3 item 4 (nenhum dado sai da máquina — proxy local only)
+- §10.4 item 3 (audit query < 100ms pra 30 dias)
+- §10.4 item 4 (`/health` retorna 200 — D-009)
+
+**Estimate:** 3-4h
+
+**Done criteria:**
+- [ ] `/catalog` GET retorna full catalog YAML+embeddings (read-only)
+- [ ] `/catalog/rebuild` POST idempotente, safe durante requests (concurrent request não corrompe index)
+- [ ] `/audit` GET retorna últimas N augmentations (redactado), `prompt_hash` em vez de raw text
+- [ ] `/audit/summary` GET retorna daily rollups (Phase 7a vai usar)
+- [ ] `/health` GET retorna 200 com `{status: "ok", uptime_ms, last_request_ts}` (mesmo sem dados)
+- [ ] **`/state/toggle` POST** (consumido por Phase 4 UI): recebe `{itemId, action: "on"|"off", critical_confirm?: string}`; toggle Rule critical sem `critical_confirm` → 400; com confirmação → 200 + write em `.memory-studio/state.json`
+- [ ] **7 endpoints total** (D-009 + Phase 4 dependency): `/augment` + 6 auxiliary (`/catalog`, `/catalog/rebuild`, `/audit`, `/audit/summary`, `/health`, `/state/toggle`)
+- [ ] **Audit async + fail-open** (D-007 CRITICAL): SQLite write error simulado → request continua 200, erro vai pra stderr, evento droppado (não bloqueia)
+- [ ] **Audit batch flush** (D-007): buffer in-memory, flush a cada N=100 events OU T=1000ms (whichever first)
+- [ ] **Empty catalog contract** (D-008): `/augment` com `activeCatalog: []` → 200 + `systemMessage` persona-only determinístico + `matchedSkills/Rules/Personas: []` + `emptyReason: "no_active_items"` + `warnings: ["activeCatalog is empty — proceeding with persona only"]` + forward unchanged
+- [ ] **`emptyReason` enum** (D-008) includes `"no_active_items"` + outros 4 valores existentes (`low_confidence | social | timeout | null`)
+- [ ] **Zero raw persistence** (PRD §10.3.1): audit row contém apenas `prompt_hash` (sha256), `matched_ids` (array de strings), `pruning_reasons` (typed), `latency_ms` (numeric). Zero raw text.
+- [ ] **Placeholder secret redaction test** (PRD §10.3.3): inject test placeholder `${SECRET_KEY}=abc123` no prompt → audit log substitui por `prompt_hash` + matched_ids (não raw)
+- [ ] **Local-only proxy** (PRD §10.3.4): network trace durante smoke test → zero requests externos exceto provedor configurado. Validated com tcpdump/Wireshark ou mock.
+- [ ] **TenantId hashed** (PRD §10.3.2): todos os logs têm `tenantId_hashed` field (sha256[0:16]), nunca raw
+- [ ] **Audit query <100ms / 30 dias** (PRD §10.4.3): `GET /audit?range=30days` retorna em <100ms com dataset de 1000+ rows
+- [ ] **Working set <1.5GB** (PRD §10.2.3): medido após 1h de operação
+
+**Output do Processador:**
+- 5 endpoint handlers (TS) com auth middleware
+- Audit buffer module (TS) com batch flush + fail-open (padrão async buffer)
+- Empty catalog contract module (TS)
+- Security invariant tests (10+ test cases)
+- Network policy module (block outbound exceto provedor)
+
+---
+
+## Phase 6a — Grill Gate + POC Validation
+
+**Goal:** decidir Branch A (implementa) vs Branch B (colapsa) antes de Phase 6b.
+
+**Scope:**
+- PRD §16.7 (Pré-grill antes de Phase 6 — **canonical**, §16.6 é stale por causa do §16.5 insert)
+- Latency trick POC (Haiku reads R_N paralelo com humano)
+
+**PRD refs:**
+- §3 Como funciona (fluxo canônico)
+- §10.1 item 12 (Inception híbrida CONDICIONAL grill §16.7)
+- §16 Inception Híbrida — arquitetura NOVEL
+- §16.7 Próximo passo (pré-grill checklist)
+- §16.2 Latency trick
+
+**Estimate:** 2-3h
+
+**Done criteria:**
+- [ ] Grill roda em PRD §16.7 (não §16.6 — stale ref) com ≥4 lenses: latency-trick, novelty, fail-open, novelty-vs-existing
+- [ ] Grill decision recorded: `branch_a_approved: true | false` em `.specs/DISCOVERIES.md` (append nova entry, ID >= D-010)
+- [ ] POC latency trick: 1 turno simulado, Haiku processa R_N em <3s enquanto humano leva 5-30s lendo
+- [ ] Se branch_a_approved=true → Phase 6b segue Branch A
+- [ ] Se branch_a_approved=false → Phase 6b segue Branch B (collapse)
+
+**Output do Processador:**
+- Grill transcript em `.specs/auto-grill-output/<timestamp>/`
+- Decision recorded em `.specs/DISCOVERIES.md`
+- POC result doc com timing measurements
+
+---
+
+## Phase 6b — Branch A Implementation OR Branch B Activation
+
+**Goal:** Turn N+1 augmenta com intel (Branch A) OU MVP fecha sem inception híbrida (Branch B).
+
+**Scope (Branch A):**
+- SPEC §IMod-5 (intel schema — D-005: `{ agentState: string, nextNeeds: string[], recentTopic: string }`)
+- SPEC §IMod-11 (Branch B fallback documentation — D-003)
+- Fast agent (Haiku) in-process
+- Intel store persistido
+- Match script (intel + prompt + context + catalog)
+- Suffix injection no system message (prefixo intacto)
+
+**Scope (Branch B):**
+- Phase 6b marcado como collapsado (0h)
+- Phase 7b pre-reqs atualizados: "Phase 5 only"
+- Total recalculado: raw 30-40h vs canonical 28-39h
+- PRD §10.1 item 12 movido pra v3.2
+- handoff-session atualizado com Branch B status
+
+**PRD refs:**
+- §3 fluxo canônico
+- §10.1 item 12 (Inception híbrida)
+- §14.7 Inception híbrida (response-first)
+- §16.1-§16.7 (latency trick, novelty, engineering decisions, intel schema §16.5, lessons, próximo passo §16.7)
+
+**Estimate (Branch A):** 8-12h
+
+**Estimate (Branch B):** 0h
+
+**Done criteria (Branch A):**
+- [ ] Fast agent (claude-3-5-haiku-*) lê R_N em paralelo com humano (in-process, não daemon)
+- [ ] Intel schema `{ agentState, nextNeeds, recentTopic }` gerado por Haiku (literal — D-005)
+- [ ] Intel store persistido em SQLite; restart do server preserva intel do último turn
+- [ ] Turn N+1 augmenta com `(intel + prompt + context + catalog)`
+- [ ] Suffix injection no system message; prefixo (persona) intacto
+- [ ] **Latency trick validated** (PRD §16.2): fast agentuality termina em **<3s** medido, vs humano 5-30s lendo (10 amostras)
+- [ ] **Cache hit quando prefixo estável** (teste explícito): 2 turns com mesmo persona + prompts diferentes → `usage.cache_read_input_tokens > 0` no segundo turn
+- [ ] **Branch B documented como árvore** (D-003): PLAN.md Phase 6 contém seção `Branch B` heading-level; esta ROADMAP.md Phase 6b marca Branch B como alternate path (não footnote)
+- [ ] Fast agent model = `claude-3-5-haiku-*` (não "Haiku-class" — modelo concreto)
+- [ ] Writer-reader contract preservado: shape literal `Intel` matches between fast agent output and match pipeline input
+
+**Done criteria (Branch B):**
+- [ ] Phase 6b marcado como collapsado (0h) em PLAN.md Phase 6 status
+- [ ] Phase 7b pre-reqs atualizados: "Phase 5 only" (Phase 6 não bloqueia)
+- [ ] Total recalculado documentado em PLAN.md §Total: raw arithmetic 30-40h vs canonical 28-39h
+- [ ] PRD §10.1 item 12 movido pra v3.2 com nota: "deferred per Branch B activation 2026-MM-DD"
+- [ ] handoff-session atualizado com Branch B status + activation rationale
+- [ ] Inception híbrida architecture ainda documentada em PRD §16 (reference), mas marcada como v3.2+
+
+**Output do Processador (Branch A):**
+- Fast agent module (TS) — Haiku integration
+- Intel store (SQLite table + read/write API)
+- Match script (TS) com writer-reader contract validation
+- Latency benchmark doc com timing measurements
+
+**Output do Processador (Branch B):**
+- PLAN.md updates (Phase 6 collapse + Phase 7 pre-reqs)
+- PRD.md §10.1 item 12 → v3.2 marker
+- handoff-session entry: Branch B activated
+
+---
+
+## Phase 7a — Metrics Instrumentation
+
+**Goal:** dashboard emite métricas cache hit + latency + working set.
+
+**Scope:**
+- SPEC §IMod-9 (provider cache metrics only — augmented cache é v3.1+, não medir)
+- SPEC §IMod-16 (latency budgets: p50, p99, working set)
+- Structured logging additions
+
+**PRD refs:**
+- §14.6 Como medir cache hit >70% (request hit rate + token cache coverage)
+- §17.1 caches distinction (provider only)
+
+**Estimate:** 2-3h
+
+**Done criteria:**
+- [ ] Dashboard mínimo (CLI ou arquivo `metrics.json`) emite:
+  - `request_hit_rate` = requests com `cache_read_input_tokens > 0` ÷ total
+  - `token_cache_coverage` = Σ `cache_read_input_tokens` ÷ Σ `total_prompt_tokens`
+  - `p50_latency_ms`, `p99_latency_ms`
+  - `working_set_mb`
+- [ ] Metrics atualizados a cada N requests (N=10) ou T=60s
+- [ ] Metrics **só do provider cache** (Anthropic `usage.cache_read_input_tokens`) — augmented cache omitido
+- [ ] Thresholds tuned documentados em `.memory-studio/state.json` com valores iniciais vs finais
+
+**Output do Processador:**
+- Metrics collector module (TS)
+- Dashboard CLI (Node script que lê `/audit/summary` + structured logs)
+- Threshold tuning doc
+
+---
+
+## Phase 7b — Empirical Tuning + Acceptance Gate
+
+**Goal:** cache hit >70% validado em sessão real (>10 turns, 1 semana wall-clock).
+
+**Scope:**
+- SPEC §IMod-16 (latency budgets acceptance)
+- Real session collection (não sintética)
+
+**PRD refs:**
+- §10.2 Performance (4 items: p50<50ms, p99<200ms, working set<1.5GB, cache hit>70%)
+- §14.6 métricas definition
+
+**Estimate:** 3-4h + 1 semana wall-clock de produção
+
+**Done criteria:**
+- [ ] **1 semana de sessões reais** (não sintéticas): audit log tem ≥ 7 dias wall-clock com ≥ 10 turns/sessão em ≥ 5 sessões distintas
+- [ ] Cache hit rate >70% validado: `request_hit_rate > 0.70` E `token_cache_coverage > 0.60` (ambos, não OR) em sessão real
+- [ ] **Latency p50 <50ms** validado em 1 semana: `p50_latency_ms < 50` no relatório final
+- [ ] **Latency p99 <200ms** validado em 1 semana: `p99_latency_ms < 200`
+- [ ] **Working set <1.5GB** validado em 1 semana: `working_set_mb < 1500` após operação sustentada
+- [ ] Thresholds finais documentados: `min_cosine_similarity` e `min_fts_hits` valores finais + log de tuning empírico
+- [ ] **Phase 6b não bloqueia** (D-003 Branch B resolve): cache hit derivável só de Phase 5a/5b; Phase 6 status não importa
+
+**Output do Processador:**
+- Acceptance report (`acceptance-2026-MM-DD.md`) com métricas finais
+- Threshold config final em `.memory-studio/state.json`
+
+---
+
+## Total
+
+### Raw arithmetic (com phase splits)
+
+| Phase | Estimate |
+|---|---|
+| Phase 1 — Catalog + Index | 4-5h |
+| Phase 2 — Detector + Fingerprint | 2-3h |
+| Phase 3 — SDK Cliente | 3-4h |
+| Phase 4 — UI Panel | 8-12h |
+| Phase 5a — API + Retrieval | 3-4h |
+| Phase 5b — Audit + Endpoints + Security | 3-4h |
+| Phase 6a — Grill Gate + POC | 2-3h |
+| **Phase 6b — Branch A (impl) OR Branch B (collapse)** | **8-12h OR 0h** |
+| Phase 7a — Metrics Instrumentation | 2-3h |
+| Phase 7b — Empirical Tuning | 3-4h + 1 semana |
+| **Branch A total** | **36-52h + 1 semana** |
+| **Branch B total** | **28-40h + 1 semana** |
+
+### Canonical (PRD §9 / PLAN §Total)
+
+| Branch | Canonical |
+|---|---|
+| Branch A | 35-50h (PRD v3.2 honest) |
+| Branch B | 28-39h (Phase 6 collapsa) |
+
+**Nota D-002:** canonical é a estimativa comunicada; raw é o que vai sair na prática com phase splits. Diferença = overhead de sub-agent setup + integration entre phases. PRD canonical é o que importa pro plano de produto; raw é o que importa pra execução single-dev.
+
+---
+
+## Cross-references
+
+- [SPEC.md](../scratch/memory-studio/spec.md) — v2 comprehensive, 70+ user stories, 20+ impl decisions
+- [PRD.md](../../PRD.md) — v3.2, decisões estratégicas
+- [PLAN.md](../../PLAN.md) — v2, 7 phases técnicas com deliverables + estimates
+- [.specs/DISCOVERIES.md](../../.specs/DISCOVERIES.md) — D-001 a D-009 (todas resolvidas em PRD/PLAN)
+- [CLAUDE.md](../../CLAUDE.md) — authority boundaries
+- [handoff-session.md](../../handoff-session.md) — executivo de sessão
+
+---
+
+**Próximo passo:** tlc-roadmap-loop lê Phase 1 → Processador gera SPEC atômica de Phase 1 → Implementer + Verifier (Waldemar) executa → Done criteria validados → repete por Phase 2 → 3 → 4 → 5a → 5b → 6a → 6b (conditional) → 7a → 7b.
