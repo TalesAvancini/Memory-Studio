@@ -530,7 +530,7 @@ Ver [PLAN.md](PLAN.md) para phases, deliverables, estimates. PRD foca em decisõ
 - [ ] Modo prompt-only (v1 compat) continua funcionando quando contexto é null
 - [ ] Funciona com pelo menos 1 agente (Claude Code MVP)
 - [ ] **`activeCatalog` vazio:** `/augment` retorna 200 com `systemMessage` determinístico (persona only), `matchedSkills/Rules/Personas` arrays vazios, `emptyReason: "no_active_items"`, e forward unchanged pro provedor (sem inject defaults, sem reject) — ver §7.1.
-- [ ] **Inception híbrida (CONDICIONAL: grill §16.6 deve aprovar):** Turn N (cold start) vai plain pro provedor, fast agent lê response em paralelo com humano, Turn N+1 augmenta com (intel + prompt + catalog). **Se grill reprovar Phase 6, este critério é movido pra v3.2** e MVP core fecha sem inception híbrida.
+- [ ] **Inception híbrida (mandatory, validado por POC Phase 6a):** Turn N (cold start) vai plain pro provedor, fast agent lê response em paralelo com humano, Turn N+1 augmenta com (intel + prompt + catalog). Phase 6a é validation gate empírico (latency trick POC + grill §16.7). Se POC valida, Phase 6b implementa; se POC reprova, decisão humana é ajustar (não collapsar — Branch B removido 2026-07-28).
 
 ### 10.2 Performance
 
@@ -715,7 +715,7 @@ Decisões fechadas após grill com humano. Justificativa "por que X e não Y" re
 
 ## 16. Inception Híbrida (response-first) — arquitetura NOVEL
 
-**Status:** definida 2026-07-26. Pré-grill em §16.6 antes de integrar formalmente em §3 e iniciar Phase 6 do PLAN.
+**Status:** definida 2026-07-26. **Pré-grill em §16.7** antes de Phase 6 (validation gate). **Mandatory desde 2026-07-28** — Branch B (collapse-to-0h fallback) removido. Se POC reprova, decisão humana é ajustar, não collapsar.
 
 ### 16.1 Conceito
 

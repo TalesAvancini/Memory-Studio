@@ -90,7 +90,7 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 
 **Depends-on:** nenhuma (foundation).
 
-**Estimate:** 4-5h.
+**Estimate:** 6-8h (bumped per MiMo analysis: FTS5 + sqlite-vec + schema versioning + build-index perf são bundleados; ONNX runtime setup tem fricção variável por OS).
 
 **Por que X (SQLite + FTS5 + sqlite-vec) e não Y (Qdrant/Pinecone):**
 
@@ -233,28 +233,18 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 **Deliverables:**
 
 - Fast agent (Haiku-class) que lê response em paralelo com humano
-- Intel store (arquivo ou unix socket)
+- Intel store (SQLite WAL mode — §16.4 decisão)
 - Scripts de match e qualification sobre (intel + prompt + context + catalog)
-- Suffix injection no system message, prefix intacto
+- Suffix injection no system message, prefix intacto (template 2 blocos `cache_control: ephemeral`)
 - Latency budget: <100ms P50, <300ms P99
 - Validação do latency trick (fast agentuality termina antes do humano digitar próximo turn)
+- Intel contract validation test (writer-reader, degradação graciosa)
 
 **Depends-on:** Phase 5.
 
-**Estimate:** 8-12h.
+**Estimate:** 12-16h (8-12h + 4h §16.4 overhead: in-process Haiku integration + SQLite intel store migration + template 2-block renderer + intel contract validation).
 
-**Status:** **pré-grill em PRD §16.6 antes de iniciar.** Esta é a peça NOVEL do v3.
-
-**Branch B (fallback se grill §16.6 reprovar):**
-
-PRD §10.1 marca inception híbrida como CONDICIONAL ao grill §16.6. Se o grill reprovar Phase 6:
-
-- Phase 6 colapsa para **0h** (sem fast agent, sem intel pipeline, sem latency trick).
-- Phase 7 pre-reqs loosen para **Phase 5 only** (cache hit §10.2.4 derivável via byte-string determinístico + `cache_control: ephemeral` + log estruturado — Phase 6 não é necessário pra essa validação).
-- Total estimado cai de 35-50h para **28-39h**.
-- MVP core fecha sem inception híbrida; `Inception híbrida (CONDICIONAL)` é movida pra v3.2 per PRD §10.1.
-
-Branch B é uma **tree branch explícita**, não footnote. Cada pré-grill em §16.6 atualiza o status (open → approved → branch-B-triggered).
+**Status:** **mandatory** (Branch B removido 2026-07-28). Esta é a peça NOVEL do v3. Phase 6a (Grill + POC Validation) é validation gate empírico — se POC valida latency trick, segue Phase 6b. Se POC reprova, decisão humana é ajustar (não collapsar).
 
 **Por que X (fast-agent-over-response) e não Y (sem pre-fetch):**
 
@@ -267,13 +257,13 @@ Branch B é uma **tree branch explícita**, não footnote. Cada pré-grill em §
 - X: custo, latency, suficiente pra intel pattern matching.
 - Y: overkill pra tarefa de extração de intel.
 
-**Engineering decisions (PRD §16.4):**
+**Engineering decisions (PRD §16.4 — resolvidas 2026-07-28):**
 
-| Decisão | Trade-off |
-|---|---|
-| Fast agent: in-process vs sidecar | Latency vs isolation |
-| Intel: file vs unix socket | Reliability vs speed |
-| Match: regex vs catalog vs embedding | Speed vs precision |
+| Decisão | Resolução | Trade-off |
+|---|---|---|
+| Fast agent: in-process vs sidecar | **in-process** (Haiku HTTP direto no mesmo processo Node) | Latency vs isolation |
+| Intel: file vs unix socket | **SQLite (WAL mode)** — tabela `intel` com schema `{ session_id, agentState, nextNeeds (JSON), recentTopic, ts }` | Reliability vs speed |
+| Match: regex vs catalog vs embedding | **embedding pipeline existente (FTS5 + sqlite-vec + RRF)** — intel entra como sinal adicional concatenado ao prompt | Speed vs precision |
 | Suffix injection: template vs raw concat | Cache hit vs flexibility |
 | Prefix stability N→N+1 | Core do produto |
 
@@ -289,7 +279,7 @@ Branch B é uma **tree branch explícita**, não footnote. Cada pré-grill em §
 
 ## Phase 7 — Tuning empírico
 
-**Pre-reqs:** Phase 5. Phase 6 é pre-req **só se Branch A** (grill §16.6 aprovou inception híbrida); se Branch B foi triggered, Phase 7 depende só de Phase 5.
+**Pre-reqs:** Phase 5 + Phase 6. Phase 6b é mandatório desde 2026-07-28 (Branch B removido).
 
 **Deliverables:**
 
@@ -315,16 +305,17 @@ Branch B é uma **tree branch explícita**, não footnote. Cada pré-grill em §
 
 | Phase | Estimate |
 |---|---|
-| 1 — Schema + Catalog (incl. FTS5, sqlite-vec, schema versioning) | 4-5h |
+| 0 — Environment Validation (novo, MiMo 2026-07-28) | 1-2h |
+| 1 — Schema + Catalog (incl. FTS5, sqlite-vec, schema versioning) | 6-8h |
 | 2 — Detector + fingerprint (promoção v1→v3) | 2-3h |
 | 3 — SDK | 3-4h |
 | 4 — UI | 8-12h |
 | 5 — Proxy (incl. retrieval runtime + done criteria) | 6-8h |
-| 6 — Fast agent (NOVEL, gated por grill) | 8-12h |
+| 6 — Fast agent + intel pipeline (mandatory, MiMo §16.4) | 12-16h |
 | 7 — Tuning (5-7h trabalho + 1 semana coleta) | 5-7h |
-| **Total** | **36-51h (honesto: 35-50h)** |
+| **Total** | **43-60h (honesto: 41-55h)** |
 
-**Por que 35-50h e não 30-40h (PRD §9 v3.1):** soma direta das phases dá 36-51h. PRD v3.1 prometeu 30-40h — promessa furada. v3.2 corrige pra 35-50h, mantendo o mesmo perfil (single-dev, inclui erro, logging, 1 round de tuning empírico).
+**Por que 41-55h e não 35-50h (PRD §9 v3.2):** v3.3 inclui Phase 0 (env validation 1-2h), Phase 1 ajustada (4-5h → 6-8h), e §16.4 overhead em Phase 6 (+4h em cima dos 8-12h Branch A raw). Soma direta raw dá 43-60h; canonical PRD §9 bumped pra 41-55h honesto.
 
 ---
 

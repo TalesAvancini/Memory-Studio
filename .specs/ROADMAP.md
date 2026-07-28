@@ -11,12 +11,12 @@ explanation: |
   - M0 (Foundation) → Phase 1 + Phase 2
   - M1 (SDK + UI) → Phase 3 + Phase 4
   - M2 (Proxy + Audit) → Phase 5a + Phase 5b
-  - M3 (Inception híbrida) → Phase 6a + Phase 6b (Branch A/B conditional)
+  - M3 (Inception híbrida) → Phase 6a (Grill + POC validation) + Phase 6b (Fast Agent + Intel Pipeline, mandatory)
   - M4 (Tuning) → Phase 7a + Phase 7b
 
   Cada phase = 1-3h de trabalho single-dev, EXCETO Phase 1 (Catalog + Index, 6-8h —
   FTS5 + sqlite-vec + schema versioning + build-index perf são intrinsicamente
-  bundleados), Phase 4 (UI, 8-12h) e Phase 6b Branch A (8-12h) que são
+  bundleados), Phase 4 (UI, 8-12h) e Phase 6b (12-16h incluindo §16.4 overhead) que são
   intrinsecamente maiores. Phases
   com split (5a/5b, 6a/6b, 7a/7b) podem ser executadas em sequência
   dentro do mesmo dia.
@@ -62,7 +62,7 @@ related:
 5. **Cache distinction:** MVP usa **só cache do provedor** (Anthropic `cache_control: ephemeral`). Cache de augmented (fingerprint semântico) é v3.1+ omitido — não medir nem expor no MVP (PRD §17.1).
 6. **Security default:** zero raw persistence, `tenantId` hasheado, placeholders determinísticos não vazam secret, proxy local-only.
 7. **Fail-open:** todo erro de retrieval/augmentation/audit → forward unchanged, request 200, log em stderr.
-8. **Branch B at Phase 6b:** se grill §16.7 reprovar inception híbrida, Phase 6b colapsa pra 0h; Phase 7b pre-reqs loosened pra Phase 5 only.
+8. **(removido 2026-07-28)** Branch B fork eliminado — Phase 6 é mandatório. Phase 6a (Grill + POC) funciona como validation gate: se POC reprova, decisão humana (ajustar, não collapsar). Total fixo 41-61h.
 9. **Endpoint count: 7 total** (6 auxiliary + /augment). `/state/toggle` foi adicionado pós-D-009 (Phase 4 UI dependency). Lista: `/augment`, `/catalog`, `/catalog/rebuild`, `/audit`, `/audit/summary`, `/health`, `/state/toggle`.
 
 ---
@@ -368,17 +368,18 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 6a — Grill Gate + POC Validation
+## Phase 6a — Grill + POC Validation (gate antes de Phase 6b)
 
-**Goal:** decidir Branch A (implementa) vs Branch B (colapsa) antes de Phase 6b.
+**Goal:** validar empiricamente latency trick + intel pipeline antes de Phase 6b. Não é binary fork — é validation. Se POC reprova, decisão humana é ajustar (não collapsar).
 
 **Scope:**
-- PRD §16.7 (Pré-grill antes de Phase 6 — **canonical**, §16.6 é stale por causa do §16.5 insert)
+- PRD §16.7 (Pré-grill checklist — canonical, §16.6 é stale por causa do §16.5 insert)
 - Latency trick POC (Haiku reads R_N paralelo com humano)
+- Intel pipeline POC (writer-reader contract end-to-end)
 
 **PRD refs:**
 - §3 Como funciona (fluxo canônico)
-- §10.1 item 12 (Inception híbrida CONDICIONAL grill §16.7)
+- §10.1 item 12 (Inception híbrida — validado por POC Phase 6a)
 - §16 Inception Híbrida — arquitetura NOVEL
 - §16.7 Próximo passo (pré-grill checklist)
 - §16.2 Latency trick
@@ -387,78 +388,57 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 **Done criteria:**
 - [ ] Grill roda em PRD §16.7 (não §16.6 — stale ref) com ≥4 lenses: latency-trick, novelty, fail-open, novelty-vs-existing
-- [ ] Grill decision recorded: `branch_a_approved: true | false` em `.specs/DISCOVERIES.md` (append nova entry, ID >= D-010)
+- [ ] Grill decision recorded em `.specs/DISCOVERIES.md` (append nova entry, ID >= D-010)
 - [ ] POC latency trick: 1 turno simulado, Haiku processa R_N em <3s enquanto humano leva 5-30s lendo
-- [ ] Se branch_a_approved=true → Phase 6b segue Branch A
-- [ ] Se branch_a_approved=false → Phase 6b segue Branch B (collapse)
+- [ ] POC intel pipeline end-to-end: Haiku gera Intel → match pipeline consome → system message augmentado
+- [ ] POC result doc com timing measurements + decision humana (proceed / adjust)
 
 **Output do Processador:**
 - Grill transcript em `.specs/auto-grill-output/<timestamp>/`
 - Decision recorded em `.specs/DISCOVERIES.md`
-- POC result doc com timing measurements
+- POC result doc com timing measurements + decisão humana
 
 ---
 
-## Phase 6b — Branch A Implementation OR Branch B Activation
+## Phase 6b — Fast Agent + Intel Pipeline (mandatory)
 
-**Goal:** Turn N+1 augmenta com intel (Branch A) OU MVP fecha sem inception híbrida (Branch B).
+**Goal:** Turn N+1 augmenta com intel. Latency trick validated em produção. Arquitetura NOVEL implementada.
 
-**Scope (Branch A):**
+**Scope:**
 - SPEC §IMod-5 (intel schema — D-005: `{ agentState: string, nextNeeds: string[], recentTopic: string }`)
-- SPEC §IMod-11 (Branch B fallback documentation — D-003)
-- Fast agent (Haiku) in-process
-- Intel store persistido
-- Match script (intel + prompt + context + catalog)
+- §16.4 decisions (in-process Haiku / SQLite intel store WAL / embedding pipeline reuse / template 2-block / persona anchor)
+- Fast agent (claude-3-5-haiku-*) in-process
+- Intel store persistido em SQLite (WAL mode)
+- Match script (intel + prompt + context + catalog) — reusa embedding pipeline existente
 - Suffix injection no system message (prefixo intacto)
-
-**Scope (Branch B):**
-- Phase 6b marcado como collapsado (0h)
-- Phase 7b pre-reqs atualizados: "Phase 5 only"
-- Total recalculado: raw 30-40h vs canonical 28-39h
-- PRD §10.1 item 12 movido pra v3.2
-- handoff-session atualizado com Branch B status
+- Intel contract validation (writer-reader test)
 
 **PRD refs:**
 - §3 fluxo canônico
-- §10.1 item 12 (Inception híbrida)
+- §10.1 item 12 (Inception híbrida — mandatório pós-POC)
 - §14.7 Inception híbrida (response-first)
-- §16.1-§16.7 (latency trick, novelty, engineering decisions, intel schema §16.5, lessons, próximo passo §16.7)
+- §16.1-§16.7 (latency trick, novelty, engineering decisions §16.4 resolvidas, intel schema §16.5, lessons, próximo passo §16.7)
 
-**Estimate (Branch A):** 8-12h
+**Estimate:** 8-12h + 4h §16.4 overhead = **12-16h**
 
-**Estimate (Branch B):** 0h
-
-**Done criteria (Branch A):**
+**Done criteria:**
 - [ ] Fast agent (claude-3-5-haiku-*) lê R_N em paralelo com humano (in-process, não daemon)
 - [ ] Intel schema `{ agentState, nextNeeds, recentTopic }` gerado por Haiku (literal — D-005)
-- [ ] Intel store persistido em SQLite; restart do server preserva intel do último turn
+- [ ] Intel store persistido em SQLite (WAL mode); restart do server preserva intel do último turn
 - [ ] Turn N+1 augmenta com `(intel + prompt + context + catalog)`
-- [ ] Suffix injection no system message; prefixo (persona) intacto
+- [ ] Suffix injection via template 2 blocos `cache_control: ephemeral` (persona + intel+Skills)
 - [ ] **Latency trick validated** (PRD §16.2): fast agentuality termina em **<3s** medido, vs humano 5-30s lendo (10 amostras)
 - [ ] **Cache hit quando prefixo estável** (teste explícito): 2 turns com mesmo persona + prompts diferentes → `usage.cache_read_input_tokens > 0` no segundo turn
-- [ ] **Branch B documented como árvore** (D-003): PLAN.md Phase 6 contém seção `Branch B` heading-level; esta ROADMAP.md Phase 6b marca Branch B como alternate path (não footnote)
 - [ ] Fast agent model = `claude-3-5-haiku-*` (não "Haiku-class" — modelo concreto)
 - [ ] Writer-reader contract preservado: shape literal `Intel` matches between fast agent output and match pipeline input
 - [ ] **Intel contract validation** (test automatizado): serializa `Intel` do writer (Haiku output), desserializa no reader (match pipeline input). Validação: `agentState: string` (vazio OK), `nextNeeds: string[]` (vazio OK, ordem flexível), `recentTopic: string` (vazio OK). Degradação graciosa: se field vazio/fora de ordem, match pipeline não crasha.
 
-**Done criteria (Branch B):**
-- [ ] Phase 6b marcado como collapsado (0h) em PLAN.md Phase 6 status
-- [ ] Phase 7b pre-reqs atualizados: "Phase 5 only" (Phase 6 não bloqueia)
-- [ ] Total recalculado documentado em PLAN.md §Total: raw arithmetic 30-40h vs canonical 28-39h
-- [ ] PRD §10.1 item 12 movido pra v3.2 com nota: "deferred per Branch B activation 2026-MM-DD"
-- [ ] handoff-session atualizado com Branch B status + activation rationale
-- [ ] Inception híbrida architecture ainda documentada em PRD §16 (reference), mas marcada como v3.2+
-
-**Output do Processador (Branch A):**
-- Fast agent module (TS) — Haiku integration
-- Intel store (SQLite table + read/write API)
+**Output do Processador:**
+- Fast agent module (TS) — Haiku integration in-process
+- Intel store (SQLite table + read/write API, WAL mode)
 - Match script (TS) com writer-reader contract validation
+- Template 2-block renderer (persona + intel+Skills)
 - Latency benchmark doc com timing measurements
-
-**Output do Processador (Branch B):**
-- PLAN.md updates (Phase 6 collapse + Phase 7 pre-reqs)
-- PRD.md §10.1 item 12 → v3.2 marker
-- handoff-session entry: Branch B activated
 
 ---
 
@@ -515,7 +495,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 - [ ] **Latency p99 <200ms** validado em 1 semana: `p99_latency_ms < 200`
 - [ ] **Working set <1.5GB** validado em 1 semana: `working_set_mb < 1500` após operação sustentada
 - [ ] Thresholds finais documentados: `min_cosine_similarity` e `min_fts_hits` valores finais + log de tuning empírico
-- [ ] **Phase 6b não bloqueia** (D-003 Branch B resolve): cache hit derivável só de Phase 5a/5b; Phase 6 status não importa
+- [ ] Phase 6b é mandatório desde 2026-07-28 (Branch B removido); Phase 7b depende de Phase 5 + Phase 6b
 
 **Output do Processador:**
 - Acceptance report (`acceptance-2026-MM-DD.md`) com métricas finais
@@ -537,20 +517,18 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 | Phase 5a — API + Retrieval | 3-4h |
 | Phase 5b — Audit + Endpoints + Security | 3-4h |
 | Phase 6a — Grill Gate + POC | 2-3h |
-| **Phase 6b — Branch A (impl) OR Branch B (collapse)** | **8-12h OR 0h** (MiMo §16.4 decisions: +4h overhead em cima do Branch A raw) |
+| **Phase 6b — Fast Agent + Intel Pipeline (mandatory)** | **12-16h** (8-12h + 4h §16.4 overhead) |
 | Phase 7a — Metrics Instrumentation | 2-3h |
 | Phase 7b — Empirical Tuning | 3-4h + 1 semana |
-| **Branch A total** | **41-61h + 1 semana** |
-| **Branch B total** | **33-49h + 1 semana** |
+| **Total (Phase 6b mandatory, sem Branch B)** | **45-69h + 1 semana** |
 
 ### Canonical (PRD §9 / PLAN §Total)
 
-| Branch | Canonical (PRD §9) | Raw arithmetic (ROADMAP) |
+| Type | Canonical (PRD §9 v3.3) | Raw arithmetic (ROADMAP) |
 |---|---|---|
-| Branch A | 35-50h (PRD v3.2 honest) | 41-61h (Phase 0 + Phase 1 ajustada + §16.4 overhead) |
-| Branch B | 28-39h (Phase 6 collapsa) | 33-49h |
+| Branch única | 41-55h (PRD v3.3 honest, pós-MiMo) | 45-69h (Phase 0 + Phase 1 ajustada + §16.4 overhead + Phase 6b mandatory) |
 
-**Drift flag (MiMo adjustments):** canonical PRD §9 está optimistic vs raw arithmetic pós-MiMo. PRD canônico deveria bumpar pra **41-55h Branch A** / **33-43h Branch B** pra refletir Phase 0 + Phase 1 ajustada + §16.4 overhead honestamente. Decisão humana se aceita bump ou mantém PRD canônico como "commitment" vs ROADMAP raw como "execution reality".
+**Drift flag:** canonical PRD §9 (41-55h) é mais otimista que raw arithmetic (45-69h). Diferença = ~4h de overhead de sub-agent setup entre phases. PRD canônico é o "commitment ao produto"; ROADMAP raw é o "execution reality".
 
 **Nota D-002:** canonical é a estimativa comunicada; raw é o que vai sair na prática com phase splits. Diferença = overhead de sub-agent setup + integration entre phases. PRD canonical é o que importa pro plano de produto; raw é o que importa pra execução single-dev.
 

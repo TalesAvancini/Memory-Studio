@@ -9,7 +9,7 @@ explanation: |
   - PRD.md v3.2 (17 seções, ~830 linhas): decisões estratégicas, escopo,
     schema, stack, invariantes, acceptance criteria, glossário.
   - PLAN.md v2 (7 phases, ~380 linhas): phases, deliverables, estimates,
-    acceptance mapping, branch B fallback.
+    acceptance mapping, Phase 6b mandatory (Branch B removido 2026-07-28).
   - .specs/DISCOVERIES.md (D-001 a D-009): 9 decisões auto-grill, todas
     resolvidas em PRD/PLAN post-gate 2026-07-28.
   - Conversation context (Waldemar loop, NotebookLM brainstorm, archive
@@ -191,7 +191,7 @@ Quando `activeCatalog` é `[]`:
 36. As a **user**, I want Turn N+1 to augment with `intel = { agentState, nextNeeds, recentTopic }` from previous turn, so that context flows across turns without re-prompting. **← D-005**
 37. As a **user**, I want the fast agent to finish in <3s, so that latency trick works (human reads take 5-30s).
 38. As a **user**, I want the fast agent to be in-process (no separate daemon), so that there's no extra service to manage.
-39. As a **user**, I want Branch B fallback (Phase 6 → 0h, Phase 7 pre-reqs → Phase 5 only) if grill §16.6 reproves inception híbrida, so that MVP closes without it as a real tree, not a footnote. **← D-003**
+39. As a **user**, I want Phase 6b inception híbrida mandatory (Branch B removido 2026-07-28) — Phase 6a acts as validation gate (latency trick POC + grill §16.7), and if POC reprova, decision humana is to adjust, not collapse, so that the architecture NOVEL is preserved as a competitive differentiator.
 
 ### F. Cache & metrics
 
@@ -448,15 +448,18 @@ async function flushAudit() {
 | `/health` | Phase 5 | liveness + readiness, REQUIRED for §10.2 latency gating |
 | `/state/toggle` | Phase 5 (consumed by Phase 4 UI) | POST `{itemId, action, critical_confirm?}`; toggle Rule critical sem confirmação → 400 |
 
-### IMod-11: Branch B fallback (D-003)
+### IMod-11: ~~Branch B fallback (D-003)~~ REMOVIDO 2026-07-28
 
-Se PRD §16.6 grill reprovar Phase 6 (inception híbrida):
-- Phase 6 estimate colapsa para **0h** (sem fast agent work).
-- Phase 7 pre-reqs loosen para **Phase 5 only** (cache hit §10.2.4 derivável via Phase 5 byte-string + cache_control ephemeral + structured log).
-- Total estimate cai de 35-50h para **28-39h**.
-- MVP core fecha sem inception híbrida; critério §10.1 item "Inception híbrida (CONDICIONAL)" é movido pra v3.2.
+**Branch B eliminado.** Phase 6b agora é mandatório — sem fork condicional.
 
-Branch B é **tree branch explícita** (PLAN.md Phase 6), não footnote.
+Rationale:
+- §16.4 engineering decisions resolvidas (in-process Haiku / SQLite / embedding pipeline / template / persona anchor).
+- Usuário commitou ao produto standalone (não OmniRoute extension) e à arquitetura NOVEL.
+- Phase 6a (Grill + POC) funciona como validation gate empírico, não binary fork.
+- Se POC reprova, decisão humana é ajustar, não collapsar.
+- Total fixo: 45-69h raw / 41-55h canonical (post-MiMo).
+
+D-003 (Branch B ausente, original) foi resolvido na primeira wave adicionando Branch B como hedge. Branch B agora removido por decisão humana 2026-07-28.
 
 ### IMod-12: Active catalog vazio contract (D-008)
 
@@ -542,14 +545,15 @@ Roda em qualquer máquina com 4GB livres.
 
 | Phase | Estimate | Deliverables |
 |---|---|---|
-| 1 — Schema + Catálogo | 4-5h | YAML schema, SQLite (catalog/embeddings/audit_events), FTS5, sqlite-vec, loader, `npm run build-index`, schema versioning |
+| 0 — Environment Validation (novo, MiMo 2026-07-28) | 1-2h | Node 22, onnxruntime-node, SQLite FTS5 + sqlite-vec, multilingual-e5-small ONNX, permissões filesystem |
+| 1 — Schema + Catálogo | 6-8h | YAML schema, SQLite (catalog/embeddings/audit_events/intel), FTS5, sqlite-vec, loader, `npm run build-index`, schema versioning |
 | 2 — Detector social + fingerprint | 2-3h | Detector social (regex), fingerprint 4-comp, hashing básico, audit schema |
 | 3 — SDK cliente | 3-4h | `@memory-studio/sdk`, `collectContext`, `fingerprint`, `MemoryStudioClient.augment`, prompt-only mode |
 | 4 — UI painel | 8-12h | Painel localhost, 5 telas, HTMX+Alpine, `.memory-studio/state.json`, Critical Rules warning |
 | 5 — Proxy transparente | 6-8h | Forwarder HTTP, retrieval runtime, byte-string determinístico, tiebreak ordering (D-006), audit async fail-open (D-007), 5 endpoints (D-009) |
-| 6 — Fast agent (NOVEL, gated) | 8-12h | Fast agent (Haiku), intel store, match scripts, suffix injection, latency trick. **Branch B: 0h se grill reprova** (D-003) |
+| 6 — Fast agent + Intel pipeline (mandatory, MiMo §16.4) | 12-16h | Fast agent (Haiku) in-process, intel store (SQLite WAL), match script (intel + prompt + catalog), suffix injection (template 2-block `cache_control: ephemeral`), latency trick, contract validation |
 | 7 — Tuning empírico | 5-7h (+ 1 semana coleta) | Dashboard mínimo, métricas cache hit, threshold tuning, aceitação >70% |
-| **Total** | **35-50h** | (Branch B: 28-39h se Phase 6 colapsada) |
+| **Total** | **45-69h raw** (canonical 41-55h) | (Phase 6b mandatory desde 2026-07-28 — Branch B removido) |
 
 ### IMod-19: Acceptance criteria mapping (PRD §10 → 23 items, 100%)
 
