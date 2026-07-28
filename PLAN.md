@@ -312,6 +312,56 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 
 ---
 
+## Acceptance criteria mapping (PRD §10 → phases)
+
+> **Origem:** relatório de cobertura 2026-07-27 identificou §10 (22 checkboxes) com ~30% mapeamento. Esta tabela fecha o gap: cada item §10.x → phase que entrega → onde valida.
+
+### §10.1 Funcional (11)
+
+| # | Critério | Phase owner | Validado em |
+|---|---|---|---|
+| 1 | Lê prompt + estado (scratch, todos, recentFiles, lastEvent) | Phase 3 (SDK coleta) + Phase 5 (proxy recebe) | Phase 5 done (smoke test) |
+| 2 | Top 3-5 skills/rules/personas identificados | Phase 5 (retrieval + match) | Phase 5 done |
+| 3 | System message byte-string determinístico | Phase 5 | Phase 5 done (SHA256) |
+| 4 | `cache_control: ephemeral` em 2 blocos | Phase 5 | Phase 5 done |
+| 5 | Cache hit verificado via log | Phase 5 (logging) + Phase 7 (mede) | Phase 7 |
+| 6 | UI mostra catálogo + toggle por projeto | Phase 4 | Phase 4 done |
+| 7 | Critical Rules: aviso visual + imunes a toggle off | Phase 4 (UI) + Phase 5 (server enforça) | Phase 4 done |
+| 8 | Audit log grava tudo (prompt redactado + matched IDs + pruning + latência) | Phase 5 | Phase 5 done |
+| 9 | Modo prompt-only funciona (v1 compat) | Phase 3 (SDK: `context: null`) | Phase 5 done |
+| 10 | Funciona com 1 agente (Claude Code) | Phase 5 (proxy testado com Claude Code) | Phase 5 done (smoke test) |
+| 11 | Inception híbrida (CONDICIONAL grill §16.6) | Phase 6 | Phase 6 done |
+
+### §10.2 Performance (4)
+
+| # | Critério | Phase owner | Validado em |
+|---|---|---|---|
+| 1 | p50 latência < 50ms | Phase 5 (proxy) | Phase 7 (1 semana real) |
+| 2 | p99 latência < 200ms | Phase 5 (proxy) | Phase 7 |
+| 3 | Working set < 1.5GB RAM | Phase 5 (deploy) | Phase 7 |
+| 4 | Cache hit rate > 70% (>10 turns) via log | Phase 7 (mede + ajusta) | Phase 7 done |
+
+### §10.3 Segurança / Privacidade (4)
+
+| # | Critério | Phase owner | Validado em |
+|---|---|---|---|
+| 1 | Zero persistência de contexto raw | Phase 2 (SDK redacta) + Phase 5 (audit redacta) | Phase 5 done |
+| 2 | `tenantId` hasheado | Phase 2 (sha256[0:16]) + Phase 5 (logging) | Phase 5 done |
+| 3 | Placeholders determinísticos não vazam secret | Phase 5 (template substitui) | Phase 5 done |
+| 4 | Nenhum dado sai da máquina (proxy local only) | Phase 5 (deploy local) + Phase 4 (UI localhost) | Phase 5 done |
+
+### §10.4 Operacional (3)
+
+| # | Critério | Phase owner | Validado em |
+|---|---|---|---|
+| 1 | `npm run build-index` < 60s pra 100 skills | Phase 1 | Phase 1 done |
+| 2 | UI carrega < 1s local | Phase 4 | Phase 4 done |
+| 3 | Audit query < 100ms pra 30 dias | Phase 5 (audit schema) + Phase 7 (valida) | Phase 7 |
+
+**Cobertura:** 22/22 = 100% mapeados. Gaps de **validação** (medir de fato) ficam pras phases correspondentes — não há gap de **ownership** (toda checkbox tem phase que entrega + phase que valida).
+
+---
+
 ## Cross-references
 
 - [PRD.md](PRD.md) — decisões + justificativas
