@@ -389,9 +389,14 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 **Done criteria:**
 - [ ] Grill roda em PRD §16.7 (não §16.6 — stale ref) com ≥4 lenses: latency-trick, novelty, fail-open, novelty-vs-existing
 - [ ] Grill decision recorded em `.specs/DISCOVERIES.md` (append nova entry, ID >= D-010)
-- [ ] POC latency trick: 1 turno simulado, Haiku processa R_N em <3s enquanto humano leva 5-30s lendo
-- [ ] POC intel pipeline end-to-end: Haiku gera Intel → match pipeline consome → system message augmentado
-- [ ] POC result doc com timing measurements + decision humana (proceed / adjust)
+- [ ] **POC hot path overhead inception** (PRIMARY): Turn N+1 mede inception overhead <10ms — `sqlite.get(intel)` <5ms (p95, 10 amostras), concat intel+prompt <1ms (p95), template render 2 blocos <1ms (p95). Total inception overhead <10ms mantém budget p50<50ms (PRD §10.2).
+- [ ] **POC latency trick** (SECONDARY, arquitetural): fast agent processa R_N enquanto humano lê. Default `MiniMax-M2.7-highspeed` (highspeed variant) tipicamente <1s; humano tem 5-30s lendo. Latência do fast agent não bloqueia request — paralelismo natural.
+- [ ] POC intel pipeline end-to-end: fast agent gera Intel → match pipeline consome → system message augmentado
+- [ ] POC result doc com timing measurements + decisão humana (proceed / adjust)
+
+**Por que hot path overhead é PRIMARY, latency trick é SECONDARY:**
+
+O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncrono, bloqueia humano). Latência do fast agent acontece em paralelo com leitura humana (folga 5-30s). Se inception overhead for <10ms, é transparente — latency trick é bônus arquitetural, não risco técnico. POC foca no gargalo real.
 
 **Output do Processador:**
 - Grill transcript em `.specs/auto-grill-output/<timestamp>/`
@@ -422,12 +427,13 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 **Estimate:** 8-12h + 4h §16.4 overhead = **12-16h**
 
 **Done criteria:**
-- [ ] Fast agent (claude-3-5-haiku-*) lê R_N em paralelo com humano (in-process, não daemon)
-- [ ] Intel schema `{ agentState, nextNeeds, recentTopic }` gerado por Haiku (literal — D-005)
+- [ ] Fast agent (default `MiniMax-M2.7-highspeed` via Anthropic-compatible API, fallback `claude-3-5-haiku-*`, configurável via `fastAgent.model` em `.memory-studio/state.json`) lê R_N em paralelo com humano (in-process, não daemon)
+- [ ] Intel schema `{ agentState, nextNeeds, recentTopic }` gerado por fast agent (literal — D-005)
 - [ ] Intel store persistido em SQLite (WAL mode); restart do server preserva intel do último turn
 - [ ] Turn N+1 augmenta com `(intel + prompt + context + catalog)`
 - [ ] Suffix injection via template 2 blocos `cache_control: ephemeral` (persona + intel+Skills)
-- [ ] **Latency trick validated** (PRD §16.2): fast agentuality termina em **<3s** medido, vs humano 5-30s lendo (10 amostras)
+- [ ] **Latency trick validated** (PRD §16.2, arquitetural): fast agentuality termina em **<3s** medido (default `MiniMax-M2.7-highspeed` tipicamente <1s), vs humano 5-30s lendo (10 amostras). Paralelismo natural — latência do fast agent NÃO bloqueia request humano.
+- [ ] **Inception hot path overhead <10ms** (PRIMARY criterion, PRD §10.2 budget): `sqlite.get(intel)` <5ms (p95), concat <1ms, template render <1ms. Medido com 10 amostras; total request p50 <50ms preservado.
 - [ ] **Cache hit quando prefixo estável** (teste explícito): 2 turns com mesmo persona + prompts diferentes → `usage.cache_read_input_tokens > 0` no segundo turn
 - [ ] Fast agent model = `claude-3-5-haiku-*` (não "Haiku-class" — modelo concreto)
 - [ ] Writer-reader contract preservado: shape literal `Intel` matches between fast agent output and match pipeline input

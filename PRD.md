@@ -764,7 +764,7 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 
 **Resoluções (documentadas 2026-07-28, antes de Phase 6a per MiMo checklist):**
 
-1. **Fast agent: in-process.** Chamada HTTP direta à API Anthropic (Haiku) dentro do mesmo processo Node. Zero IPC, zero sidecar. Fail-open natural: se Haiku morrer ou demorar, request principal já respondeu — intel vazio, turn N+1 degrada gracioso. Latência mínima.
+1. **Fast agent: in-process.** Chamada HTTP direta à API Anthropic-compatible dentro do mesmo processo Node. Default model: `MiniMax-M2.7-highspeed` (via base URL `https://api.minimax.io/anthropic`, Anthropic SDK). Fallback: `claude-3-5-haiku-*`. Configurável via `.memory-studio/state.json` (`fastAgent.model`). Zero IPC, zero sidecar. Fail-open natural: se fast agent morrer ou demorar, request principal já respondeu — intel vazio, turn N+1 degrada gracioso. Latência mínima.
 2. **Intel store: SQLite (WAL mode).** Tabela `intel` com schema `{ session_id, agentState TEXT, nextNeeds TEXT (JSON array), recentTopic TEXT, ts INTEGER }`. WAL mode já configurado. Restart preserva. Estimativa: ~1h migration SQL.
 3. **Match strategy: embedding pipeline existente (FTS5 + sqlite-vec + RRF).** Intel entra como sinal adicional — `agentState` + `recentTopic` concatenados ao prompt antes do embedding. `nextNeeds` pode dar score bonus pra items com keywords matching. Sem pipeline novo. Estimativa: ~2h.
 4. **Suffix injection: template com 2 blocos `cache_control: ephemeral`.** Bloco 1 = persona (estável, cache hit). Bloco 2 = intel + Skills (variável, cache miss esperado). Template fixa estrutura → byte-string determinístico. Estimativa: ~1h.

@@ -117,7 +117,7 @@ Response com cacheHit (v3.1+), pruningDecisions, decisionTraceId
 Turn N (cold start):
   P_N plain → provedor → R_N
   Ramo A (paralelo): humano lê R_N
-  Ramo B (paralelo): fast agent (Haiku) lê R_N → gera Intel → persiste
+  Ramo B (paralelo): fast agent (default `MiniMax-M2.7-highspeed`, configurável) lê R_N → gera Intel → persiste
 
 Turn N+1 (augmentação cache-friendly):
   P_{N+1} + Intel(R_N) + contexto + catálogo
@@ -187,9 +187,10 @@ Quando `activeCatalog` é `[]`:
 ### E. Inception híbrida (Phase 6, gated)
 
 34. As a **user**, I want Turn N to go plain to the provider (no augmentação, cold start), so that the first request doesn't suffer latency.
-35. As a **user**, I want a fast agent (Haiku-class) to read response in parallel with my reading, so that intel is ready when I type the next turn.
+35. As a **user**, I want a fast agent (default `MiniMax-M2.7-highspeed`, configurable via `.memory-studio/state.json` `fastAgent.model`, fallback `claude-3-5-haiku-*`) to read response in parallel with my reading, so that intel is ready when I type the next turn.
 36. As a **user**, I want Turn N+1 to augment with `intel = { agentState, nextNeeds, recentTopic }` from previous turn, so that context flows across turns without re-prompting. **← D-005**
-37. As a **user**, I want the fast agent to finish in <3s, so that latency trick works (human reads take 5-30s).
+37. As a **user**, I want the fast agent (default `MiniMax-M2.7-highspeed`) to finish in <3s (tipicamente <1s com highspeed variant), so that latency trick works (human reads take 5-30s). Latency do fast agent é **arquitetural** (paralelismo natural) — não bloqueia request humano.
+37a. As a **user**, I want inception hot path overhead (intel load + concat + template render) <10ms total, so that request p50 stays <50ms (PRD §10.2 budget). **Medido, não estimado.**
 38. As a **user**, I want the fast agent to be in-process (no separate daemon), so that there's no extra service to manage.
 39. As a **user**, I want Phase 6b inception híbrida mandatory (Branch B removido 2026-07-28) — Phase 6a acts as validation gate (latency trick POC + grill §16.7), and if POC reprova, decision humana is to adjust, not collapse, so that the architecture NOVEL is preserved as a competitive differentiator.
 
@@ -351,7 +352,7 @@ type Intel = {
 }
 ```
 
-**Writer:** fast agent (Haiku) ao final de Turn N. Lê R_N, gera Intel, persiste no store.
+**Writer:** fast agent (default `MiniMax-M2.7-highspeed`, configurável) ao final de Turn N. Lê R_N, gera Intel, persiste no store.
 **Reader:** match pipeline no início de Turn N+1. Carrega Intel do store.
 **Invariante:** schema drift entre writer/reader quebra inception híbrida silenciosamente. Phase 6 implementa contra este shape literal.
 
@@ -614,7 +615,7 @@ Roda em qualquer máquina com 4GB livres.
 | `intel` | `{ agentState, nextNeeds, recentTopic }` (D-005). Shape exato. | §16.5 |
 | `activeCatalog` | Array de IDs ativos. Source = `.memory-studio/state.json`. | §7.1 |
 | `emptyReason` | Enum: `low_confidence \| social \| timeout \| no_active_items \| null`. | §7.1, D-008 |
-| `fast agent` | Haiku-class agent que lê response em paralelo. | §16 |
+| `fast agent` | Default `MiniMax-M2.7-highspeed` (configurável via `.memory-studio/state.json` `fastAgent.model`, fallback `claude-3-5-haiku-*`). Anthropic-compatible API via `https://api.minimax.io/anthropic`. Lê response em paralelo com humano. | §16 |
 | `fast-agent-over-response` | Padrão arquitetural. | §16.3 |
 
 **Regra:** PRD, PLAN, SPEC, SDK, schema, response — todos usam casing canônico. Drift = discovery.
