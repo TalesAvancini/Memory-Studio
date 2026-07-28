@@ -116,7 +116,18 @@
     {
       "from": "sqlite",
       "to": "sqlite-vec",
-      "label": "vec virtual table"
+      "label": "vec virtual table",
+      "route": "orthogonal-v",
+      "via": [
+        [
+          180,
+          80
+        ],
+        [
+          640,
+          80
+        ]
+      ]
     },
     {
       "from": "embedding-model",
