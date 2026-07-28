@@ -332,3 +332,53 @@ Tu precisa (se ainda não fez): copiar MiniMax API key do Claude Code pra `.env`
 | `7142ef6` | `.gitignore` hardening (`.env.*` glob) |
 
 **Estado final:** Working tree clean. origin/main pushed (`7142ef6`). PRD v3.4 + PLAN v3 + SPEC v2 + ROADMAP v5 + BACKLOG (13 entries) + .gitignore hardened. Phase 1 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
+
+---
+
+### Marcos 19-20 (post-v3 follow-up — Phase 6a reframe + SPEC drift)
+
+Após finalização do v3 do handoff, verificação adicional identificou drift residual entre PRD/PLAN/ROADMAP/SPEC sobre o papel da Phase 6a. Os docs ainda referenciavam "grill" como método da Phase 6a, mas a conversa pós-MiMo já tinha estabelecido que Phase 6a é **POC técnica** que mede targets concretos (não grill adversarial).
+
+**Escopo:** continuation patches no mesmo dia (2026-07-28), branch `main`. Não é sessão nova.
+
+#### Marco 19 — Phase 6a reframe (PRD §16.7 + ROADMAP Phase 6a)
+
+- **PRD §16.7** reescrita: 2 POC targets (overhead hot path <10ms total, fast agent <3s) + 3 itens "Resolvido em §16.4" (não mais TODO) + cache hit >70% movido pra Phase 7b
+- **ROADMAP Phase 6a** renomeada "Grill + POC Validation" → "POC Validation (hot path + fast agent)"
+- **ROADMAP Phase 6a Done criteria** reescritas como 6 targets medidos (10 amostras): sqlite.get(intel) <5ms, concat <1ms, template render <1ms, overhead total <10ms (PRIMARY), fast agent <3s, byte-string SHA256 igual
+- **ROADMAP meta-conv #8** + frontmatter: PLAN.md marcado como referência histórica (execução segue ROADMAP)
+
+Rationale: gargalo real da inception é o overhead no hot path (<10ms), não a latência do fast agent (paralelo com leitura humana, 5-30s folga).
+
+**Commit:** `322766f — @ docs: reframe Phase 6a — POC Validation (hot path + fast agent)` (+32/-20, 2 files)
+
+#### Marco 20 — SPEC drift fix (cosmetic consistency)
+
+SPEC.md (synthesis de PRD+PLAN+DISCOVERIES) tinha 2 referências stale ao "grill" após os patches do Marco 19:
+
+- **SPEC IMod-11** linha 459: "Phase 6a (Grill + POC)" → "Phase 6a (POC Validation)" — consistente com ROADMAP meta-conv #8
+- **SPEC User Story 39**: reescrita de "latency trick POC + grill §16.7" → "technical POC that validates hot path overhead <10ms + fast agent latency <3s (per PRD §16.7 + ROADMAP Phase 6a)" — consistente com PRD §16.7 rewrite
+
+Não-estrutural, não-bloqueante, mas confuso se SPEC for lido isolado.
+
+**Commit:** `0fcdb47 — @ docs(spec): fechar drift "grill" → POC Validation em IMod-11 + User Story 39` (+2/-2, 1 file)
+
+---
+
+**Commits finais da sessão (v3 + v4 follow-up):**
+
+| Commit | Descrição |
+|---|---|
+| `322766f` | **v4:** Phase 6a reframe (PRD §16.7 + ROADMAP Phase 6a) — POC hot path PRIMARY |
+| `0fcdb47` | **v4:** SPEC drift fix — "grill" → POC Validation |
+| `3bf1034` | MiMo: §16.4 decisions + reranker removido + Phase 0 + standalone strategy |
+| `eb08f75` | BACKLOG: 12 entries (I-002 a I-013) |
+| `9da2000` | Branch B removido (single branch, Phase 6b mandatory) |
+| `770f1ee` | POC reframe + MiniMax-M2.7-highspeed default |
+| `e8a4c60` | Anthropic fallback removido (Haiku = MiniMax no Claude Code) |
+| `cafadea` | `.env.example` simplificado (vazio) |
+| `2d81254` | `.env.example` template bloated (vazio) |
+| `e2a8646` | `.env.example` deletado |
+| `7142ef6` | `.gitignore` hardening (`.env.*` glob) |
+
+**Estado final (atualizado v4):** Working tree: `M .specs/architecture.architecture.json` (modificação pré-existente do início da sessão, não tocada). origin/main em `0fcdb47`. PRD v3.4 + PLAN v3 + SPEC v2 + ROADMAP v5 + BACKLOG (13 entries) + .gitignore hardened + **SPEC drift 100% consistente com PRD/ROADMAP**. Phase 1 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
