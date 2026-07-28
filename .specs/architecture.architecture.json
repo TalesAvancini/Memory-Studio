@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Memory Studio — Farol Arquitetural (v4)",
+    "title": "Memory Studio — Farol Arquitetural (v5)",
     "subtitle": "PRD v3.4 + PLAN v3 + SPEC v2 + ROADMAP v5 — Phase 6b mandatory, MiniMax fast agent",
     "output": ".specs/architecture.html",
     "visual_preset": "blueprint",
@@ -10,75 +10,60 @@
     "quality_profile": "showcase",
     "views": [
       {"id": "request-flow", "label": "01 — Fluxo do augment request", "focus": ["human", "agents", "sdk", "server", "augmenter", "cache", "minimax-api"], "note": "Human → Agents → SDK → Server → Augmenter + Cache → MiniMax API."},
-      {"id": "ingest-flow", "label": "02 — Catálogo + embeddings", "focus": ["catalog-yaml", "catalog", "embedding-model", "sqlite", "sqlite-fts5", "sqlite-vec"], "note": "YAML → SQLite + vetores ONNX."},
-      {"id": "loop-control", "label": "03 — Loop tlc-roadmap-loop", "focus": ["tlc-roadmap-loop", "auto-grill", "verifier-v1", "verifier-v2", "implementer", "roadmap-md", "mimo"], "note": "tlc-roadmap-loop + auto-grill + verifiers."},
-      {"id": "inception-flow", "label": "04 — Inception híbrida (mandatory)", "focus": ["fast-agent", "intel-store", "match-script", "minimax-api", "audit-buffer"], "note": "Phase 6 mandatory. MiniMax-M2.7-highspeed in-process."},
-      {"id": "security-flow", "label": "05 — Audit + Security + State", "focus": ["server", "audit-buffer", "state-toggle", "state-json", "ui-panel"], "note": "Audit async fail-open + /state/toggle."}
+      {"id": "loop-control", "label": "02 — Loop tlc-roadmap-loop", "focus": ["tlc-roadmap-loop", "auto-grill", "verifier", "roadmap-md", "mimo"], "note": "tlc-loop lê ROADMAP → Planner → Implementer + Verifier."},
+      {"id": "inception-flow", "label": "03 — Inception híbrida (Phase 6)", "focus": ["fast-agent", "match-script", "intel-store", "minimax-api", "audit-buffer"], "note": "Mandatory Phase 6b. MiniMax-M2.7-highspeed in-process."},
+      {"id": "ingest-flow", "label": "04 — Catálogo + storage", "focus": ["catalog-yaml", "catalog", "embedding-model", "sqlite", "sqlite-fts5", "sqlite-vec"], "note": "YAML → SQLite + ONNX. Phase 0 + 1."},
+      {"id": "security-flow", "label": "05 — Audit + State", "focus": ["server", "audit-buffer", "state-toggle", "ui-panel"], "note": "Audit async fail-open (D-007) + /state/toggle critical_confirm."}
     ]
   },
   "layout": {
     "mode": "grid",
     "origin": [40, 60],
-    "cols": 5,
-    "gapX": 60,
-    "gapY": 90,
-    "cellW": 280,
-    "cellH": 88
+    "cols": 4,
+    "gapX": 100,
+    "gapY": 140,
+    "cellW": 320,
+    "cellH": 120
   },
   "components": [
     {"id": "human", "type": "external", "label": "Human", "sublabel": "operator", "row": 0, "col": 0, "tag": "operator"},
     {"id": "agents", "type": "external", "label": "Agents", "sublabel": "Claude Code / Aider", "row": 0, "col": 1, "tag": "consumer"},
-    {"id": "minimax-api", "type": "external", "label": "MiniMax API", "sublabel": "Anthropic-compatible", "row": 0, "col": 4, "tag": "provider"},
+    {"id": "minimax-api", "type": "external", "label": "MiniMax API", "sublabel": "Anthropic-compatible", "row": 0, "col": 3, "tag": "provider"},
 
     {"id": "tlc-roadmap-loop", "type": "backend", "label": "tlc-roadmap-loop", "sublabel": "loop orchestrator v0.2", "row": 1, "col": 0, "tag": "skill"},
-    {"id": "auto-grill", "type": "backend", "label": "auto-grill", "sublabel": "9 decisions resolvidas", "row": 1, "col": 1, "tag": "skill ⚡"},
-    {"id": "verifier-v1", "type": "backend", "label": "Verifier v1", "sublabel": "7 fixes", "row": 1, "col": 2, "tag": "subagent"},
-    {"id": "verifier-v2", "type": "backend", "label": "Verifier v2", "sublabel": "5 fixes", "row": 1, "col": 3, "tag": "subagent"},
-    {"id": "mimo", "type": "external", "label": "MiMo", "sublabel": "advisor", "row": 1, "col": 4, "tag": "advisor"},
+    {"id": "auto-grill", "type": "backend", "label": "auto-grill", "sublabel": "9 decisions resolvidas 2026-07-28", "row": 1, "col": 1, "tag": "skill ⚡"},
+    {"id": "verifier", "type": "backend", "label": "Verifier", "sublabel": "verifier-v1 + v2 ran", "row": 1, "col": 2, "tag": "subagent"},
+    {"id": "mimo", "type": "external", "label": "MiMo", "sublabel": "consulted 2026-07-28", "row": 1, "col": 3, "tag": "advisor"},
 
-    {"id": "node-22", "type": "cloud", "label": "Node 22 LTS", "sublabel": "Phase 0", "row": 2, "col": 0, "tag": "Phase 0"},
-    {"id": "sqlite-extensions", "type": "database", "label": "FTS5 + vec", "sublabel": "Phase 0", "row": 2, "col": 1, "tag": "Phase 0"},
-    {"id": "onnx-embedding", "type": "cloud", "label": "ONNX Runtime", "sublabel": "Phase 0", "row": 2, "col": 2, "tag": "Phase 0"},
-    {"id": "implementer", "type": "backend", "label": "Implementer", "sublabel": "Waldemar", "row": 2, "col": 3, "tag": "subagent"},
-    {"id": "tlc-spec-driven", "type": "backend", "label": "tlc-spec-driven", "sublabel": "SDD base", "row": 2, "col": 4, "tag": "skill"},
+    {"id": "ui-panel", "type": "frontend", "label": "UI Panel", "sublabel": "HTMX + Alpine · localhost", "row": 2, "col": 0, "tag": "control"},
+    {"id": "state-toggle", "type": "backend", "label": "/state/toggle", "sublabel": "critical_confirm enforcement", "row": 2, "col": 1, "tag": "endpoint"},
+    {"id": "audit-buffer", "type": "backend", "label": "Audit Buffer", "sublabel": "async + fail-open D-007", "row": 2, "col": 2, "tag": "D-007 ⚠"},
+    {"id": "fast-agent", "type": "backend", "label": "Fast Agent", "sublabel": "MiniMax-M2.7-highspeed", "row": 2, "col": 3, "tag": "Phase 6 ⚡"},
 
-    {"id": "ui-panel", "type": "frontend", "label": "UI Panel", "sublabel": "HTMX + Alpine", "row": 3, "col": 0, "tag": "control"},
-    {"id": "state-toggle", "type": "backend", "label": "/state/toggle", "sublabel": "critical_confirm", "row": 3, "col": 1, "tag": "endpoint"},
-    {"id": "state-json", "type": "database", "label": "state.json", "sublabel": "toggle state", "row": 3, "col": 2, "tag": "git-tracked"},
-    {"id": "audit-buffer", "type": "backend", "label": "Audit Buffer", "sublabel": "D-007", "row": 3, "col": 3, "tag": "D-007 ⚠"},
+    {"id": "sdk", "type": "backend", "label": "@memory-studio/sdk", "sublabel": "TS ~50KB · zero deps", "row": 3, "col": 0, "tag": "client"},
+    {"id": "server", "type": "backend", "label": "Server", "sublabel": "Fastify + 7 endpoints", "row": 3, "col": 1, "tag": "edge"},
+    {"id": "augmenter", "type": "backend", "label": "Augmenter", "sublabel": "byte-string determinístico", "row": 3, "col": 2, "tag": "core ⚡"},
+    {"id": "match-script", "type": "backend", "label": "Match Script", "sublabel": "intel + prompt + catalog", "row": 3, "col": 3, "tag": "Phase 6"},
 
-    {"id": "sdk", "type": "backend", "label": "@memory-studio/sdk", "sublabel": "TS ~50KB", "row": 4, "col": 0, "tag": "client"},
-    {"id": "server", "type": "backend", "label": "Server", "sublabel": "Fastify + 7 ep", "row": 4, "col": 1, "tag": "edge"},
-    {"id": "augmenter", "type": "backend", "label": "Augmenter", "sublabel": "byte-string", "row": 4, "col": 2, "tag": "core ⚡"},
-    {"id": "search", "type": "backend", "label": "Search", "sublabel": "FTS5 + vec + RRF", "row": 4, "col": 3, "tag": "core ⚡"},
-    {"id": "cache", "type": "backend", "label": "Cache", "sublabel": "SHA256", "row": 4, "col": 4, "tag": "hot"},
+    {"id": "search", "type": "backend", "label": "Search", "sublabel": "FTS5 + vec + RRF + tiebreak", "row": 4, "col": 0, "tag": "core ⚡"},
+    {"id": "catalog", "type": "backend", "label": "Catalog", "sublabel": "YAML → SQLite + embed", "row": 4, "col": 1, "tag": "ingest"},
+    {"id": "intel-store", "type": "database", "label": "Intel Store", "sublabel": "{agentState,nextNeeds,recentTopic}", "row": 4, "col": 2, "tag": "Phase 6 ⚡"},
+    {"id": "cache", "type": "backend", "label": "Cache", "sublabel": "SHA256 byte-string", "row": 4, "col": 3, "tag": "hot"},
 
-    {"id": "social-detector", "type": "backend", "label": "Social Detector", "sublabel": "regex bypass", "row": 5, "col": 0, "tag": "guard"},
-    {"id": "catalog", "type": "backend", "label": "Catalog", "sublabel": "YAML ingest", "row": 5, "col": 1, "tag": "ingest"},
-    {"id": "fast-agent", "type": "backend", "label": "Fast Agent", "sublabel": "MiniMax-2.7-hs", "row": 5, "col": 2, "tag": "Phase 6 ⚡"},
-    {"id": "match-script", "type": "backend", "label": "Match Script", "sublabel": "intel + prompt", "row": 5, "col": 3, "tag": "Phase 6"},
-    {"id": "intel-store", "type": "database", "label": "Intel Store", "sublabel": "{agentState,...}", "row": 5, "col": 4, "tag": "Phase 6 ⚡"},
+    {"id": "sqlite", "type": "database", "label": "SQLite", "sublabel": "catalog + audit + intel", "row": 5, "col": 0, "tag": "data"},
+    {"id": "sqlite-fts5", "type": "database", "label": "SQLite FTS5", "sublabel": "full-text engine", "row": 5, "col": 1, "tag": "engine"},
+    {"id": "sqlite-vec", "type": "database", "label": "sqlite-vec", "sublabel": "vector engine 384d", "row": 5, "col": 2, "tag": "engine"},
+    {"id": "embedding-model", "type": "cloud", "label": "Embedding Model", "sublabel": "m-e5-small 384d ONNX", "row": 5, "col": 3, "tag": "ONNX"},
 
-    {"id": "embedding-model", "type": "cloud", "label": "Embedding Model", "sublabel": "m-e5-small 384d", "row": 6, "col": 0, "tag": "ONNX"},
-    {"id": "reranker", "type": "backend", "label": "Reranker", "sublabel": "REMOVIDO v3.1+", "row": 6, "col": 1, "tag": "v3.1+"},
-    {"id": "sqlite", "type": "database", "label": "SQLite", "sublabel": "catalog+audit+intel", "row": 6, "col": 2, "tag": "data"},
-    {"id": "sqlite-fts5", "type": "database", "label": "SQLite FTS5", "sublabel": "full-text engine", "row": 6, "col": 3, "tag": "engine"},
-    {"id": "sqlite-vec", "type": "database", "label": "sqlite-vec", "sublabel": "vector engine", "row": 6, "col": 4, "tag": "engine"},
-
-    {"id": "catalog-yaml", "type": "external", "label": "Catalog YAML", "sublabel": "config/catalog/", "row": 7, "col": 0, "tag": "versioned"},
-    {"id": "prd-md", "type": "database", "label": "PRD.md v3.4", "sublabel": "17 seções", "row": 7, "col": 1, "tag": "doc"},
-    {"id": "plan-md", "type": "database", "label": "PLAN.md v3", "sublabel": "7 phases", "row": 7, "col": 2, "tag": "doc"},
-    {"id": "spec-md", "type": "database", "label": "spec.md v2", "sublabel": "70+ US", "row": 7, "col": 3, "tag": "doc ⚡"},
-    {"id": "roadmap-md", "type": "database", "label": "ROADMAP.md v5", "sublabel": "10 phases", "row": 7, "col": 4, "tag": "doc ⚡"},
-
-    {"id": "discoveries-md", "type": "database", "label": "DISCOVERIES.md", "sublabel": "D-001 to D-009", "row": 8, "col": 0, "tag": "append-only"},
-    {"id": "architecture-md", "type": "database", "label": "ARCHITECTURE.md", "sublabel": "farol texto · IDs", "row": 8, "col": 1, "tag": "stable IDs"}
+    {"id": "catalog-yaml", "type": "external", "label": "Catalog YAML", "sublabel": "config/catalog/<id>.yaml", "row": 6, "col": 0, "tag": "versioned"},
+    {"id": "prd-md", "type": "database", "label": "PRD.md v3.4", "sublabel": "decisões · §16.7 gate", "row": 6, "col": 1, "tag": "doc"},
+    {"id": "spec-md", "type": "database", "label": "spec.md v2", "sublabel": "70+ US · 20+ ImplDec", "row": 6, "col": 2, "tag": "doc ⚡"},
+    {"id": "roadmap-md", "type": "database", "label": "ROADMAP.md v5", "sublabel": "10 phases · tlc-loop", "row": 6, "col": 3, "tag": "doc ⚡"}
   ],
   "boundaries": [
-    {"kind": "region", "label": "Orquestração", "wraps": ["tlc-roadmap-loop", "auto-grill", "verifier-v1", "verifier-v2", "mimo", "implementer", "tlc-spec-driven"]},
-    {"kind": "region", "label": "Phase 0 — Env Validation", "wraps": ["node-22", "sqlite-extensions", "onnx-embedding"]},
-    {"kind": "region", "label": "Produto (Memory Studio MVP)", "wraps": ["ui-panel", "state-toggle", "state-json", "sdk", "server", "audit-buffer", "augmenter", "search", "cache", "social-detector", "catalog", "fast-agent", "match-script", "intel-store", "embedding-model", "reranker"]},
-    {"kind": "region", "label": "Storage + Specs", "wraps": ["sqlite", "sqlite-fts5", "sqlite-vec", "catalog-yaml", "prd-md", "plan-md", "spec-md", "roadmap-md", "discoveries-md", "architecture-md"]},
+    {"kind": "region", "label": "Orquestração", "wraps": ["tlc-roadmap-loop", "auto-grill", "verifier", "mimo"]},
+    {"kind": "region", "label": "Produto (Memory Studio MVP)", "wraps": ["ui-panel", "state-toggle", "audit-buffer", "fast-agent", "sdk", "server", "augmenter", "match-script", "search", "catalog", "intel-store", "cache"]},
+    {"kind": "region", "label": "Storage + Specs", "wraps": ["sqlite", "sqlite-fts5", "sqlite-vec", "embedding-model", "catalog-yaml", "prd-md", "spec-md", "roadmap-md"]},
     {"kind": "region", "label": "External", "wraps": ["human", "agents", "minimax-api"]}
   ],
   "connections": [
@@ -86,30 +71,23 @@
     {"from": "sdk", "to": "server"},
     {"from": "server", "to": "augmenter"},
     {"from": "augmenter", "to": "cache"},
-    {"from": "cache", "to": "server"},
-
     {"from": "ui-panel", "to": "state-toggle"},
-    {"from": "state-toggle", "to": "state-json"},
     {"from": "server", "to": "audit-buffer"},
-    {"from": "audit-buffer", "to": "sqlite"},
-
-    {"from": "catalog", "to": "catalog-yaml"},
-    {"from": "catalog", "to": "sqlite"},
-    {"from": "search", "to": "sqlite-fts5"},
-    {"from": "search", "to": "sqlite-vec"},
-
     {"from": "fast-agent", "to": "match-script"},
     {"from": "match-script", "to": "intel-store"},
     {"from": "match-script", "to": "augmenter"},
-
-    {"from": "tlc-roadmap-loop", "to": "roadmap-md", "route": "orthogonal-v", "via": [[180, 1100], [1480, 1100]]},
-    {"from": "auto-grill", "to": "discoveries-md"},
+    {"from": "catalog", "to": "sqlite"},
+    {"from": "search", "to": "sqlite"},
+    {"from": "search", "to": "embedding-model", "route": "orthogonal-v", "via": [[160, 1130], [1300, 1130]]},
+    {"from": "tlc-roadmap-loop", "to": "auto-grill"},
+    {"from": "tlc-roadmap-loop", "to": "roadmap-md"},
+    {"from": "auto-grill", "to": "verifier"},
     {"from": "mimo", "to": "tlc-roadmap-loop", "variant": "dashed"}
   ],
   "cards": [
-    {"dot": "cyan", "title": "9/9 discoveries resolvidas", "items": ["D-007 audit async (CRITICAL) ✓", "D-006 tiebreak lex ✓", "D-005 intel schema ✓", "D-003 Branch B removido ✓", "D-004 wording ✓", "D-008 emptyReason ✓", "D-009 endpoints ✓"]},
+    {"dot": "cyan", "title": "9/9 discoveries resolvidas", "items": ["D-007 audit async ✓", "D-006 tiebreak lex ✓", "D-005 intel schema ✓", "D-003 Branch B removido ✓", "D-008 emptyReason ✓", "D-009 endpoints ✓"]},
     {"dot": "emerald", "title": "Byte-string cache hit", "items": ["Determinístico + tiebreak lex (D-006)", "2 cache_control:ephemeral blocks", "p50<50ms · p99<200ms"]},
-    {"dot": "amber", "title": "Fast agent — MiniMax-M2.7-highspeed", "items": ["In-process · Anthropic-compatible API", "highspeed variant: latency <1s típico", "No Claude Code: 'Haiku' = MiniMax"]},
-    {"dot": "rose", "title": "POC criteria (Phase 6a)", "items": ["PRIMARY: hot path overhead <10ms", "sqlite.get(intel) <5ms · concat <1ms · template <1ms", "SECONDARY: fast agent <3s (arquitetural)"]}
+    {"dot": "amber", "title": "Fast agent — MiniMax-M2.7-highspeed", "items": ["In-process · Anthropic-compatible", "highspeed variant: latency <1s típico", "POC: hot path overhead <10ms (PRIMARY)"]},
+    {"dot": "rose", "title": "Phase 6 mandatory", "items": ["Branch B removido 2026-07-28", "POC validates hot path overhead <10ms", "Fast agent latency <3s (arquitetural)"]}
   ]
 }
