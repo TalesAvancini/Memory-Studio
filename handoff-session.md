@@ -174,7 +174,6 @@ Humano aprovou todas as 9 decisions ("aprovo todas as decisões"). M3-CLI começ
   - `PRD.md` (sem mudança — fixes pendentes)
   - `PLAN.md` (5 edits aplicados: L93, L214, L241, L254, L375)
 - **Untracked (decidir):**
-  - `.specs/features/system-message-builder/` (target de teste deferido)
   - `Memory-Studio-Discuss.md`, `critica-plan.md`, `interrogado-content.txt`
   - `.specs/auto-grill-output/2026-07-28_023050/` (run M3E + 4 artifacts + CONTEXT.md)
   - `.scratch/memory-studio/spec.md` (to-spec output)

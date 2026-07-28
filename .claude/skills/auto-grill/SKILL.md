@@ -273,7 +273,7 @@ ROLE: Answer the Interrogator on behalf of the human. You hold the project conte
 ```bash
 # From project root
 # Single target
-auto-grill .specs/features/system-message-builder/spec.md
+auto-grill .specs/archive/2026-07-calibration/features/system-message-builder/spec.md
 auto-grill PLAN.md --lenses fog-of-war,tracer-bullets --confidence-floor 0.8
 auto-grill design.md --context-dir . --output-dir .specs/auto-grill-output/
 
@@ -469,5 +469,5 @@ If you find yourself approving auto-grill outputs without reading them, you've l
 - **Composed on:** `mattpocock-skills/grill-with-docs` v1.1 + brainstorm in NotebookLM notebook `f235cc21-b876-483e-b8a7-20d6234fa35c` (2026-07-26).
 - **Optimized for fresh-model plug-and-play on 2026-07-27:** added §SETUP pre-flight checklist (CONTEXT.md workaround for composite targets, farol skip path, read-only + gate contract), §Orchestrator Discipline sanity checks (regra 7 enforcement, contradiction detection), §Common Failure Modes (10 symptoms → causes → fixes). Composite-target support oficializado in CLI, sub-agent prompts, output naming, triggers.
 - **Inspired by:** Matt Pocock (grilling, grill-me, grill-with-docs, domain-modeling). Lenses Fog of War / Semantic Anchors / Tracer Bullets surfaced in the user's 2026-07-26 NotebookLM discussion.
-- **First target test:** `.specs/features/system-message-builder/spec.md` (Phase 5 of Memory Studio).
+- **First target test:** `.specs/archive/2026-07-calibration/features/system-message-builder/spec.md` (Phase 5 of Memory Studio — calibration artifact, archived).
 - **First composite target test:** `PRD.md` + `PLAN.md` (Memory Studio foundation, 2026-07-27).

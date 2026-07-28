@@ -6,7 +6,7 @@ Autonomous variant of `mattpocock-skills:grill-with-docs`. Runs the same relentl
 
 ```bash
 # Single target
-auto-grill .specs/features/system-message-builder/spec.md
+auto-grill .specs/archive/2026-07-calibration/features/system-message-builder/spec.md
 # → writes <spec>.auto-grill.{transcript,decisions,loop-state}.md (next to target)
 # → appends to .specs/DISCOVERIES.md
 # → surfaces a decisions table for you to approve/reject/loop
@@ -121,5 +121,5 @@ Quando o `decisions.md` passa de ~40 linhas, ler a tabela markdown vira cansativ
 
 - Brainstormed in NotebookLM notebook `f235cc21-b876-483e-b8a7-20d6234fa35c` on 2026-07-26 (full Portuguese + English discussion of A2A grilling loop).
 - Composed on top of Matt Pocock's `grill-with-docs` v1.1 (LICENSE: CC-BY-4.0).
-- First target test (deferred per `feedback-no-random-invocation`): `.specs/features/system-message-builder/spec.md` (Phase 5 of Memory Studio).
+- First target test (deferred per `feedback-no-random-invocation`): `.specs/archive/2026-07-calibration/features/system-message-builder/spec.md` (Phase 5 of Memory Studio — calibration artifact, archived).
 - Composite target support added 2026-07-27 — official v0.2 of the skill. See [SKILL.md §SETUP pre-flight](../../SKILL.md) for composite invocation contract.
