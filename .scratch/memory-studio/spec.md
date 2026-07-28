@@ -192,7 +192,7 @@ Quando `activeCatalog` é `[]`:
 37. As a **user**, I want the fast agent (default `MiniMax-M2.7-highspeed`) to finish in <3s (tipicamente <1s com highspeed variant), so that latency trick works (human reads take 5-30s). Latency do fast agent é **arquitetural** (paralelismo natural) — não bloqueia request humano.
 37a. As a **user**, I want inception hot path overhead (intel load + concat + template render) <10ms total, so that request p50 stays <50ms (PRD §10.2 budget). **Medido, não estimado.**
 38. As a **user**, I want the fast agent to be in-process (no separate daemon), so that there's no extra service to manage.
-39. As a **user**, I want Phase 6b inception híbrida mandatory (Branch B removido 2026-07-28) — Phase 6a acts as validation gate (latency trick POC + grill §16.7), and if POC reprova, decision humana is to adjust, not collapse, so that the architecture NOVEL is preserved as a competitive differentiator.
+39. As a **user**, I want Phase 6b inception híbrida mandatory (Branch B removido 2026-07-28) — Phase 6a is a technical POC that validates hot path overhead <10ms + fast agent latency <3s (per PRD §16.7 + ROADMAP Phase 6a), and if POC reprova, human decision is to adjust (not collapse), so that the NOVEL architecture is preserved as a competitive differentiator.
 
 ### F. Cache & metrics
 
@@ -456,7 +456,7 @@ async function flushAudit() {
 Rationale:
 - §16.4 engineering decisions resolvidas (in-process Haiku / SQLite / embedding pipeline / template / persona anchor).
 - Usuário commitou ao produto standalone (não OmniRoute extension) e à arquitetura NOVEL.
-- Phase 6a (Grill + POC) funciona como validation gate empírico, não binary fork.
+- Phase 6a (POC Validation) funciona como validation gate empírico, não binary fork.
 - Se POC reprova, decisão humana é ajustar, não collapsar.
 - Total fixo: 45-69h raw / 41-55h canonical (post-MiMo).
 
