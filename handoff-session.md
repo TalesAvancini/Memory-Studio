@@ -4,7 +4,7 @@ author: Claude/M3-CLI (continuação pós-compactação)
 audience: agentes futuros (sessão fresca, contexto compactado) + humano (revisão)
 type: end-of-session-handoff
 prev_handoff: archive_handoff/handoff-session-2026-07-27.md
-update_note: "v2 do handoff 2026-07-28. Supera v1 (M3E+M3-CLI) que terminou em gate fechado. Esta v2 cobre continuação pós-compactação: 6 fixes aplicadas, SPEC v2 comprehensive, ROADMAP v3 extraído, 2 verifiers dispatched, 5 fixes v2 aplicadas, /state/toggle endpoint adicionado, push final."
+update_note: "v2 do handoff 2026-07-28. Supera v1 (M3E+M3-CLI) que terminou em gate fechado. Esta v2 cobre continuação pós-compactação: 6 fixes aplicadas, SPEC v2 comprehensive, ROADMAP v3 extraído, 2 verifiers dispatched, 5 fixes v2 aplicadas, /state/toggle endpoint adicionado. Marco 12 (auto-grill v2 — verifier-honest-uncertainty variant) adicionado em continuação posterior."
 ---
 
 # Handoff de sessão — 2026-07-28 (final v2)
@@ -120,6 +120,41 @@ Todos os 12 fixes (7 + 5) aplicados.
 
 **Commit:** `20e3c24 — docs(roadmap): extract ROADMAP from SPEC`
 
+### Marco 12 — Auto-grill v2: verifier-honest-uncertainty variant (NOVA skill)
+
+Conversa sobre Wayfinder (4 ticket types: Research / Prototype / Grilling / Task) levou a insight epistemológico:
+
+**Frame inicial (errado):** "research tenta resolver → confidence sobe → find fechado" → levantei 3 contra-argumentos (recursão, diluição de papel, theater).
+
+**Correção do humano:** "LLMs sempre inferem, nunca admitem que não sabem. Verifier deveria **admitir** incerteza estruturalmente (rebaixar confidence), disparar research como **insight** (não fix), sem obrigação de loop."
+
+**Diferença epistemológica-chave:**
+
+| Frame errado (meu) | Frame correto (humano) |
+|---|---|
+| "Pesquise até eu ter certeza" | "Admita que não tem certeza, traga o que achou" |
+| Research tenta **subir** confidence | Research **documenta a incerteza** |
+| Loop até cap ou sucesso | Sem loop — 1 shot, sem obrigação |
+| Verificador quer parecer competente | Verificador quer ser honesto |
+
+**Decisão:** criar **v2 do auto-grill** (paralelo, v0.2 intacto) com 3 adições:
+1. **R11 (nova):** verifier admite incerteza; research é insight, não obrigação.
+2. **3º sub-agent role:** Insight Researcher (informational, NOT stakeholder, NOT fixer).
+3. **Opt-in flag:** `--auto-research-insight` (default OFF). v0.2 behavior = default v2.
+
+**Files criados** em `.claude/skills/auto-grill-v2/`:
+- `SKILL.md` — contrato canônico com delta de v0.2 documentado (R11, flag, 3rd role, novo output `*.auto-grill.research.md`, 2 colunas novas no schema)
+- `README.md` — quickstart + quando usar v2 vs v0.2 + promotion criteria
+- `diagrams/08-critical-rules.md` — v2 delta (R11 + 2 risks: verifier theater, confidence inflation). Cross-refs v0.2 pra R1-R10.
+- `diagrams/15-honest-uncertainty.md` — 3 mermaid blocks: state machine, decision tree no CheckConfidence, layout do gate output.
+- `prompts/insight-researcher.md` — sub-agent prompt com constraints R11 (informational not fixer, do NOT modify original confidence, NO_EVIDENCE when sources missing, primary sources only).
+
+**Memory criada:** `feedback-verifier-honest-uncertainty` (1 fato por arquivo) — princípio epistemológico + sinais de theater a evitar.
+
+**Commit:** `12374b9 — feat(skill): auto-grill v2 — verifier-honest-uncertainty variant`
+
+**Status v2:** experimental, ainda não rodado em produção. Critério de promoção v0.2→v2 default documentado no README.
+
 ---
 
 ## Lições desta sessão (processo)
@@ -144,12 +179,14 @@ Todos os 12 fixes (7 + 5) aplicados.
 
 10. **to-spec ≠ SPEC completa.** to-spec é conversacional — pega contexto + findings + gera SPEC. Se contexto é "PRD rico + discoveries aplicadas", output pode ser subset. User instrução: "vou mandar manualmente" — futuro to-spec skipped pra Memory Studio.
 
+11. **LLMs always infer; verifier must admit uncertainty structurally.** Frame inicial meu foi "research tenta resolver → confidence sobe". Correção: research é **insight**, não fix. Auto-resolution sem insight honesto = theater. Princípio virou R11 do auto-grill v2.
+
 ---
 
 ## Working tree state (commit final)
 
-- ✅ **Clean** — todos os 4 commits pushados pra `origin/main`
-- `origin/main` agora em `20e3c24`
+- ✅ **Clean** — todos os 5 commits pushados pra `origin/main`
+- `origin/main` agora em `12374b9`
 
 | Commit | Descrição |
 |---|---|
@@ -157,6 +194,7 @@ Todos os 12 fixes (7 + 5) aplicados.
 | `82ae739` | docs(artifacts): auto-grill run + to-spec + brainstorm inputs |
 | `c880b63` | chore(specs): archive .specs/features/ (calibration testbed) |
 | `20e3c24` | docs(roadmap): extract ROADMAP from SPEC (10 phases, tlc-roadmap-loop ready) |
+| `12374b9` | feat(skill): auto-grill v2 — verifier-honest-uncertainty variant (5 files, 947 insertions) |
 
 ---
 
@@ -199,6 +237,7 @@ Todos os 12 fixes (7 + 5) aplicados.
 | `m3e-vs-m3cli-architecture` | M3-CLI (esta sessão) = Implementer principal. M3E continua sendo usado pra tasks específicas (auto-grill run). |
 | `metadata-default-required` | ROADMAP.md tem frontmatter (date, version, type, description, explanation, related). |
 | `grill-with-docs-approach` | grill-with-docs (Pocock HITL) → auto-grill (autonomous variant). v1 INADEQUATE forçou reestruturação. |
+| `feedback-verifier-honest-uncertainty` | **NOVA 2026-07-28.** LLMs inferem por default; verifier deve admitir incerteza estruturalmente. Research = insight, NÃO fix. Base do R11 do auto-grill v2. |
 
 ---
 
@@ -212,6 +251,7 @@ Todos os 12 fixes (7 + 5) aplicados.
 - [.specs/DISCOVERIES.md](.specs/DISCOVERIES.md) — D-001 a D-009 todas resolvidas
 - [CLAUDE.md](CLAUDE.md) — authority boundaries + glossary
 - [BACKLOG.md](BACKLOG.md) — ideias pós-MVP
+- [.claude/skills/auto-grill-v2/](.claude/skills/auto-grill-v2/) — **NOVA skill** (v2 do auto-grill com R11 + verifier-honest-uncertainty)
 - [archive_handoff/handoff-session-2026-07-27.md](archive_handoff/handoff-session-2026-07-27.md) — handoff anterior
 - [Memory-Studio-Discuss.md](Memory-Studio-Discuss.md) — brainstorm doc
 - [critica-plan.md](critica-plan.md) — 37-finding critical review
