@@ -1,13 +1,13 @@
 ---
-session_end: 2026-07-28-final-v2
+session_end: 2026-07-28-final-v3
 author: Claude/M3-CLI (continuação pós-compactação)
 audience: agentes futuros (sessão fresca, contexto compactado) + humano (revisão)
 type: end-of-session-handoff
 prev_handoff: archive_handoff/handoff-session-2026-07-27.md
-update_note: "v2 do handoff 2026-07-28. Supera v1 (M3E+M3-CLI) que terminou em gate fechado. Esta v2 cobre continuação pós-compactação: 6 fixes aplicadas, SPEC v2 comprehensive, ROADMAP v3 extraído, 2 verifiers dispatched, 5 fixes v2 aplicadas, /state/toggle endpoint adicionado. Marco 12 (auto-grill v2 — verifier-honest-uncertainty variant) adicionado em continuação posterior."
+update_note: "v3 do handoff 2026-07-28. Supera v2 (que terminou com ROADMAP v3 + SPEC v2 + 9 discoveries resolvidas). Esta v3 cobre: (a) MiMo analysis aplicado (§16.4 decisions + reranker removed + Phase 0 + estimates), (b) BACKLOG com 12 entradas pós-MVP, (c) Branch B removido (single branch, Phase 6b mandatory), (d) PLAN sync com ROADMAP v4, (e) POC reframe (hot path overhead PRIMARY vs latency trick SECONDARY), (f) fast agent = MiniMax-M2.7-highspeed (sem fallback Anthropic), (g) .env.example lifecycle + .gitignore hardening."
 ---
 
-# Handoff de sessão — 2026-07-28 (final v2)
+# Handoff de sessão — 2026-07-28 (final v3)
 
 ## TL;DR
 
@@ -36,7 +36,7 @@ Sessão pós-compactação. **2 handoffs do dia:**
 
 ---
 
-## O que aconteceu hoje (2026-07-28) — 11 marcos
+## O que aconteceu hoje (2026-07-28) — 18 marcos (v2 + v3)
 
 ### Marcos 1-6 (M3E + M3-CLI v1 do handoff)
 
@@ -258,4 +258,77 @@ Conversa sobre Wayfinder (4 ticket types: Research / Prototype / Grilling / Task
 
 ---
 
-**Status final:** Working tree clean. origin/main pushed (20e3c24). PRD + PLAN + SPEC + ROADMAP + 9 discoveries all in sync. Phase 1 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
+### Marcos 13-18 (v3 do handoff — após MiMo analysis + Branch B removal)
+
+#### Marco 13 — MiMo analysis aplicado (6 fixes)
+
+Após MiMo analysis consolidado:
+- **PRD v3.3:** §16.4 5 engineering decisions resolvidas (in-process Haiku / SQLite intel store WAL / embedding pipeline reuse / template 2-block / persona anchor); §8 reranker removido (v3.1+, working set -90MB → ~905MB); §9 estimate bumped 35-50h → 41-55h Branch A / 33-43h Branch B
+- **SPEC v2:** IMod-14/15 reranker removido
+- **ROADMAP v4:** meta-conv endpoint count 6→7 (incluindo /state/toggle); Phase 0 adicionada (env validation 1-2h, pré-req hard de Phase 1); Phase 1 estimate 4-5h → 6-8h; exception list atualizada; Intel contract validation em Phase 6b Done
+- Frontmatter revisions: PRD v3.3 entry adicionada
+
+**Commits:** `3bf1034` (MiMo), `eb08f75` (BACKLOG)
+
+#### Marco 14 — BACKLOG com 12 entradas pós-MVP
+
+Adicionado em BACKLOG.md (I-002 a I-013) com "Por que NÃO MVP" obrigatório:
+- **v3.1+ (10):** reranker (I-002), augmented cache fingerprint (I-003), hook integration mode (I-004), MCP server completo (I-005), OpenAI↔Anthropic adapter (I-006), persona tone_addendum (I-007), catálogo 3 camadas (I-011), attention tiers (I-013)
+- **v3.2+ (2):** discovery signals + curator LLM (I-008), decision trace visualization (I-012)
+- **v4+ (2):** long-term memory (I-009), multi-tenant (I-010)
+- I-001 (auto-discovery, pré-existente) preservado
+
+**Commit:** `eb08f75`
+
+#### Marco 15 — Branch A/B removido + PLAN sync
+
+- **ROADMAP v5:** meta-conv §8 Branch B fork eliminado; Phase 6b agora mandatório; Phase 7b pre-reqs Phase 5+6; totals consolidados (single branch)
+- **PLAN v3:** §Total 35-50h → 41-55h canonical (Phase 0 + Phase 1 ajustada + §16.4 overhead); Phase 6 status "pré-grill" → "mandatory"; Phase 6 estimate 8-12h → 12-16h (§16.4 overhead: in-process Haiku integration + SQLite WAL migration + template 2-block renderer + intel contract validation); Phase 7 pre-reqs Phase 5 → Phase 5+6; §16.4 table preenchida com 5 decisões resolvidas
+- **PRD v3.4:** §10.1 item 12 "CONDICIONAL grill" → "mandatory, validated by POC Phase 6a"; §16 Inception Híbrida status "pré-grill" → "mandatory"
+- **SPEC v2:** IMod-11 Branch B fallback section → REMOVIDO rationale; User Story 39 "Branch B fallback" → "Phase 6b mandatory"; IMod-18 phase plan atualizado
+
+Rationale: §16.4 já decidido + standalone commit + inception híbrida é diferencial competitivo (não dá pra abandoná-la via binary fork)
+
+**Commit:** `9da2000`
+
+#### Marco 16 — Fast agent = MiniMax-M2.7-highspeed (sem fallback Anthropic)
+
+- **PRD §16.4 decision 1:** fast agent default `MiniMax-M2.7-highspeed` via `https://api.minimax.io/anthropic` (Anthropic-compatible SDK); **no Claude Code, "Haiku" option = MiniMax-M2.7-highspeed** (verificado 2026-07-28, sem acesso a Anthropic oficial)
+- **ROADMAP Phase 6b done:** fast agent model default sem fallback Anthropic (não tens essa key)
+- **SPEC User Story 35, 36, 37, 37a (nova):** fast agent model default + highspeed latency (~1s típico vs humano 5-30s); IMod-5 Writer usa MiniMax-M2.7-highspeed; §17.2 glossary fast agent atualizado
+
+#### Marco 17 — POC reframe (hot path overhead PRIMARY vs latency trick SECONDARY)
+
+Análise crítica: gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncrono, bloqueia humano), não latência do fast agent (paralelo com leitura humana, 5-30s folga).
+
+- **ROADMAP Phase 6a done (PRIMARY):** inception hot path overhead <10ms — `sqlite.get(intel)` <5ms (p95), concat intel+prompt <1ms (p95), template render 2 blocos <1ms (p95). Total <10ms preserva budget p50<50ms (PRD §10.2)
+- **ROADMAP Phase 6a done (SECONDARY):** fast agent latency <3s — paralelismo natural, arquitetural (não bloqueia request humano)
+- **ROADMAP Phase 6b done:** adicionado critério "Inception hot path overhead <10ms (medido, não estimado)"
+- **SPEC User Story 37a (nova):** inception hot path overhead <10ms (medido)
+
+#### Marco 18 — `.env.example` lifecycle + `.gitignore` hardening
+
+- **`.env.example`** criado com template bloated (commit `2d81254`) → simplificado (commit `cafadea`) → deletado (commit `e2a8646`). Nenhum commit continha secret real (valores vazios).
+- **`.env`** local criado pelo usuário com MEMORY_STUDIO_FAST_AGENT_API_KEY (gitignored)
+- **`.gitignore` hardening** (commit `7142ef6`): adicionado `.env.*` glob — defesa em profundidade, blinda contra commits acidentais de qualquer `.env*` futuro (incluindo .env.example)
+- **Validação final:** `git log --all -p | grep -c "sk-cp-6ijLAa"` = **0 hits** — key NUNCA commitada em nenhum momento. Alarme falso inicial foi corrigido.
+
+Tu precisa (se ainda não fez): copiar MiniMax API key do Claude Code pra `.env` local (mesma key, mesma base URL `https://api.minimax.io/anthropic`).
+
+---
+
+**Commits finais da sessão (v3):**
+
+| Commit | Descrição |
+|---|---|
+| `3bf1034` | MiMo: §16.4 decisions + reranker removido + Phase 0 + standalone strategy |
+| `eb08f75` | BACKLOG: 12 entries (I-002 a I-013) |
+| `9da2000` | Branch B removido (single branch, Phase 6b mandatory) |
+| `770f1ee` | POC reframe + MiniMax-M2.7-highspeed default |
+| `e8a4c60` | Anthropic fallback removido (Haiku = MiniMax no Claude Code) |
+| `cafadea` | `.env.example` simplificado (vazio) |
+| `2d81254` | `.env.example` template bloated (vazio) |
+| `e2a8646` | `.env.example` deletado |
+| `7142ef6` | `.gitignore` hardening (`.env.*` glob) |
+
+**Estado final:** Working tree clean. origin/main pushed (`7142ef6`). PRD v3.4 + PLAN v3 + SPEC v2 + ROADMAP v5 + BACKLOG (13 entries) + .gitignore hardened. Phase 1 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
