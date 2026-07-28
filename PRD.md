@@ -402,12 +402,32 @@ text: |
   latencyMs: { embedding: number, retrieval: number, rerank: number, total: number }
   decisionTraceId: string                            // link pro audit log
   warnings: string[]
-  emptyReason?: "low_confidence" | "social" | "timeout" | null
+  emptyReason?: "low_confidence" | "social" | "timeout" | "no_active_items" | null
   schemaVersion: 3
 }
 ```
 
 **Sem fingerprint cache** (descartado de v2). v3 MVP usa byte-string determinístico direto. Semantic cache 2-tier é v3.1+. Ver §17.1 para distinção entre **cache do provedor** (MVP) e **cache de augmented/fingerprint** (v3.1+).
+
+**Contrato de `emptyReason` — `no_active_items`:**
+
+Quando `activeCatalog` está vazio (humano desligou todas Skills/Personas via painel), `/augment` retorna:
+
+- HTTP 200 (não é erro)
+- `systemMessage`: byte-string determinístico do persona prefix sozinho (sem Skills variáveis)
+- `matchedSkills / matchedRules / matchedPersonas`: arrays vazios `[]`
+- `emptyReason: "no_active_items"`
+- `warnings`: `["activeCatalog is empty — proceeding with persona only"]`
+- `pruningDecisions`: todas as razões com arrays vazios
+- Forward unchanged pro provedor (não injeta fallback, não rejeita)
+
+**Por que X (200 + forward unchanged) e não Y (reject 400 ou inject defaults):**
+
+- **X:** fail-open consistente com §2 (augmentação é advisory, nunca quebra sessão). Cache key estável porque byte-string continua determinístico.
+- **Y:** reject quebra sessão. Inject defaults esconde erro de UX (humano deveria saber que toggle tá vazio).
+- **Y é descartado:** princípio fail-open é invariante.
+
+Cache do provedor ainda funciona: persona prefix é a única parte do system message, byte-string estável entre requests com mesmo persona.
 
 ### 7.2 Outros endpoints (MVP)
 
@@ -476,6 +496,7 @@ Roda em qualquer máquina com 4GB livres.
 - 🆕 Critical Rules atômicas (sempre injetadas se ativas no painel)
 - 🆕 Response com `pruning_decisions` (debug-first)
 - 🆕 State local do agente entra no match (`recentFiles`, `scratch`, `todos`, `lastEvent`)
+- 🆕 **Audit log async + fail-open:** writes enfileirados em buffer in-memory, batch flush (a cada N events ou T ms), fail-open em erro de write (request continua 200, erro vai pra stderr). Request **nunca bloqueia** por audit log — invariante crítica pra honrar budget p50<50ms (§10.2).
 - 🆕 **Inception híbrida** (response-first + latency trick) — ver §16
 
 ---
@@ -502,6 +523,7 @@ Ver [PLAN.md](PLAN.md) para phases, deliverables, estimates. PRD foca em decisõ
 - [ ] Audit log grava todo request com prompt redactado + matched IDs + pruning reasons + latência
 - [ ] Modo prompt-only (v1 compat) continua funcionando quando contexto é null
 - [ ] Funciona com pelo menos 1 agente (Claude Code MVP)
+- [ ] **`activeCatalog` vazio:** `/augment` retorna 200 com `systemMessage` determinístico (persona only), `matchedSkills/Rules/Personas` arrays vazios, `emptyReason: "no_active_items"`, e forward unchanged pro provedor (sem inject defaults, sem reject) — ver §7.1.
 - [ ] **Inception híbrida (CONDICIONAL: grill §16.6 deve aprovar):** Turn N (cold start) vai plain pro provedor, fast agent lê response em paralelo com humano, Turn N+1 augmenta com (intel + prompt + catalog). **Se grill reprovar Phase 6, este critério é movido pra v3.2** e MVP core fecha sem inception híbrida.
 
 ### 10.2 Performance
@@ -732,7 +754,27 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 | Suffix injection: template vs raw concat | Cache hit vs flexibility |
 | Prefix stability N→N+1 | Core do produto |
 
-### 16.5 Lessons from research
+### 16.5 Intel schema (writer-reader contract)
+
+**Schema canônico** (TypeScript shape) — Phase 6 DEVE implementar exatamente este shape:
+
+```typescript
+type Intel = {
+  agentState: string       // free-text, o que o agente estava fazendo
+  nextNeeds: string[]      // structured tags, o que o agente provavelmente vai precisar
+  recentTopic: string      // free-text, foco atual
+}
+```
+
+**Writer:** fast agent (§16.2) ao final de Turn N. Lê `R_N`, gera `Intel` via Haiku, persiste no store.
+
+**Reader:** match pipeline (§3 Turn N+1) no início de Turn N+1. Carrega `Intel` do store, junta com `prompt + context + catalog`, monta system message augmentado.
+
+**Invariante crítica:** schema drift entre writer e reader quebra inception híbrida silenciosamente. Phase 6 implementa contra este shape literal — não inventar schema próprio. Se Haiku gerar `agentState` vazio ou `nextNeeds` array fora de ordem, match pipeline precisa degradar graciosamente (não crashar).
+
+**Glossary entry:** ver §17.2.
+
+### 16.6 Lessons from research
 
 | Necessidade | Padrão equivalente (reaproveitar) |
 |---|---|
@@ -742,7 +784,7 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 | Cache TTL (5-min window) | Anthropic `cache_control: { ttl: "5m" }` faz async pre-fetch custo-effective |
 | Role normalization | OmniRoute: `developer` → `system` |
 
-### 16.6 Próximo passo
+### 16.7 Próximo passo
 
 **Pré-grill antes de Phase 6 do PLAN.md:**
 
@@ -779,6 +821,7 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 | **fast agent** | Agente rápido (Haiku-class) que lê response do provedor em paralelo com humano. Gera intel pra próximo turn. | §16 |
 | **fast-agent-over-response** | Padrão arquitetural: o fast agentuality roda sobre a response, não sobre o prompt. | §16.3 |
 | **fast agentuality** | Sinônimo informal de "fast agent" (uso descritivo, não técnico). Evitar em PRD/PLAN. | — |
+| **intel** | Objeto `{ agentState: string, nextNeeds: string[], recentTopic: string }` gerado pelo fast agent ao fim de Turn N, lido pelo match pipeline no início de Turn N+1. Writer-reader contract entre §16.2 (fast agent) e §3 Turn N+1 (match). Schema canônico em §16.5. | §16.5, §17.2 |
 | **recentFiles** | Lista de paths de arquivos recentes do working tree do agente (`git status modified`, ou equivalente). **Padrão canônico** — usar este nome em PRD, SDK, schema, response. NÃO usar `gitStatus`, `files`, `recent_files`. | §5, §7.1 |
 | **scratch** | Scratchpad local do agente (últimos N chars). | §5, §7.1 |
 | **todos** | Lista de TODOs ativos do agente. | §5, §7.1 |

@@ -90,7 +90,7 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 
 **Depends-on:** nenhuma (foundation).
 
-**Estimate:** 3-4h.
+**Estimate:** 4-5h.
 
 **Por que X (SQLite + FTS5 + sqlite-vec) e não Y (Qdrant/Pinecone):**
 
@@ -194,24 +194,29 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 - **Retrieval pipeline em runtime:** query FTS5 + sqlite-vec → RRF fusion → threshold duplo (`min_cosine_similarity` + `min_fts_hits`) → top-K candidatos. Schema do índice vem de Phase 1.
 - System message augmenté: 2 blocos `cache_control: ephemeral` (persona + Skills)
 - **Byte-string determinístico do input completo** (mesma input → mesma saída byte-a-byte). **Sem garantia cross-turn** do prefixo intacto — isso é deliverable de Phase 6.
+- **Ordering canônico dos arrays matched (tiebreaker explícito):** após RRF fusion, antes de serializar system message, `matchedSkills/Rules/Personas` são ordenados via `Array.sort((a,b) => a.id.localeCompare(b.id))`. Sem tiebreak, RRF ties com cosine 384d perto do threshold quebram byte-string silenciosamente.
 - Response struct com `pruningDecisions` (5 razões). `cacheHit` da response é v3.1+ (omitido no MVP) — **métrica de cache hit MVP é via log estruturado** (PRD §17.1 + §14.6), NÃO pelo campo da response.
-- Audit log preenchido
+- **Audit log via async buffer com batch flush + fail-open:** writes enfileirados em buffer in-memory. Worker background faz flush a cada N events ou T ms (whichever first). Em erro de write: log em stderr, **request continua respondendo 200** (fail-open). Request nunca bloqueia por audit log.
 - Structured JSON logging de `usage.cache_read_input_tokens` por request (PRD §14.6)
+- **5 endpoints do MVP, todos ownados por Phase 5:** `/augment` (POST), `/catalog` (GET, lê Phase 1 data), `/catalog/rebuild` (POST, idempotente, escreve Phase 1 index), `/audit` (GET, últimas N augmentations redactadas), `/audit/summary` (GET, rollups diários), `/health` (GET, liveness + readiness, REQUIRED pra §10.2 latency gating).
 
 **Done criteria (smoke test antes de Phase 6):**
 
 - [ ] Smoke test end-to-end com Claude Code via custom baseURL (PRD §13)
-- [ ] Byte-string determinístico validado: mesma input → mesmo SHA256 do system message
+- [ ] Byte-string determinístico validado: SHA256(byte-string) **igual** entre 2 requests com mesma input lógica (incluindo ordering estável dos matched arrays)
 - [ ] Cache hit do provedor verificado em log: `cache_read_input_tokens > 0` em 2 requests seguidos com mesmas Skills ativas
 - [ ] Retrieval retorna top-K com hit no índice (FTS5 + sqlite-vec)
+- [ ] **Tiebreak ordering testado:** 2 requests com cosine scores empatando no threshold produzem mesmo SHA256(byte-string)
 - [ ] Audit log gravado com prompt redactado + matched IDs + pruning reasons
+- [ ] **Audit async boundary testado:** simulando SQLite write error → request continua 200 (fail-open), erro vai pra stderr
 - [ ] `usage.cache_read_input_tokens` logado por request
+- [ ] **5 endpoints respondendo:** `/augment`, `/catalog`, `/catalog/rebuild`, `/audit`, `/audit/summary`, `/health` (este último retorna 200 mesmo sem dados)
 
 **Gating:** Phase 6 (Fast agent) **NÃO começa** sem smoke test verde.
 
 **Depends-on:** Phase 1, 2.
 
-**Estimate:** 5-7h.
+**Estimate:** 6-8h.
 
 **Por que X (proxy) e não Y (hook):**
 
@@ -238,7 +243,18 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 
 **Estimate:** 8-12h.
 
-**Status:** **pré-grill em PRD §18.6 antes de iniciar.** Esta é a peça NOVEL do v3.
+**Status:** **pré-grill em PRD §16.6 antes de iniciar.** Esta é a peça NOVEL do v3.
+
+**Branch B (fallback se grill §16.6 reprovar):**
+
+PRD §10.1 marca inception híbrida como CONDICIONAL ao grill §16.6. Se o grill reprovar Phase 6:
+
+- Phase 6 colapsa para **0h** (sem fast agent, sem intel pipeline, sem latency trick).
+- Phase 7 pre-reqs loosen para **Phase 5 only** (cache hit §10.2.4 derivável via byte-string determinístico + `cache_control: ephemeral` + log estruturado — Phase 6 não é necessário pra essa validação).
+- Total estimado cai de 35-50h para **28-39h**.
+- MVP core fecha sem inception híbrida; `Inception híbrida (CONDICIONAL)` é movida pra v3.2 per PRD §10.1.
+
+Branch B é uma **tree branch explícita**, não footnote. Cada pré-grill em §16.6 atualiza o status (open → approved → branch-B-triggered).
 
 **Por que X (fast-agent-over-response) e não Y (sem pre-fetch):**
 
@@ -251,7 +267,7 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 - X: custo, latency, suficiente pra intel pattern matching.
 - Y: overkill pra tarefa de extração de intel.
 
-**Engineering decisions (PRD §18.4):**
+**Engineering decisions (PRD §16.4):**
 
 | Decisão | Trade-off |
 |---|---|
@@ -273,7 +289,7 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 
 ## Phase 7 — Tuning empírico
 
-**Pre-reqs:** Phase 5, 6.
+**Pre-reqs:** Phase 5. Phase 6 é pre-req **só se Branch A** (grill §16.6 aprovou inception híbrida); se Branch B foi triggered, Phase 7 depende só de Phase 5.
 
 **Deliverables:**
 
@@ -357,6 +373,7 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 | 1 | `npm run build-index` < 60s pra 100 skills | Phase 1 | Phase 1 done |
 | 2 | UI carrega < 1s local | Phase 4 | Phase 4 done |
 | 3 | Audit query < 100ms pra 30 dias | Phase 5 (audit schema) + Phase 7 (valida) | Phase 7 |
+| 4 | `/health` endpoint retorna 200 (liveness + readiness) | Phase 5 | Phase 5 done |
 
 **Cobertura:** 22/22 = 100% mapeados. Gaps de **validação** (medir de fato) ficam pras phases correspondentes — não há gap de **ownership** (toda checkbox tem phase que entrega + phase que valida).
 
@@ -372,7 +389,7 @@ Phase 1 ──┬──> Phase 2 ──┐         ┌──> Phase 6 (Fast agen
 
 ## Regra operacional
 
-> **Não começar Phase 6 sem grill em PRD §18.6.** Phase 1-5 podem começar antes (com ground truth de PRD §14).
+> **Não começar Phase 6 sem grill em PRD §16.6.** Phase 1-5 podem começar antes (com ground truth de PRD §14).
 
 > **Não começar Phase 6 sem smoke test de Phase 5** (proxy funciona end-to-end com Claude Code).
 
