@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Memory Studio — Arquitetura de Runtime (5 módulos)",
+    "subtitle": "PRD v3.4 · PLAN v3 · SPEC v2 · ROADMAP v5 · 9/9 discoveries resolvidas · Phase 6b mandatory · Branch B removido",
+    "output": "memory-studio.html",
+    "visual_preset": "classic",
+    "quality_profile": "standard"
+  },
+  "layout": {
+    "mode": "grid",
+    "origin": [80, 140],
+    "cols": 3,
+    "gapX": 80,
+    "gapY": 90,
+    "cellW": 200,
+    "cellH": 64
+  },
+  "components": [
+    { "id": "human", "type": "external", "label": "Human", "sublabel": "operator", "row": 0, "col": 0, "tag": "actor" },
+    { "id": "agents", "type": "external", "label": "Agents", "sublabel": "Claude Code · Aider · Cursor", "row": 0, "col": 1, "tag": "consumer" },
+    { "id": "minimax-api", "type": "external", "label": "MiniMax API", "sublabel": "Anthropic-compatible", "row": 0, "col": 2, "tag": "provider" },
+
+    { "id": "node22", "type": "cloud", "label": "Node 22 LTS", "sublabel": "runtime ESM", "row": 1, "col": 0, "tag": "P0" },
+    { "id": "sqlite-ext", "type": "cloud", "label": "SQLite FTS5+vec", "sublabel": "extensões compiladas", "row": 1, "col": 1, "tag": "P0" },
+    { "id": "onnx-rt", "type": "cloud", "label": "ONNX Runtime", "sublabel": "onnxruntime-node", "row": 1, "col": 2, "tag": "P0" },
+
+    { "id": "ui-panel", "type": "frontend", "label": "UI Panel", "sublabel": "HTMX + Alpine", "row": 2, "col": 0, "tag": "control" },
+    { "id": "sdk", "type": "backend", "label": "@memory-studio/sdk", "sublabel": "TS · zero deps", "row": 2, "col": 1, "tag": "client" },
+    { "id": "fast-agent", "type": "backend", "label": "Fast Agent", "sublabel": "MiniMax-M2.7 in-process", "row": 2, "col": 2, "tag": "P6 ⚡" },
+
+    { "id": "state-toggle", "type": "backend", "label": "/state/toggle", "sublabel": "POST endpoint", "row": 3, "col": 0, "tag": "endpoint" },
+    { "id": "server", "type": "backend", "label": "Server", "sublabel": "Fastify · 7 ep", "row": 3, "col": 1, "tag": "edge" },
+    { "id": "intel-store", "type": "database", "label": "Intel Store", "sublabel": "{state,nextNeeds,topic}", "row": 3, "col": 2, "tag": "P6 ⚡" },
+
+    { "id": "state-json", "type": "database", "label": "state.json", "sublabel": "git-tracked", "row": 4, "col": 0, "tag": "git" },
+    { "id": "audit-buffer", "type": "backend", "label": "Audit Buffer", "sublabel": "async+batch+fail-open", "row": 4, "col": 1, "tag": "D-007" },
+    { "id": "match-script", "type": "backend", "label": "Match Script", "sublabel": "intel+prompt+catalog", "row": 4, "col": 2, "tag": "P6" },
+
+    { "id": "augmenter", "type": "backend", "label": "Augmenter", "sublabel": "byte-string · 2-block", "row": 5, "col": 0, "tag": "core ⚡" },
+    { "id": "search", "type": "backend", "label": "Search", "sublabel": "FTS5+vec+RRF D-006", "row": 5, "col": 1, "tag": "core ⚡" },
+    { "id": "social-detector", "type": "backend", "label": "Social Detector", "sublabel": "regex bypass", "row": 5, "col": 2, "tag": "guard" },
+
+    { "id": "catalog", "type": "backend", "label": "Catalog", "sublabel": "YAML→SQLite+embed", "row": 6, "col": 0, "tag": "ingest" },
+    { "id": "cache", "type": "backend", "label": "Cache", "sublabel": "SHA256(byte-string)", "row": 6, "col": 1, "tag": "hot" },
+    { "id": "fts5-vec", "type": "database", "label": "FTS5+vec", "sublabel": "search engine (módulo 5)", "row": 6, "col": 2, "tag": "engine" },
+
+    { "id": "sqlite", "type": "database", "label": "SQLite", "sublabel": "catalog+audit+intel", "row": 7, "col": 0, "tag": "data" },
+    { "id": "embed-model", "type": "cloud", "label": "Embedding Model", "sublabel": "mE5-small ONNX 384d", "row": 7, "col": 1, "tag": "ONNX" },
+    { "id": "catalog-yaml", "type": "external", "label": "Catalog YAML", "sublabel": "config/catalog/*.yaml", "row": 7, "col": 2, "tag": "versioned" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Módulo 1 — External (boundary human/machine)", "wraps": ["human", "agents", "minimax-api"] },
+    { "kind": "region", "label": "Módulo 2 — Phase 0 · Environment Validation", "wraps": ["node22", "sqlite-ext", "onnx-rt"] },
+    { "kind": "security-group", "label": "Módulo 3 — Produto · Hot Path (síncrono, p50<50ms)", "wraps": ["ui-panel", "sdk", "fast-agent", "state-toggle", "server", "intel-store", "state-json", "audit-buffer", "match-script"] },
+    { "kind": "region", "label": "Módulo 4 — Produto · Pipeline (retrieval core)", "wraps": ["augmenter", "search", "social-detector", "catalog", "cache", "fts5-vec"] },
+    { "kind": "region", "label": "Módulo 5 — Storage (runtime data)", "wraps": ["sqlite", "embed-model", "catalog-yaml"] }
+  ],
+  "connections": [
+    { "id": "human-agents", "from": "human", "to": "agents", "label": "prompts", "fromSide": "right", "toSide": "left" },
+    { "id": "node-host-sqlite", "from": "node22", "to": "sqlite-ext", "fromSide": "right", "toSide": "left" },
+    { "id": "sqlite-host-onnx", "from": "sqlite-ext", "to": "onnx-rt", "fromSide": "right", "toSide": "left" },
+
+    { "id": "agents-sqliteext", "from": "agents", "to": "sqlite-ext", "label": "POST /augment", "variant": "emphasis", "route": "orthogonal-v", "fromSide": "bottom", "toSide": "top", "labelAt": [420, 245] },
+    { "id": "sqliteext-sdk", "from": "sqlite-ext", "to": "sdk", "variant": "emphasis", "fromSide": "bottom", "toSide": "top" },
+    { "id": "ui-toggle", "from": "ui-panel", "to": "state-toggle", "fromSide": "bottom", "toSide": "top" },
+    { "id": "fastagent-intel", "from": "fast-agent", "to": "intel-store", "label": "write Intel", "route": "orthogonal-v", "fromSide": "bottom", "toSide": "top", "labelAt": [700, 553] },
+
+    { "id": "sdk-server", "from": "sdk", "to": "server", "fromSide": "bottom", "toSide": "top" },
+    { "id": "toggle-json", "from": "state-toggle", "to": "state-json", "fromSide": "bottom", "toSide": "top" },
+    { "id": "intel-match", "from": "intel-store", "to": "match-script", "label": "read Intel", "variant": "dashed", "route": "orthogonal-v", "fromSide": "bottom", "toSide": "top", "labelAt": [700, 707] },
+
+    { "id": "server-augmenter", "from": "server", "to": "augmenter", "label": "retrieve", "variant": "emphasis", "fromSide": "bottom", "toSide": "top" },
+    { "id": "audit-augmenter", "from": "audit-buffer", "to": "augmenter", "label": "log retrieve", "variant": "dashed", "fromSide": "bottom", "toSide": "top" },
+    { "id": "match-augmenter", "from": "match-script", "to": "augmenter", "label": "suffix inject", "variant": "emphasis", "route": "orthogonal-v", "fromSide": "bottom", "toSide": "left" },
+
+    { "id": "augmenter-search", "from": "augmenter", "to": "search", "fromSide": "right", "toSide": "left" },
+    { "id": "search-social", "from": "search", "to": "social-detector", "label": "guard", "variant": "security", "fromSide": "right", "toSide": "left" },
+    { "id": "augmenter-cache", "from": "augmenter", "to": "cache", "label": "lookup", "variant": "dashed", "fromSide": "bottom", "toSide": "top" },
+    { "id": "search-cache", "from": "search", "to": "cache", "fromSide": "bottom", "toSide": "top" },
+    { "id": "cache-fts5", "from": "cache", "to": "fts5-vec", "label": "FTS5+vec", "variant": "emphasis", "fromSide": "right", "toSide": "left" },
+
+    { "id": "fts5-sqlite", "from": "fts5-vec", "to": "sqlite", "variant": "emphasis", "route": "orthogonal-v", "fromSide": "bottom", "toSide": "left" },
+    { "id": "sqlite-embed", "from": "sqlite", "to": "embed-model", "fromSide": "right", "toSide": "left" },
+    { "id": "embed-yaml", "from": "embed-model", "to": "catalog-yaml", "fromSide": "right", "toSide": "left" },
+    { "id": "yaml-sqlite", "from": "catalog-yaml", "to": "sqlite", "label": "load (cold)", "variant": "dashed", "fromSide": "top", "toSide": "right", "via": [[820, 1240], [820, 1320], [180, 1320]] }
+  ]
+}
