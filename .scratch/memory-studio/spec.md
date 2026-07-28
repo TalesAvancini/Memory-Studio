@@ -503,7 +503,7 @@ Cache key estável porque byte-string é determinístico.
 | HTTP server | Fastify | ~5MB |
 | Banco | SQLite + FTS5 + sqlite-vec | ~10MB |
 | Embedding local | multilingual-e5-small (ONNX, 384d) | ~470MB |
-| Reranker local | ms-marco-MiniLM-L-6-v2 (ONNX) | ~90MB |
+| ~~Reranker local~~ | ~~ms-marco-MiniLM-L-6-v2 (ONNX)~~ | ~~~90MB~~ (v3.1+ — removido do MVP) |
 | UI | HTMX+Alpine (MVP) | ~50KB JS browser |
 | SDK cliente | TypeScript puro, ~50KB | 0 deps nativas |
 
@@ -512,12 +512,12 @@ Cache key estável porque byte-string é determinístico.
 | Componente | Tamanho |
 |---|---|
 | Embedding (multilingual-e5-small ONNX) | ~470MB |
-| Reranker (ms-marco-MiniLM-L-6-v2 ONNX) | ~90MB |
+| ~~Reranker (ms-marco-MiniLM-L-6-v2 ONNX)~~ | ~~~90MB~~ (v3.1+) |
 | SQLite cache + sqlite-vec | ~10MB |
 | Fastify + Node runtime baseline | ~200MB |
 | ONNX runtime overhead + file cache | ~125MB |
 | Misc (audit log buffer, catalog cache) | ~100MB |
-| **Total** | **~995MB (arredondado ~1GB)** |
+| **Total** | **~905MB (arredondado ~1GB, sem reranker)** |
 
 Roda em qualquer máquina com 4GB livres.
 

@@ -10,6 +10,11 @@ revision: |
   - §9: estimativa 30-40h → 35-50h (soma direta das phases é 36-51h)
   - §10.1: inception híbrida marcada CONDICIONAL ao grill §16.6 (mover pra v3.2 se grill reprovar)
 
+  3.3 (2026-07-28) — MiMo analysis aplicado:
+  - §8: reranker removido do MVP (v3.1+), working set -90MB (~905MB)
+  - §9: estimativa ajustada 35-50h → 41-55h Branch A / 33-43h Branch B (Phase 0 + Phase 1 ajustada + §16.4 overhead)
+  - §16.4: 5 engineering decisions resolvidas (in-process / SQLite / embedding pipeline / template 2-block / persona âncora)
+
   3.1 (2026-07-27) — revisão externa de 17 findings aplicada. Renumeração §18 → §16. Nova §17 (Glossário caches + nomenclatura).
 description: "Memory Studio v3.2 — PRD. Documenta DECISÕES (com justificativa 'por que X e não Y'). Companion do PLAN.md (fases de implementação)."
 explanation: |
@@ -459,7 +464,7 @@ Cache do provedor ainda funciona: persona prefix é a única parte do system mes
 | HTTP server | Fastify | ~5MB |
 | Banco | SQLite + FTS5 + sqlite-vec | ~10MB |
 | Embedding local | multilingual-e5-small (ONNX, 384d) | ~470MB |
-| Reranker local | ms-marco-MiniLM-L-6-v2 (ONNX) | ~90MB |
+| ~~Reranker local~~ | ~~ms-marco-MiniLM-L-6-v2 (ONNX)~~ | ~~~90MB~~ (v3.1+) |
 | UI | HTMX+Alpine (MVP) | ~50KB JS browser |
 | SDK cliente | TypeScript puro, ~50KB | 0 deps nativas |
 
@@ -468,12 +473,12 @@ Cache do provedor ainda funciona: persona prefix é a única parte do system mes
 | Componente | Tamanho |
 |---|---|
 | Embedding (multilingual-e5-small ONNX) | ~470MB |
-| Reranker (ms-marco-MiniLM-L-6-v2 ONNX) | ~90MB |
+| ~~Reranker (ms-marco-MiniLM-L-6-v2 ONNX)~~ | ~~~90MB~~ (removido do MVP — v3.1+ se métricas mostrarem recall insuficiente) |
 | SQLite cache + sqlite-vec | ~10MB |
 | Fastify + Node runtime baseline | ~200MB |
 | ONNX runtime overhead + file cache | ~125MB |
 | Misc (audit log buffer, catalog cache) | ~100MB |
-| **Total** | **~995MB (arredondado ~1GB)** |
+| **Total** | **~905MB (arredondado ~1GB, sem reranker)** |
 
 Roda em qualquer máquina com 4GB livres.
 
@@ -506,7 +511,7 @@ Roda em qualquer máquina com 4GB livres.
 
 Ver [PLAN.md](PLAN.md) para phases, deliverables, estimates. PRD foca em decisões, PLAN em fases.
 
-**Estimativa total:** **35-50h single-dev** (inclui erro, logging, 1 round de tuning empírico). v3.1 prometeu 30-40h — soma direta das phases dá 36-51h, então v3.2 corrige pra 35-50h honesto.
+**Estimativa total:** **41-55h single-dev** (inclui erro, logging, 1 round de tuning empírico). v3.1 prometeu 30-40h; v3.2 subiu pra 35-50h; **v3.3 (2026-07-28)** ajusta pra **41-55h Branch A / 33-43h Branch B** após MiMo analysis: Phase 0 (env validation, 1-2h) + Phase 1 ajustada (4-5h → 6-8h, ONNX runtime setup tem fricção por OS) + §16.4 decisions overhead (+4h em Phase 6b Branch A). Soma direta das 11 phases raw = 41-61h Branch A.
 
 ---
 
@@ -745,6 +750,8 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 
 **Memory Studio seria o primeiro** com fast-agent-over-response. **Diferencial competitivo, não overhead.**
 
+**Estratégia de produto (2026-07-28): Memory Studio é standalone, não extensão/plugin de OmniRoute ou 9Router.** Tabela acima é só pra novelty claim (mostrar que ninguém implementa fast-agent-over-response). Não há roadmap de integração, fork, ou contribution pra OmniRoute/9Router. Catálogo YAML curado + critical rules + inception híbrida + UI específica são diferenciais próprios que justificam produto independente.
+
 ### 16.4 Engineering decisions (a desenrolar)
 
 | Decisão | Trade-off |
@@ -754,6 +761,16 @@ Nenhum routing tool existente implementa fast-agent-over-response. Comparação:
 | Match: regex vs catalog vs embedding | Speed vs precision |
 | Suffix injection: template vs raw concat | Cache hit vs flexibility |
 | Prefix stability N→N+1 | Core do produto |
+
+**Resoluções (documentadas 2026-07-28, antes de Phase 6a per MiMo checklist):**
+
+1. **Fast agent: in-process.** Chamada HTTP direta à API Anthropic (Haiku) dentro do mesmo processo Node. Zero IPC, zero sidecar. Fail-open natural: se Haiku morrer ou demorar, request principal já respondeu — intel vazio, turn N+1 degrada gracioso. Latência mínima.
+2. **Intel store: SQLite (WAL mode).** Tabela `intel` com schema `{ session_id, agentState TEXT, nextNeeds TEXT (JSON array), recentTopic TEXT, ts INTEGER }`. WAL mode já configurado. Restart preserva. Estimativa: ~1h migration SQL.
+3. **Match strategy: embedding pipeline existente (FTS5 + sqlite-vec + RRF).** Intel entra como sinal adicional — `agentState` + `recentTopic` concatenados ao prompt antes do embedding. `nextNeeds` pode dar score bonus pra items com keywords matching. Sem pipeline novo. Estimativa: ~2h.
+4. **Suffix injection: template com 2 blocos `cache_control: ephemeral`.** Bloco 1 = persona (estável, cache hit). Bloco 2 = intel + Skills (variável, cache miss esperado). Template fixa estrutura → byte-string determinístico. Estimativa: ~1h.
+5. **Prefix stability N→N+1: persona = âncora de cache.** Persona não muda entre turns (exceto se humano trocar via painel — cache miss consciente). Decisão de UX, não engenharia. Estimativa: ~0h.
+
+**Overhead total: ~4h em cima dos 8-12h da Phase 6b Branch A.**
 
 ### 16.5 Intel schema (writer-reader contract)
 

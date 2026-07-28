@@ -14,7 +14,7 @@ explanation: |
   - M3 (Inception híbrida) → Phase 6a + Phase 6b (Branch A/B conditional)
   - M4 (Tuning) → Phase 7a + Phase 7b
 
-  Cada phase = 1-3h de trabalho single-dev, EXCETO Phase 1 (Catalog + Index, 4-5h —
+  Cada phase = 1-3h de trabalho single-dev, EXCETO Phase 1 (Catalog + Index, 6-8h —
   FTS5 + sqlite-vec + schema versioning + build-index perf são intrinsicamente
   bundleados), Phase 4 (UI, 8-12h) e Phase 6b Branch A (8-12h) que são
   intrinsecamente maiores. Phases
@@ -63,22 +63,51 @@ related:
 6. **Security default:** zero raw persistence, `tenantId` hasheado, placeholders determinísticos não vazam secret, proxy local-only.
 7. **Fail-open:** todo erro de retrieval/augmentation/audit → forward unchanged, request 200, log em stderr.
 8. **Branch B at Phase 6b:** se grill §16.7 reprovar inception híbrida, Phase 6b colapsa pra 0h; Phase 7b pre-reqs loosened pra Phase 5 only.
+9. **Endpoint count: 7 total** (6 auxiliary + /augment). `/state/toggle` foi adicionado pós-D-009 (Phase 4 UI dependency). Lista: `/augment`, `/catalog`, `/catalog/rebuild`, `/audit`, `/audit/summary`, `/health`, `/state/toggle`.
 
 ---
 
 ## Sequência
 
 ```
-Phase 1 ──┬──> Phase 2 ──┐
-          │              │
-          ├──> Phase 3 ──┼──> Phase 4 ──┐
-          │              │              │
-          │              ├──────────────┴──> Phase 5a ──> Phase 5b ──┬──> Phase 6a ──> Phase 6b ──┐
-          │              │                                          │                              │
-          └──> Phase 2 ──┘                                          └──> Phase 7a ──> Phase 7b ──┘
+Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
+                      │              │
+                      ├──> Phase 3 ──┼──> Phase 4 ──┐
+                      │              │              │
+                      │              ├──────────────┴──> Phase 5a ──> Phase 5b ──┬──> Phase 6a ──> Phase 6b ──┐
+                      │              │                                          │                              │
+                      └──> Phase 1 ──┘                                          └──> Phase 7a ──> Phase 7b ──┘
 ```
 
-**Paralelização:** Phase 3 + 4 paralelizáveis (Phase 3 = consumido externo por agentes; Phase 4 só depende de Phase 1; nenhum bloqueia o outro internamente). Phase 5a + 5b sequenciais (mesmo phase técnica). Phase 7a pode começar após Phase 5b (não bloqueia em 6b).
+**Paralelização:** Phase 3 + 4 paralelizáveis (Phase 3 = consumido externo por agentes; Phase 4 só depende de Phase 1; nenhum bloqueia o outro internamente). Phase 5a + 5b sequenciais (mesmo phase técnica). Phase 7a pode começar após Phase 5b (não bloqueia em 6b). Phase 0 é pré-requisito hard de Phase 1 (env validation).
+
+---
+
+## Phase 0 — Environment Validation
+
+**Goal:** garantir que o ambiente suporta SQLite + FTS5 + sqlite-vec + ONNX runtime + Node 22 antes de Phase 1 começar. Evita descobrir fricção de setup no meio da Phase 1.
+
+**Scope:**
+- Node 22 LTS instalado (`node --version`)
+- `onnxruntime-node` build OK (compilação específica por OS — Windows tem fricção)
+- SQLite com extensões FTS5 + sqlite-vec compiladas e carregáveis
+- multilingual-e5-small ONNX model baixa + carrega (~470MB)
+- Permissões filesystem (read YAML, write SQLite, write `.memory-studio/state.json`)
+
+**Estimate:** 1-2h (depende do OS; Windows tem fricção maior que Linux/macOS)
+
+**Done criteria:**
+- [ ] `node --version` retorna v22.x LTS
+- [ ] `npm install onnxruntime-node` succeeds sem erros de compilação
+- [ ] SQLite carrega FTS5 (`PRAGMA compile_options;` mostra `ENABLE_FTS5`)
+- [ ] sqlite-vec carrega (`SELECT vec_version();` retorna versão)
+- [ ] multilingual-e5-small ONNX model baixa e carrega (`embedding.encode("test")` retorna 384d array)
+- [ ] Test write em `.memory-studio/state.json` succeeds com permissões corretas
+- [ ] Smoke script `/scripts/verify-env.mjs` passa todos os 6 checks acima
+
+**Output do Processador:**
+- Script `/scripts/verify-env.mjs` (TS) que roda os 6 checks e retorna exit 0 se tudo OK
+- Documentado em `.memory-studio/setup.md` como pré-requisito
 
 ---
 
@@ -99,7 +128,7 @@ Phase 1 ──┬──> Phase 2 ──┐
 - §10.4 item 1 (`npm run build-index` < 60s pra 100 skills)
 - §17.2 nomenclature (`recentFiles`, etc. — usado no schema do context, mas schema YAML usa type/id/text apenas)
 
-**Estimate:** 4-5h
+**Estimate:** 6-8h (Phase 1 raw estimate; bumped de 4-5h per MiMo — FTS5 + sqlite-vec + schema versioning + build-index perf são bundleados)
 
 **Done criteria (cada checkbox testável):**
 - [ ] YAML schema validado: `id`, `type`, `title` (skill), `text` obrigatório; `category` enum (procedural|diagnostic|reference|pattern) pra skill; `critical: bool` pra rule; `isDefault: bool` pra persona
@@ -410,6 +439,7 @@ Phase 1 ──┬──> Phase 2 ──┐
 - [ ] **Branch B documented como árvore** (D-003): PLAN.md Phase 6 contém seção `Branch B` heading-level; esta ROADMAP.md Phase 6b marca Branch B como alternate path (não footnote)
 - [ ] Fast agent model = `claude-3-5-haiku-*` (não "Haiku-class" — modelo concreto)
 - [ ] Writer-reader contract preservado: shape literal `Intel` matches between fast agent output and match pipeline input
+- [ ] **Intel contract validation** (test automatizado): serializa `Intel` do writer (Haiku output), desserializa no reader (match pipeline input). Validação: `agentState: string` (vazio OK), `nextNeeds: string[]` (vazio OK, ordem flexível), `recentTopic: string` (vazio OK). Degradação graciosa: se field vazio/fora de ordem, match pipeline não crasha.
 
 **Done criteria (Branch B):**
 - [ ] Phase 6b marcado como collapsado (0h) em PLAN.md Phase 6 status
@@ -495,29 +525,32 @@ Phase 1 ──┬──> Phase 2 ──┐
 
 ## Total
 
-### Raw arithmetic (com phase splits)
+### Raw arithmetic (com phase splits + MiMo adjustments)
 
 | Phase | Estimate |
 |---|---|
-| Phase 1 — Catalog + Index | 4-5h |
+| **Phase 0 — Environment Validation** | **1-2h** (novo, MiMo suggestion) |
+| Phase 1 — Catalog + Index | 6-8h (MiMo bumped de 4-5h) |
 | Phase 2 — Detector + Fingerprint | 2-3h |
 | Phase 3 — SDK Cliente | 3-4h |
 | Phase 4 — UI Panel | 8-12h |
 | Phase 5a — API + Retrieval | 3-4h |
 | Phase 5b — Audit + Endpoints + Security | 3-4h |
 | Phase 6a — Grill Gate + POC | 2-3h |
-| **Phase 6b — Branch A (impl) OR Branch B (collapse)** | **8-12h OR 0h** |
+| **Phase 6b — Branch A (impl) OR Branch B (collapse)** | **8-12h OR 0h** (MiMo §16.4 decisions: +4h overhead em cima do Branch A raw) |
 | Phase 7a — Metrics Instrumentation | 2-3h |
 | Phase 7b — Empirical Tuning | 3-4h + 1 semana |
-| **Branch A total** | **36-52h + 1 semana** |
-| **Branch B total** | **28-40h + 1 semana** |
+| **Branch A total** | **41-61h + 1 semana** |
+| **Branch B total** | **33-49h + 1 semana** |
 
 ### Canonical (PRD §9 / PLAN §Total)
 
-| Branch | Canonical |
-|---|---|
-| Branch A | 35-50h (PRD v3.2 honest) |
-| Branch B | 28-39h (Phase 6 collapsa) |
+| Branch | Canonical (PRD §9) | Raw arithmetic (ROADMAP) |
+|---|---|---|
+| Branch A | 35-50h (PRD v3.2 honest) | 41-61h (Phase 0 + Phase 1 ajustada + §16.4 overhead) |
+| Branch B | 28-39h (Phase 6 collapsa) | 33-49h |
+
+**Drift flag (MiMo adjustments):** canonical PRD §9 está optimistic vs raw arithmetic pós-MiMo. PRD canônico deveria bumpar pra **41-55h Branch A** / **33-43h Branch B** pra refletir Phase 0 + Phase 1 ajustada + §16.4 overhead honestamente. Decisão humana se aceita bump ou mantém PRD canônico como "commitment" vs ROADMAP raw como "execution reality".
 
 **Nota D-002:** canonical é a estimativa comunicada; raw é o que vai sair na prática com phase splits. Diferença = overhead de sub-agent setup + integration entre phases. PRD canonical é o que importa pro plano de produto; raw é o que importa pra execução single-dev.
 
