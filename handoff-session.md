@@ -1,15 +1,31 @@
 ---
-session_end: 2026-07-28-final-v4
+session_end: 2026-07-28-final-v5
 author: Claude/M3-CLI (continuação pós-compactação)
 audience: agentes futuros (sessão fresca, contexto compactado) + humano (revisão)
 type: end-of-session-handoff
 prev_handoff: archive_handoff/handoff-session-2026-07-27.md
-update_note: "v4 do handoff 2026-07-28. Substitui v3 (que documentava MiMo + Branch B removal + POC reframe + MiniMax). Esta v4 é diferente: DECLARAÇÃO DE FRACASSO. O produto Memory Studio (PRD/PLAN/SPEC/ROADMAP) está pronto, mas o farol arquitetural falhou em renderizar como sub-diagramas por confusão entre meta-tools e arquitetura do produto. PRINCIPAIS APRENDIZADOS para sessões futuras: (1) auto-grill é validation tool, NÃO parte do produto, NÃO uma phase no roadmap, NÃO uma sub-diagram no farol. (2) Meta-tools (tlc-roadmap-loop, auto-grill, verifier, MiMo) vivem em .claude/skills/ e .agents/skills/, NÃO no farol do produto. (3) Spec docs (PRD/SPEC/ROADMAP) são meta-documentação, NÃO componentes runtime. (4) Farol do produto = External + Phase 0 env + Produto (UI/Server/SDK/Augmenter/Search/Cache/Audit/Fast Agent/Catalog) + Storage (SQLite/FTS5/vec/ONNX/YAML) — só runtime."
+update_note: "v5 do handoff 2026-07-28. Substitui v4 (que documentava Phase 6a reframe + SPEC drift). Esta v5 documenta 3 entregas desta sessão: (1) FAROL DO PRODUTO UNIFICADO — single-page archify architecture com 5 módulos runtime, 25 componentes, 26 conexões rotuladas, fundo transparente, sem grade quadriculada. (2) 3-AGENT REVIEW — 20 findings de consistência PRD/SPEC/ROADMAP/Arquitetura; 19 aplicados em batch único (commit 1f773a8). (3) ARCHITECTURE.md v2 — reescrito do zero refletindo JSON canônico; meta-tools removidas do farol do produto; arquivado v1 em .specs/archive/architeture/."
 ---
 
-# Handoff de sessão — 2026-07-28 (final v4 — DECLARAÇÃO DE FRACASSO)
+# Handoff de sessão — 2026-07-28 (final v5)
+
+# Handoff de sessão — 2026-07-28 (final v5)
 
 ## TL;DR
+
+**3 entregas desta sessão (v5):**
+
+1. **Farol do produto unificado** — single-page archify architecture (`memory-studio.html`), 5 módulos runtime, 25 componentes, 26 conexões rotuladas, fundo transparente sem grade quadriculada (commit `08d75fa`).
+2. **3-agent review** — PRD/ROADMAP, SPEC/ROADMAP, Arquitetura/PRD+SPEC retornaram 20 findings; 19 aplicados em batch único (commit `1f773a8`).
+3. **ARCHITECTURE.md v2** — reescrito do zero refletindo JSON canônico; meta-tools removidas do farol do produto; v1 arquivada em `.specs/archive/architeture/` (commit `23672ff`).
+
+**Status final:** origin/main em `23672ff`. PRD v3.4 + PLAN v3 + SPEC v2 + ROADMAP v5 + BACKLOG (13 entries) + 19 consistency fixes + farol renderizado. Phase 1 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
+
+**Próximo passo:** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 1 (Catalog + Schema + Index).
+
+---
+
+## v4 (resumo preservado)
 
 Sessão pós-compactação. **2 handoffs do dia:**
 
@@ -365,10 +381,14 @@ Não-estrutural, não-bloqueante, mas confuso se SPEC for lido isolado.
 
 ---
 
-**Commits finais da sessão (v3 + v4 follow-up):**
+**Commits finais da sessão (v3 + v4 follow-up + v5 desta sessão):**
 
 | Commit | Descrição |
 |---|---|
+| `23672ff` | **v5:** ARCHITECTURE.md reescrito do zero (do JSON canônico) |
+| `1f773a8` | **v5:** 19 consistency fixes do 3-agent review |
+| `08d75fa` | **v5:** Architecture CSS patch — transparent fills + remove grid lines |
+| `6f2c293` | **v5:** Single-page archify architecture diagram (5 módulos runtime) |
 | `322766f` | **v4:** Phase 6a reframe (PRD §16.7 + ROADMAP Phase 6a) — POC hot path PRIMARY |
 | `0fcdb47` | **v4:** SPEC drift fix — "grill" → POC Validation |
 | `3bf1034` | MiMo: §16.4 decisions + reranker removido + Phase 0 + standalone strategy |
@@ -381,4 +401,93 @@ Não-estrutural, não-bloqueante, mas confuso se SPEC for lido isolado.
 | `e2a8646` | `.env.example` deletado |
 | `7142ef6` | `.gitignore` hardening (`.env.*` glob) |
 
-**Estado final (atualizado v4):** Working tree: `M .specs/architecture.architecture.json` (modificação pré-existente do início da sessão, não tocada). origin/main em `0fcdb47`. PRD v3.4 + PLAN v3 + SPEC v2 + ROADMAP v5 + BACKLOG (13 entries) + .gitignore hardened + **SPEC drift 100% consistente com PRD/ROADMAP**. Phase 1 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
+**Estado final (atualizado v5):** Working tree contém `custom-farol.html.bak` (untracked, preservado conforme regra "não remova nada"). origin/main em `23672ff`. PRD v3.4 + PLAN v3 + SPEC v2 + ROADMAP v5 + BACKLOG (13 entries) + .gitignore hardened + **farol arquitetural unificado (single-page archify, 5 módulos runtime, fundo transparente)** + **19 consistency fixes (PRD/SPEC/ROADMAP/Arquitetura)** + **ARCHITECTURE.md v2 reescrito do zero**. Phase 1 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
+
+---
+
+### Marcos 21-23 (v5 desta sessão — farol unificado + consistency review + ARCHITECTURE.md rewrite)
+
+Sessão pós-v4, mesmo dia 2026-07-28, branch `main`. 3 entregas:
+
+#### Marco 21 — Farol do produto unificado (single-page archify)
+
+**Contexto:** v4 do handoff documentou que tentativas anteriores de renderizar o farol via archify falharam — confusão entre meta-tools e arquitetura do produto (tlc-roadmap-loop, auto-grill, archify, verifier apareciam como componentes).
+
+**Decisão arquitetural:** farol do produto = **apenas runtime**:
+- 5 módulos: External + Phase 0 (env validation) + Hot Path (sync, p50<50ms) + Pipeline (retrieval) + Storage
+- 25 componentes runtime-only (UI Panel, SDK, Server, Fast Agent, Intel Store, Augmenter, Search, Cache, Audit Buffer, Match Script, Catalog, Social Detector, SQLite, Embedding Model, Catalog YAML, Node 22, SQLite FTS5+vec, ONNX Runtime, Human, Agents, MiniMax API, etc.)
+- **Sem meta-tools**: tlc-roadmap-loop, auto-grill, archify, Planner/Implementer/Verifier vivem em `.claude/skills/` e `.agents/skills/` — **NÃO** aparecem no farol
+
+**Decisões técnicas para layout:**
+- 3 colunas × 8 rows (24 cells + 1 stub), `gapY=90`, `gapX=80`
+- Toda edge `route: orthogonal-v` ou `fromSide:bottom / toSide:top` entre rows adjacentes (archify rejeita edges que pulam rows)
+- 22 edges com `labelAt` ou `via` waypoints para evitar crossings
+- `via` explícito para `yaml-sqlite` (catalog-yaml → sqlite) desvia pela direita
+- `labelAt` posiciona labels em gaps, não em cima de componentes
+- **Patch CSS pós-render**: `--mask`, `--*-fill` (frontend/backend/database/cloud/security/messagebus/external) → `transparent`; `--grid` → `transparent`; `.c-grid` → `display: none` (perde em todo re-render)
+
+**Resultado:** [`.specs/architecture/memory-studio.html`](.specs/architecture/memory-studio.html) — fundo preto, caixinhas com bordas coloridas e fundo totalmente transparente, sem grade quadriculada, arrows verde/ciano conectando módulos, 5 boundaries pontilhados nomeando os módulos.
+
+**Backup:** `custom-farol.html.bak` (tentativa manual com CSS próprio) preservado no working tree untracked, conforme regra "não remova nada".
+
+**Commits:**
+- `6f2c293 — feat(architecture): single-page archify diagram for Memory Studio` — JSON + HTML + index inicial
+- `08d75fa — fix(architecture): transparent fills + remove grid lines` — patch CSS pós-render
+
+#### Marco 22 — 3-agent review de consistência (20 findings, 19 aplicados)
+
+**Decisão:** dispatchar 3 sub-agentes em paralelo pra comparar:
+1. PRD ↔ ROADMAP (decisões, phases obrigatórias, fast agent, POC)
+2. SPEC ↔ ROADMAP (User Stories órfãs, AC, invariantes, schema intel, 2-block cache)
+3. Arquitetura renderizada ↔ PRD + SPEC (componentes presentes/ausentes, labels, fast agent, 2-block cache, schema intel, social detector, match script)
+
+**Resultado:** 20 findings totais (4 alta, 9 média, 7 baixa). Decisões do humano:
+- F1 (alta, Provider label) — **manter como está** (MiniMax API na arquitetura divergente intencionalmente)
+- F2 (alta, Fast agent model ROADMAP) — corrigir: `claude-3-5-haiku-*` → `MiniMax-M2.7-highspeed` em L421+L444
+- F3 (alta, POST /augment edge) — verificar lógica: agents → sqlite-ext → sdk → **server** (chain transit); label `POST /augment` move para edge `sdk-server`
+- F4 (média, endpoint count) — manter
+- F5 (média, raw sum divergence) — corrigir: PRD §9 raw sum 41-61h → 45-63h (match ROADMAP components)
+- F7 (alta, Server → Provider edge ausente) — adicionar edge `server → fast-agent → minimax-api` (chain via Fast Agent)
+- Resto: aplicar todas
+
+**Correções aplicadas (19 fixes):**
+
+| Categoria | # | Finding |
+|---|---|---|
+| PRD↔ROADMAP | F2 | ROADMAP Phase 6b (L421, L444) `MiniMax-M2.7-highspeed` |
+| PRD↔ROADMAP | F5 | PRD §9 raw sum 45-63h |
+| PRD↔ROADMAP | F4' | ROADMAP typo 45-69h → 45-63h (3 lugares) |
+| PRD↔ROADMAP | F5' | PRD revision log §16.6 → §16.7 |
+| SPEC↔ROADMAP | F6 | Phase 1 scope inclui SPEC US 6 (migrate v1 calibration STATE.md) |
+| Arq↔PRD+SPEC | F3 | Edge `POST /augment` agora em `sdk → server` (era `agents → sqlite-ext`) |
+| Arq↔PRD+SPEC | F7 | Edge `server → fast-agent` (forward augmented) adicionado |
+| Arq↔PRD+SPEC | F8' | Edge `minimax-api → fast-agent` (read R_N) adicionado |
+| Arq↔PRD+SPEC | F9' | Edges `catalog → sqlite` (ingest YAML) + `catalog → embed-model` (compute embeddings) |
+| Arq↔PRD+SPEC | F4' | Audit direction invertida: `augmenter → audit-buffer` (era `audit-buffer → augmenter`) |
+| Arq↔PRD+SPEC | F2' | Fast Agent sublabel `MiniMax-M2.7-highspeed in-process` |
+| Arq↔PRD+SPEC | F6' | Intel Store sublabel `{agentState,nextNeeds,recentTopic}` (camelCase canônico) |
+| Arq↔PRD+SPEC | F5' | FTS5+vec node sublabel drop `(módulo 5)` |
+| Arq↔PRD+SPEC | F10' | @memory-studio/sdk sublabel `TS · ~50KB · zero deps` |
+| Arq↔PRD+SPEC | F11' | Agents sublabel `Claude Code (MVP) · v3.1+: Aider, Cursor` |
+| Arq↔PRD+SPEC | F12' | Embedding Model sublabel `multilingual-e5-small ONNX 384d` (sem contração mE5-small) |
+
+**Commit:** `1f773a8 — fix: consistency fixes from 3-agent review (20 findings, 19 applied)`
+
+#### Marco 23 — ARCHITECTURE.md v2 (do zero, do JSON canônico)
+
+**Contexto:** versão antiga do `.specs/ARCHITECTURE.md` (v1, 2026-07-22) tinha 3 camadas erradas: Produto + Orquestração + Externa, com meta-tools (`tlc-roadmap-loop`, `tlc-spec-driven`, `Planner`, `Implementer`, `Verifier`, `archify`) como componentes. Era inconsistente com o farol canônico renderizado (que tem só runtime).
+
+**Decisão:** reescrever do zero, espelhando a estrutura do JSON canônico.
+
+**Estrutura nova (v2):**
+- 5 módulos runtime (não 3 camadas antigas)
+- 25 componentes com stable IDs (kebab-case) — bate 1:1 com `memory-studio.architecture.json`
+- 26 conexões agrupadas em 3 fluxos: hot path (sync, p50<50ms), cold path (build-index), audit (D-007 async)
+- 5 boundaries (region/region/region/security-group/region)
+- Tabela "Decisões travadas refletidas no farol" — 14 decisões × onde aparece
+- Cross-references: PRD §7/§10/§16.4/§17, PLAN §16.4, SPEC IMod-5/7/13, ROADMAP Phase 6b
+- Versionamento: v1 (stale, com meta-tools) → v2 (canônico, runtime-only)
+
+**Backup:** v1 antiga preservada em [`.specs/archive/architeture/architecture.html`](.specs/archive/architeture/architecture.html) + `architecture.architecture.json` (referência histórica, não é mais farol canônico).
+
+**Commit:** `23672ff — docs(architecture): rewrite ARCHITECTURE.md from canonical JSON source` (+168/-74)
