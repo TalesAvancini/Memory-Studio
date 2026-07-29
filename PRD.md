@@ -8,7 +8,7 @@ status: ready-to-build
 revision: |
   3.2 (2026-07-27) — ajustes pós `critica-plan.md` (filtro crítico, não-aplicação cega):
   - §9: estimativa 30-40h → 35-50h (soma direta das phases é 36-51h)
-  - §10.1: inception híbrida marcada CONDICIONAL ao grill §16.6 (mover pra v3.2 se grill reprovar)
+  - §10.1: inception híbrida marcada CONDICIONAL ao grill §16.7 (mover pra v3.2 se grill reprovar)
 
   3.3 (2026-07-28) — MiMo analysis aplicado:
   - §8: reranker removido do MVP (v3.1+), working set -90MB (~905MB)
@@ -511,7 +511,7 @@ Roda em qualquer máquina com 4GB livres.
 
 Ver [PLAN.md](PLAN.md) para phases, deliverables, estimates. PRD foca em decisões, PLAN em fases.
 
-**Estimativa total:** **41-55h single-dev** (inclui erro, logging, 1 round de tuning empírico). v3.1 prometeu 30-40h; v3.2 subiu pra 35-50h; **v3.3 (2026-07-28)** ajusta pra **41-55h Branch A / 33-43h Branch B** após MiMo analysis: Phase 0 (env validation, 1-2h) + Phase 1 ajustada (4-5h → 6-8h, ONNX runtime setup tem fricção por OS) + §16.4 decisions overhead (+4h em Phase 6b Branch A). Soma direta das 11 phases raw = 41-61h Branch A.
+**Estimativa total:** **41-55h single-dev canonical** (inclui erro, logging, 1 round de tuning empírico). v3.1 prometeu 30-40h; v3.2 subiu pra 35-50h; **v3.3 (2026-07-28)** ajusta pra **41-55h Branch A / 33-43h Branch B** após MiMo analysis: Phase 0 (env validation, 1-2h) + Phase 1 ajustada (4-5h → 6-8h, ONNX runtime setup tem fricção por OS) + §16.4 decisions overhead (+4h em Phase 6b Branch A). Soma direta das 11 phases raw (per ROADMAP components) = 45-63h Branch A.
 
 ---
 

@@ -120,7 +120,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 - SPEC §IMod-13 (invariantes sólida: 1 Node-only, 4 catálogo versionado, 5 tenant_id hasheado)
 - SPEC §IMod-14 (stack table: Node 22, Fastify, SQLite + FTS5 + sqlite-vec, multilingual-e5-small)
 - SPEC §IMod-15 (working set partial — embeddings + sqlite)
-- SPEC User Stories §A (config inicial — apenas items 1, 4, 5, 7, 8)
+- SPEC User Stories §A (config inicial — items 1, 4, 5, 6, 7, 8; item 6 = migrate v1 calibration STATE.md → schema)
 
 **PRD refs:**
 - §6 Schema do catálogo (YAML versionado em git)
@@ -418,7 +418,7 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 **Scope:**
 - SPEC §IMod-5 (intel schema — D-005: `{ agentState: string, nextNeeds: string[], recentTopic: string }`)
 - §16.4 decisions (in-process Haiku / SQLite intel store WAL / embedding pipeline reuse / template 2-block / persona anchor)
-- Fast agent (claude-3-5-haiku-*) in-process
+- Fast agent (`MiniMax-M2.7-highspeed`) in-process
 - Intel store persistido em SQLite (WAL mode)
 - Match script (intel + prompt + context + catalog) — reusa embedding pipeline existente
 - Suffix injection no system message (prefixo intacto)
@@ -441,7 +441,7 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 - [ ] **Latency trick validated** (PRD §16.2, arquitetural): fast agentuality termina em **<3s** medido (default `MiniMax-M2.7-highspeed` tipicamente <1s), vs humano 5-30s lendo (10 amostras). Paralelismo natural — latência do fast agent NÃO bloqueia request humano.
 - [ ] **Inception hot path overhead <10ms** (PRIMARY criterion, PRD §10.2 budget): `sqlite.get(intel)` <5ms (p95), concat <1ms, template render <1ms. Medido com 10 amostras; total request p50 <50ms preservado.
 - [ ] **Cache hit quando prefixo estável** (teste explícito): 2 turns com mesmo persona + prompts diferentes → `usage.cache_read_input_tokens > 0` no segundo turn
-- [ ] Fast agent model = `claude-3-5-haiku-*` (não "Haiku-class" — modelo concreto)
+- [ ] Fast agent model = `MiniMax-M2.7-highspeed` (não "Haiku-class" — modelo concreto)
 - [ ] Writer-reader contract preservado: shape literal `Intel` matches between fast agent output and match pipeline input
 - [ ] **Intel contract validation** (test automatizado): serializa `Intel` do writer (Haiku output), desserializa no reader (match pipeline input). Validação: `agentState: string` (vazio OK), `nextNeeds: string[]` (vazio OK, ordem flexível), `recentTopic: string` (vazio OK). Degradação graciosa: se field vazio/fora de ordem, match pipeline não crasha.
 
@@ -532,15 +532,15 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 | **Phase 6b — Fast Agent + Intel Pipeline (mandatory)** | **12-16h** (8-12h + 4h §16.4 overhead) |
 | Phase 7a — Metrics Instrumentation | 2-3h |
 | Phase 7b — Empirical Tuning | 3-4h + 1 semana |
-| **Total (Phase 6b mandatory, sem Branch B)** | **45-69h + 1 semana** |
+| **Total (Phase 6b mandatory, sem Branch B)** | **45-63h + 1 semana** |
 
 ### Canonical (PRD §9 / PLAN §Total)
 
 | Type | Canonical (PRD §9 v3.3) | Raw arithmetic (ROADMAP) |
 |---|---|---|
-| Branch única | 41-55h (PRD v3.3 honest, pós-MiMo) | 45-69h (Phase 0 + Phase 1 ajustada + §16.4 overhead + Phase 6b mandatory) |
+| Branch única | 41-55h (PRD v3.3 honest, pós-MiMo) | 45-63h (Phase 0 + Phase 1 ajustada + §16.4 overhead + Phase 6b mandatory) |
 
-**Drift flag:** canonical PRD §9 (41-55h) é mais otimista que raw arithmetic (45-69h). Diferença = ~4h de overhead de sub-agent setup entre phases. PRD canônico é o "commitment ao produto"; ROADMAP raw é o "execution reality".
+**Drift flag:** canonical PRD §9 (41-55h) é mais otimista que raw arithmetic (45-63h). Diferença = ~4h de overhead de sub-agent setup entre phases. PRD canônico é o "commitment ao produto"; ROADMAP raw é o "execution reality".
 
 **Nota D-002:** canonical é a estimativa comunicada; raw é o que vai sair na prática com phase splits. Diferença = overhead de sub-agent setup + integration entre phases. PRD canonical é o que importa pro plano de produto; raw é o que importa pra execução single-dev.
 

@@ -3430,7 +3430,6 @@
     svg[data-preset="blueprint"] .c-grid {
       stroke-dasharray: 1 3;
       opacity: 0.78;
-      display: none;
     }
     svg[data-preset="blueprint"] .c-region {
       fill: color-mix(in srgb, var(--cloud-fill) 58%, transparent);
@@ -3859,15 +3858,15 @@
         <path data-edge-from="human" data-edge-to="agents" data-edge-label="prompts" data-edge-key="0" data-edge-id="human-agents" data-composition-points="200,170;360,170" d="M 200 170 L 360 170" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="node22" data-edge-to="sqlite-ext" data-edge-key="1" data-edge-id="node-host-sqlite" data-composition-points="200,324;360,324" d="M 200 324 L 360 324" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="sqlite-ext" data-edge-to="onnx-rt" data-edge-key="2" data-edge-id="sqlite-host-onnx" data-composition-points="480,324;640,324" d="M 480 324 L 640 324" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="agents" data-edge-to="sqlite-ext" data-edge-label="POST /augment" data-edge-key="3" data-edge-id="agents-sqliteext" data-composition-points="420,200;420,247;420,247;420,294" d="M 420 200 L 420 247 L 420 247 L 420 294" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="agents" data-edge-to="sqlite-ext" data-edge-label="host process transit" data-edge-key="3" data-edge-id="agents-sqliteext" data-composition-points="420,200;420,247;420,247;420,294" d="M 420 200 L 420 247 L 420 247 L 420 294" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="sqlite-ext" data-edge-to="sdk" data-edge-key="4" data-edge-id="sqliteext-sdk" data-composition-points="420,354;420,448" d="M 420 354 L 420 448" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="ui-panel" data-edge-to="state-toggle" data-edge-key="5" data-edge-id="ui-toggle" data-composition-points="140,508;140,602" d="M 140 508 L 140 602" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="fast-agent" data-edge-to="intel-store" data-edge-label="write Intel" data-edge-key="6" data-edge-id="fastagent-intel" data-composition-points="700,508;700,555;700,555;700,602" d="M 700 508 L 700 555 L 700 555 L 700 602" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="sdk" data-edge-to="server" data-edge-key="7" data-edge-id="sdk-server" data-composition-points="420,508;420,602" d="M 420 508 L 420 602" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="sdk" data-edge-to="server" data-edge-label="POST /augment" data-edge-key="7" data-edge-id="sdk-server" data-composition-points="420,508;420,602" d="M 420 508 L 420 602" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="state-toggle" data-edge-to="state-json" data-edge-key="8" data-edge-id="toggle-json" data-composition-points="140,662;140,756" d="M 140 662 L 140 756" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="intel-store" data-edge-to="match-script" data-edge-label="read Intel" data-edge-key="9" data-edge-id="intel-match" data-composition-points="700,662;700,709;700,709;700,756" d="M 700 662 L 700 709 L 700 709 L 700 756" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="server" data-edge-to="augmenter" data-edge-label="retrieve" data-edge-key="10" data-edge-id="server-augmenter" data-composition-points="420,662;280,662;280,910;140,910" d="M 420 662 L 288 662 Q 280 662 280 670 L 280 902 Q 280 910 272 910 L 140 910" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="audit-buffer" data-edge-to="augmenter" data-edge-label="log retrieve" data-edge-key="11" data-edge-id="audit-augmenter" data-composition-points="420,816;280,816;280,910;140,910" d="M 420 816 L 288 816 Q 280 816 280 824 L 280 902 Q 280 910 272 910 L 140 910" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="augmenter" data-edge-to="audit-buffer" data-edge-label="log retrieve" data-edge-key="11" data-edge-id="augmenter-audit" data-composition-points="200,940;280,940;280,786;360,786" d="M 200 940 L 272 940 Q 280 940 280 932 L 280 794 Q 280 786 288 786 L 360 786" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="match-script" data-edge-to="augmenter" data-edge-label="suffix inject" data-edge-key="12" data-edge-id="match-augmenter" data-composition-points="700,816;700,878;80,878;80,940" d="M 700 816 L 700 870 Q 700 878 692 878 L 88 878 Q 80 878 80 886 L 80 940" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="augmenter" data-edge-to="search" data-edge-key="13" data-edge-id="augmenter-search" data-composition-points="200,940;360,940" d="M 200 940 L 360 940" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="search" data-edge-to="social-detector" data-edge-label="guard" data-edge-key="14" data-edge-id="search-social" data-composition-points="480,940;640,940" d="M 480 940 L 640 940" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
@@ -3878,6 +3877,11 @@
         <path data-edge-from="sqlite" data-edge-to="embed-model" data-edge-key="19" data-edge-id="sqlite-embed" data-composition-points="200,1248;360,1248" d="M 200 1248 L 360 1248" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="embed-model" data-edge-to="catalog-yaml" data-edge-key="20" data-edge-id="embed-yaml" data-composition-points="480,1248;640,1248" d="M 480 1248 L 640 1248" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="catalog-yaml" data-edge-to="sqlite" data-edge-label="load (cold)" data-edge-key="21" data-edge-id="yaml-sqlite" data-composition-points="700,1218;820,1240;820,1320;180,1320;200,1248" d="M 700 1218 L 812.1311475409836 1238.5573770491803 Q 820 1240 820 1248 L 820 1312 Q 820 1320 812 1320 L 188 1320 Q 180 1320 182.14115091028876 1312.2918567229606 L 200 1248" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="server" data-edge-to="fast-agent" data-edge-label="forward augmented" data-edge-key="22" data-edge-id="server-fastagent" data-composition-points="480,632;560,632;560,478;640,478" d="M 480 632 L 552 632 Q 560 632 560 624 L 560 486 Q 560 478 568 478 L 640 478" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="fast-agent" data-edge-to="minimax-api" data-edge-label="call provider" data-edge-key="23" data-edge-id="fastagent-minimax" data-composition-points="700,448;1100,478;1100,170;730,170;700,200" d="M 700 448 L 1092.0224055208923 477.4016804140669 Q 1100 478 1100 470 L 1100 178 Q 1100 170 1092 170 L 738 170 Q 730 170 724.3431457505076 175.65685424949237 L 700 200" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="minimax-api" data-edge-to="fast-agent" data-edge-label="read R_N" data-edge-key="24" data-edge-id="minimax-fastagent-read" data-composition-points="700,200;1100,170;1100,478;760,478" d="M 700 200 L 1092.0224055208923 170.59831958593307 Q 1100 170 1100 178 L 1100 470 Q 1100 478 1092 478 L 760 478" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="catalog" data-edge-to="sqlite" data-edge-label="ingest YAML" data-edge-key="25" data-edge-id="catalog-sqlite" data-composition-points="140,1124;140,1218" d="M 140 1124 L 140 1218" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="catalog" data-edge-to="embed-model" data-edge-label="compute embeddings" data-edge-key="26" data-edge-id="catalog-embed" data-composition-points="140,1124;280,1124;280,1218;420,1218" d="M 140 1124 L 272 1124 Q 280 1124 280 1132 L 280 1210 Q 280 1218 288 1218 L 420 1218" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
         <!-- Components -->
         <g id="node-human" data-node-id="human" data-node-label="Human" tabindex="0" role="button" aria-label="Focus Human, operator, Módulo 1 — External (boundary human/machine)" aria-pressed="false" data-node-kind="external" data-node-sublabel="operator" data-node-tag="actor" data-node-context="Módulo 1 — External (boundary human/machine)">
@@ -3893,8 +3897,8 @@
         <text data-detail="fine" x="140" y="192" class="t-external" font-size="7" text-anchor="middle">actor</text>
         </g>
 
-        <g id="node-agents" data-node-id="agents" data-node-label="Agents" tabindex="0" role="button" aria-label="Focus Agents, Claude Code · Aider · Cursor, Módulo 1 — External (boundary human/machine)" aria-pressed="false" data-node-kind="external" data-node-sublabel="Claude Code · Aider · Cursor" data-node-tag="consumer" data-node-context="Módulo 1 — External (boundary human/machine)">
-          <title>Agents · Claude Code · Aider · Cursor · Módulo 1 — External (boundary human/machine) · consumer</title>
+        <g id="node-agents" data-node-id="agents" data-node-label="Agents" tabindex="0" role="button" aria-label="Focus Agents, Claude Code (MVP) · v3.1+: Aider, Cursor, Módulo 1 — External (boundary human/machine)" aria-pressed="false" data-node-kind="external" data-node-sublabel="Claude Code (MVP) · v3.1+: Aider, Cursor" data-node-tag="consumer" data-node-context="Módulo 1 — External (boundary human/machine)">
+          <title>Agents · Claude Code (MVP) · v3.1+: Aider, Cursor · Módulo 1 — External (boundary human/machine) · consumer</title>
           <rect x="360" y="140" width="120" height="60" rx="6" class="c-mask"/>
           <rect x="360" y="140" width="120" height="60" rx="6" class="c-external" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(366 146) scale(0.6875)">
@@ -3902,7 +3906,7 @@
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
           <text data-detail-anchor x="420" y="168" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Agents</text>
-        <text data-detail="context" x="420" y="184" class="t-muted" font-size="9" text-anchor="middle">Claude Code · Aider · Cursor</text>
+        <text data-detail="context" x="420" y="184" class="t-muted" font-size="9" text-anchor="middle">Claude Code (MVP) · v3.1+: Aider, Cursor</text>
         <text data-detail="fine" x="420" y="192" class="t-external" font-size="7" text-anchor="middle">consumer</text>
         </g>
 
@@ -3970,27 +3974,27 @@
         <text data-detail="fine" x="140" y="500" class="t-frontend" font-size="7" text-anchor="middle">control</text>
         </g>
 
-        <g id="node-sdk" data-node-id="sdk" data-node-label="@memory-studio/sdk" tabindex="0" role="button" aria-label="Focus @memory-studio/sdk, TS · zero deps, Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="TS · zero deps" data-node-tag="client" data-node-context="Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)">
-          <title>@memory-studio/sdk · TS · zero deps · Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms) · client</title>
+        <g id="node-sdk" data-node-id="sdk" data-node-label="@memory-studio/sdk" tabindex="0" role="button" aria-label="Focus @memory-studio/sdk, TS · ~50KB · zero deps, Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="TS · ~50KB · zero deps" data-node-tag="client" data-node-context="Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)">
+          <title>@memory-studio/sdk · TS · ~50KB · zero deps · Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms) · client</title>
           <rect x="360" y="448" width="120" height="60" rx="6" class="c-mask"/>
           <rect x="360" y="448" width="120" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(366 454) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-detail-anchor x="420" y="476" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">@memory-studio/sdk</text>
-        <text data-detail="context" x="420" y="492" class="t-muted" font-size="9" text-anchor="middle">TS · zero deps</text>
+        <text data-detail="context" x="420" y="492" class="t-muted" font-size="9" text-anchor="middle">TS · ~50KB · zero deps</text>
         <text data-detail="fine" x="420" y="500" class="t-backend" font-size="7" text-anchor="middle">client</text>
         </g>
 
-        <g id="node-fast-agent" data-node-id="fast-agent" data-node-label="Fast Agent" tabindex="0" role="button" aria-label="Focus Fast Agent, MiniMax-M2.7 in-process, Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="MiniMax-M2.7 in-process" data-node-tag="P6 ⚡" data-node-context="Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)">
-          <title>Fast Agent · MiniMax-M2.7 in-process · Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms) · P6 ⚡</title>
+        <g id="node-fast-agent" data-node-id="fast-agent" data-node-label="Fast Agent" tabindex="0" role="button" aria-label="Focus Fast Agent, MiniMax-M2.7-highspeed in-process, Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="MiniMax-M2.7-highspeed in-process" data-node-tag="P6 ⚡" data-node-context="Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)">
+          <title>Fast Agent · MiniMax-M2.7-highspeed in-process · Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms) · P6 ⚡</title>
           <rect x="640" y="448" width="120" height="60" rx="6" class="c-mask"/>
           <rect x="640" y="448" width="120" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(646 454) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-detail-anchor x="700" y="476" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Fast Agent</text>
-        <text data-detail="context" x="700" y="492" class="t-muted" font-size="9" text-anchor="middle">MiniMax-M2.7 in-process</text>
+        <text data-detail="context" x="700" y="492" class="t-muted" font-size="9" text-anchor="middle">MiniMax-M2.7-highspeed in-process</text>
         <text data-detail="fine" x="700" y="500" class="t-backend" font-size="7" text-anchor="middle">P6 ⚡</text>
         </g>
 
@@ -4018,8 +4022,8 @@
         <text data-detail="fine" x="420" y="654" class="t-backend" font-size="7" text-anchor="middle">edge</text>
         </g>
 
-        <g id="node-intel-store" data-node-id="intel-store" data-node-label="Intel Store" tabindex="0" role="button" aria-label="Focus Intel Store, {state,nextNeeds,topic}, Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)" aria-pressed="false" data-node-kind="database" data-node-sublabel="{state,nextNeeds,topic}" data-node-tag="P6 ⚡" data-node-context="Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)">
-          <title>Intel Store · {state,nextNeeds,topic} · Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms) · P6 ⚡</title>
+        <g id="node-intel-store" data-node-id="intel-store" data-node-label="Intel Store" tabindex="0" role="button" aria-label="Focus Intel Store, {agentState,nextNeeds,recentTopic}, Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)" aria-pressed="false" data-node-kind="database" data-node-sublabel="{agentState,nextNeeds,recentTopic}" data-node-tag="P6 ⚡" data-node-context="Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms)">
+          <title>Intel Store · {agentState,nextNeeds,recentTopic} · Módulo 3 — Produto · Hot Path (síncrono, p50&lt;50ms) · P6 ⚡</title>
           <rect x="640" y="602" width="120" height="60" rx="6" class="c-mask"/>
           <rect x="640" y="602" width="120" height="60" rx="6" class="c-database" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(646 608) scale(0.6875)">
@@ -4027,7 +4031,7 @@
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
           <text data-detail-anchor x="700" y="630" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Intel Store</text>
-        <text data-detail="context" x="700" y="646" class="t-muted" font-size="9" text-anchor="middle">{state,nextNeeds,topic}</text>
+        <text data-detail="context" x="700" y="646" class="t-muted" font-size="9" text-anchor="middle">{agentState,nextNeeds,recentTopic}</text>
         <text data-detail="fine" x="700" y="654" class="t-database" font-size="7" text-anchor="middle">P6 ⚡</text>
         </g>
 
@@ -4128,8 +4132,8 @@
         <text data-detail="fine" x="420" y="1116" class="t-backend" font-size="7" text-anchor="middle">hot</text>
         </g>
 
-        <g id="node-fts5-vec" data-node-id="fts5-vec" data-node-label="FTS5+vec" tabindex="0" role="button" aria-label="Focus FTS5+vec, search engine (módulo 5), Módulo 4 — Produto · Pipeline (retrieval core)" aria-pressed="false" data-node-kind="database" data-node-sublabel="search engine (módulo 5)" data-node-tag="engine" data-node-context="Módulo 4 — Produto · Pipeline (retrieval core)">
-          <title>FTS5+vec · search engine (módulo 5) · Módulo 4 — Produto · Pipeline (retrieval core) · engine</title>
+        <g id="node-fts5-vec" data-node-id="fts5-vec" data-node-label="FTS5+vec" tabindex="0" role="button" aria-label="Focus FTS5+vec, search engine, Módulo 4 — Produto · Pipeline (retrieval core)" aria-pressed="false" data-node-kind="database" data-node-sublabel="search engine" data-node-tag="engine" data-node-context="Módulo 4 — Produto · Pipeline (retrieval core)">
+          <title>FTS5+vec · search engine · Módulo 4 — Produto · Pipeline (retrieval core) · engine</title>
           <rect x="640" y="1064" width="120" height="60" rx="6" class="c-mask"/>
           <rect x="640" y="1064" width="120" height="60" rx="6" class="c-database" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(646 1070) scale(0.6875)">
@@ -4137,7 +4141,7 @@
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
           <text data-detail-anchor x="700" y="1092" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">FTS5+vec</text>
-        <text data-detail="context" x="700" y="1108" class="t-muted" font-size="9" text-anchor="middle">search engine (módulo 5)</text>
+        <text data-detail="context" x="700" y="1108" class="t-muted" font-size="9" text-anchor="middle">search engine</text>
         <text data-detail="fine" x="700" y="1116" class="t-database" font-size="7" text-anchor="middle">engine</text>
         </g>
 
@@ -4154,15 +4158,15 @@
         <text data-detail="fine" x="140" y="1270" class="t-database" font-size="7" text-anchor="middle">data</text>
         </g>
 
-        <g id="node-embed-model" data-node-id="embed-model" data-node-label="Embedding Model" tabindex="0" role="button" aria-label="Focus Embedding Model, mE5-small ONNX 384d, Módulo 5 — Storage (runtime data)" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="mE5-small ONNX 384d" data-node-tag="ONNX" data-node-context="Módulo 5 — Storage (runtime data)">
-          <title>Embedding Model · mE5-small ONNX 384d · Módulo 5 — Storage (runtime data) · ONNX</title>
+        <g id="node-embed-model" data-node-id="embed-model" data-node-label="Embedding Model" tabindex="0" role="button" aria-label="Focus Embedding Model, multilingual-e5-small ONNX 384d, Módulo 5 — Storage (runtime data)" aria-pressed="false" data-node-kind="cloud" data-node-sublabel="multilingual-e5-small ONNX 384d" data-node-tag="ONNX" data-node-context="Módulo 5 — Storage (runtime data)">
+          <title>Embedding Model · multilingual-e5-small ONNX 384d · Módulo 5 — Storage (runtime data) · ONNX</title>
           <rect x="360" y="1218" width="120" height="60" rx="6" class="c-mask"/>
           <rect x="360" y="1218" width="120" height="60" rx="6" class="c-cloud" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="cloud" class="semantic-sigil s-cloud" transform="translate(366 1224) scale(0.6875)">
             <path d="M4.3 12.5h7.3a2.4 2.4 0 0 0 .2-4.8 4 4 0 0 0-7.5-1.3A3.1 3.1 0 0 0 4.3 12.5Z"/>
           </g>
           <text data-detail-anchor x="420" y="1246" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Embedding Model</text>
-        <text data-detail="context" x="420" y="1262" class="t-muted" font-size="9" text-anchor="middle">mE5-small ONNX 384d</text>
+        <text data-detail="context" x="420" y="1262" class="t-muted" font-size="9" text-anchor="middle">multilingual-e5-small ONNX 384d</text>
         <text data-detail="fine" x="420" y="1270" class="t-cloud" font-size="7" text-anchor="middle">ONNX</text>
         </g>
 
@@ -4186,9 +4190,9 @@
         </g>
 
 
-        <g data-detail="context" data-edge-from="agents" data-edge-to="sqlite-ext" data-edge-label="POST /augment" data-edge-key="3" data-edge-id="agents-sqliteext">
-          <rect x="383.8" y="235" width="72.4" height="14" rx="3" class="c-mask"/>
-          <text x="420" y="245" class="t-backend" font-size="8" text-anchor="middle">POST /augment</text>
+        <g data-detail="context" data-edge-from="agents" data-edge-to="sqlite-ext" data-edge-label="host process transit" data-edge-key="3" data-edge-id="agents-sqliteext">
+          <rect x="367" y="235" width="106" height="14" rx="3" class="c-mask"/>
+          <text x="420" y="245" class="t-backend" font-size="8" text-anchor="middle">host process transit</text>
         </g>
 
 
@@ -4196,7 +4200,10 @@
           <rect x="668.6" y="543" width="62.8" height="14" rx="3" class="c-mask"/>
           <text x="700" y="553" class="t-muted" font-size="8" text-anchor="middle">write Intel</text>
         </g>
-
+        <g data-detail="context" data-edge-from="sdk" data-edge-to="server" data-edge-label="POST /augment" data-edge-key="7" data-edge-id="sdk-server">
+          <rect x="383.8" y="512" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="420" y="522" class="t-backend" font-size="8" text-anchor="middle">POST /augment</text>
+        </g>
 
         <g data-detail="context" data-edge-from="intel-store" data-edge-to="match-script" data-edge-label="read Intel" data-edge-key="9" data-edge-id="intel-match">
           <rect x="671" y="697" width="58" height="14" rx="3" class="c-mask"/>
@@ -4206,7 +4213,7 @@
           <rect x="255.8" y="766" width="48.4" height="14" rx="3" class="c-mask"/>
           <text x="280" y="776" class="t-backend" font-size="8" text-anchor="middle">retrieve</text>
         </g>
-        <g data-detail="context" data-edge-from="audit-buffer" data-edge-to="augmenter" data-edge-label="log retrieve" data-edge-key="11" data-edge-id="audit-augmenter">
+        <g data-detail="context" data-edge-from="augmenter" data-edge-to="audit-buffer" data-edge-label="log retrieve" data-edge-key="11" data-edge-id="augmenter-audit">
           <rect x="246.2" y="843" width="67.6" height="14" rx="3" class="c-mask"/>
           <text x="280" y="853" class="t-messagebus" font-size="8" text-anchor="middle">log retrieve</text>
         </g>
@@ -4234,6 +4241,26 @@
         <g data-detail="context" data-edge-from="catalog-yaml" data-edge-to="sqlite" data-edge-label="load (cold)" data-edge-key="21" data-edge-id="yaml-sqlite">
           <rect x="788.6" y="1260" width="62.8" height="14" rx="3" class="c-mask"/>
           <text x="820" y="1270" class="t-messagebus" font-size="8" text-anchor="middle">load (cold)</text>
+        </g>
+        <g data-detail="context" data-edge-from="server" data-edge-to="fast-agent" data-edge-label="forward augmented" data-edge-key="22" data-edge-id="server-fastagent">
+          <rect x="514.2" y="535" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="560" y="545" class="t-backend" font-size="8" text-anchor="middle">forward augmented</text>
+        </g>
+        <g data-detail="context" data-edge-from="fast-agent" data-edge-to="minimax-api" data-edge-label="call provider" data-edge-key="23" data-edge-id="fastagent-minimax">
+          <rect x="1063.8" y="304" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="1100" y="314" class="t-backend" font-size="8" text-anchor="middle">call provider</text>
+        </g>
+        <g data-detail="context" data-edge-from="minimax-api" data-edge-to="fast-agent" data-edge-label="read R_N" data-edge-key="24" data-edge-id="minimax-fastagent-read">
+          <rect x="1075.8" y="304" width="48.4" height="14" rx="3" class="c-mask"/>
+          <text x="1100" y="314" class="t-backend" font-size="8" text-anchor="middle">read R_N</text>
+        </g>
+        <g data-detail="context" data-edge-from="catalog" data-edge-to="sqlite" data-edge-label="ingest YAML" data-edge-key="25" data-edge-id="catalog-sqlite">
+          <rect x="108.6" y="1128" width="62.8" height="14" rx="3" class="c-mask"/>
+          <text x="140" y="1138" class="t-messagebus" font-size="8" text-anchor="middle">ingest YAML</text>
+        </g>
+        <g data-detail="context" data-edge-from="catalog" data-edge-to="embed-model" data-edge-label="compute embeddings" data-edge-key="26" data-edge-id="catalog-embed">
+          <rect x="371.8" y="1128" width="96.39999999999999" height="14" rx="3" class="c-mask"/>
+          <text x="420" y="1138" class="t-messagebus" font-size="8" text-anchor="middle">compute embeddings</text>
         </g>
 
         <!-- Legend -->
