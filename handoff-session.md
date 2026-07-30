@@ -693,3 +693,33 @@ Tu apontou: "handoff-session está enorme, n sei como resolver agora".
 | `7142ef6` | `.gitignore` hardening (`.env.*` glob) |
 
 **Estado final (atualizado v6):** Working tree contém `custom-farol.html.bak` (untracked, preservado). origin/main em `7dfd058`. PRD v3.4 + PLAN v3 + SPEC v2 + ROADMAP v5 (reformatado v6) + BACKLOG (13 entries) + .gitignore hardened + farol unificado + 19 consistency fixes + ARCHITECTURE.md v2 + **CLAUDE.md Testing contract + LESSONS store (readiness fechado)**. **Phase 0 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.**
+
+---
+
+### Marco 28 — Handoff next-session focus (mattpocock-skills:handoff invocado)
+
+Em 2026-07-30, invocaste `/mattpocock-skills:handoff "deixe os detalhes pertinentes que estamos prontos para rodar o roadmap loop."` A skill tem `disable-model-invocation: true` no frontmatter (não invocável via Skill tool). Decisão tomada em vez disso:
+
+**Por que NÃO `%TEMP%/handoff-<session>.md`:** caminho absoluto fora do repo, sem auto-discovery, volátil no Windows. Próximo agente fresh não saberia onde procurar.
+
+**Por que SIM `handoff-session.md` versionado:** já é o handoff cross-session canônico (frontmatter + Índice cronológico + TL;DR + Marcos 1-27 + `## Onde estamos` + Estado final v6). Aponta tu que está versionado no repo, navegável, durável, e o frontmatter `session_end: 2026-07-29-final-v6` é o que o próximo agent vai ler via CLAUDE.md/MEMORY.md.
+
+**Decisão registrada:** mattpocock handoff skill é redundante dado que `handoff-session.md` versionado já cumpre o papel. Em futuras sessões, se quiseres handoff transitório intra-conversa, considerar (a) escrever em `.scratch/handoff-<session>.md` (dentro do repo) + pointer no MEMORY.md; ou (b) continuar com `handoff-session.md` append-only.
+
+**Próxima sessão — pronto para rodar roadmap loop:**
+
+1. **Invocar `tlc-roadmap-loop`** em `.specs/ROADMAP.md`
+2. Phase picker escolhe Phase 0 (primeira `[ ]` sem deps)
+3. Planner dispatcha, gera `.specs/features/phase-0-environment-validation/spec.md` atômico
+4. Implementer cria `scripts/verify-env.mjs` + `.memory-studio/setup.md` (per ROADMAP L111-113)
+5. Verifier roda 6 checks (Node v22, onnxruntime-node install, FTS5, sqlite-vec, ONNX 384d, state.json write)
+6. Verifier PASS → flip `[ ]` → `[x]` na Phase 0 → STATE.md `## Handoff` updated → commit
+7. Loop continua Phase 1 → 2 → ... até todas `[x]` ou escalação
+
+**Pré-condições verificadas (Waldemar 4/4):**
+- ✅ Fast feedback (`npm test`, `tsc --noEmit` segundos; Phase 0 única exceção — 1 download ONNX 470MB)
+- ✅ Reliable stop condition (Verifier PASS/FAIL binary + ROADMAP Done criteria binários por phase)
+- ✅ Sufficient backlog (11 phases)
+- ✅ Clear project glue (CLAUDE.md Testing contract — substitui AGENTS.md)
+
+**Argumento passado:** "deixe os detalhes pertinentes que estamos prontos para rodar o roadmap loop."
