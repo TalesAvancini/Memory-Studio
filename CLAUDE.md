@@ -117,3 +117,35 @@ Issues e specs vivem como arquivos markdown em `.scratch/<feature>/` (local-only
 ### Domain docs
 
 Layout single-context: `CONTEXT.md` + `docs/adr/` na raiz quando criados. Currently o conteúdo de glossary/domain context mora em `CLAUDE.md` (sections Glossary / Authority boundaries / Cross-references) — não duplicar até `/domain-modeling` materializar. See `docs/agents/domain.md`.
+
+---
+
+## Testing contract (sub-agent project glue)
+
+> **Equivalente a `AGENTS.md`** — pre-condition Waldemar #4 do `tlc-roadmap-loop` SKILL.md. Sub-agentes do loop lêem esta seção automaticamente porque CLAUDE.md é auto-injected.
+
+**Stack:** Node 22 LTS (ESM), TypeScript, Fastify, SQLite + FTS5 + sqlite-vec, multilingual-e5-small ONNX 384d. Ver `package.json` engines.
+
+**Comandos de gate (rodam antes de qualquer commit):**
+
+```bash
+npm test              # Node 22 test runner (test/)
+npm run typecheck     # tsc --noEmit
+npm run catalog:load  # tsx src/catalog/cli.ts (cold-path ingest)
+```
+
+**Onde os testes vivem:** `test/` no raiz. Convenções:
+- `test/<module>/<name>.test.mjs` — unit tests por módulo
+- `test/smoke.test.mjs` — smoke test (roda sempre)
+- `test/search/*.test.mjs` — discrimination sensor + RRF tests
+- Cobertura: `npm run test:coverage`
+
+**Quality bar:**
+- Test runner decide se passa — não self-assessment
+- 1 atomic commit por task (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`)
+- Tests derivam de spec acceptance criteria — never mirror implementation
+- Gate must pass before commit (test runner decides)
+
+**Pre-flight Phase 0:** `scripts/verify-env.mjs` valida ambiente (Node 22 + onnxruntime-node + FTS5 + sqlite-vec + ONNX 384d + state.json write). Roda **1 vez** antes de Phase 1; cache local do modelo persiste nas phases seguintes.
+
+**Authority dentro de phases:** Implementer commita sem confirmação (auto-commit inside loop). Verifier valida via spec-anchored check + discrimination sensor. Ver `.specs/ARCHITECTURE.md` (farol textual com stable IDs).

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Windows shim: python3 → py launcher
+exec py "$@"
