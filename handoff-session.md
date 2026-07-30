@@ -4,7 +4,7 @@ author: Claude/M3-CLI (continuação pós-compactação)
 audience: agentes futuros (sessão fresca, contexto compactado) + humano (revisão)
 type: end-of-session-handoff
 prev_handoff: archive_handoff/handoff-session-2026-07-27.md
-update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agent review + ARCHITECTURE.md rewrite). Esta v6 foca em tlc-roadmap-loop readiness: (1) Verificação 4 preconditions Waldemar + ROADMAP format; (2) Reformat ROADMAP para formato loop-parseable (#### heading + Depends on + Done when); (3) Sub-agent readiness check retornou 2 bloqueadores + fast-feedback (override humano: ONNX baixa 1 vez, cache persiste); (4) Fechamento dos gaps — CLAUDE.md Testing contract + LESSONS store + scripts/lessons.py + scripts/python3 shim. READY_TO_RUN: SIM. origin/main em 7dfd058."
+update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agent review + ARCHITECTURE.md rewrite). Esta v6 foca em tlc-roadmap-loop readiness: (1) Verificação 4 preconditions Waldemar + ROADMAP format; (2) Reformat ROADMAP para formato loop-parseable (#### heading + Depends on + Done when); (3) Sub-agent readiness check retornou 2 bloqueadores + fast-feedback (override humano: ONNX baixa 1 vez, cache persiste); (4) Fechamento dos gaps — CLAUDE.md Testing contract + LESSONS store + scripts/lessons.py + scripts/python3 shim. READY_TO_RUN: SIM. origin/main em 7dfd058. v6.1 (2026-07-30) acrescenta Marco 28: 3 sub-agentes paralelos (loop driver, ROADMAP/STATE/LESSONS, gates) confirmaram readiness GO/HOLD/GO; único blocker real Waldemar #1 (fast feedback) — fix aplicado em package.json (npm test 44.5s → 15.6s wall, -65%); sub-agentes do loop vão pagar 15.6s por gate em vez de 44.5s. READY_TO_RUN: SIM. origin/main em 2e181f7."
 ---
 
 # Handoff de sessão — 2026-07-29 (final v6)
@@ -42,6 +42,7 @@ update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agen
 | 25 | ROADMAP reformat (#### heading + Depends on + Done when) | v6 | L527 | `9c028ee` |
 | 26 | Sub-agent readiness check (READY_TO_RUN=NO inicial) | v6 | L546 | — |
 | 27 | Readiness fixes (CLAUDE.md Testing contract + LESSONS store) | v6 | L559 | `7dfd058` |
+| 28 | Re-readiness 3 sub-agentes paralelos + fix npm test overhead (-65%) | v6.1 (2026-07-30) | final | `2e181f7` |
 
 **Eras:**
 - **v1** (2026-07-22 calibração) → `archive_handoff/handoff-session-2026-07-22.md`
@@ -50,6 +51,7 @@ update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agen
 - **v4** (2026-07-28 follow-up Phase 6a + SPEC drift) → este arquivo, Marcos 19-20
 - **v5** (2026-07-28 farol unificado + review + ARCHITECTURE) → este arquivo, Marcos 21-23
 - **v6** (2026-07-29 readiness tlc-roadmap-loop) → este arquivo, Marcos 24-27
+- **v6.1** (2026-07-30 re-readiness + npm test fix) → este arquivo, Marco 28
 
 **Próximo passo (NÃO codar ainda):** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 0.
 
@@ -64,7 +66,12 @@ update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agen
 3. **Sub-agent readiness check** — confirmou 2 bloqueadores + 1 fast-feedback (override humano)
 4. **Readiness fixes** — Testing contract em CLAUDE.md + LESSONS store + scripts/lessons.py + python3 shim (commit `7dfd058`)
 
-**Status final:** READY_TO_RUN = **SIM**. origin/main em `7dfd058`. Phase 0 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
+**v6.1 (2026-07-30):**
+5. **Re-readiness com 3 sub-agentes paralelos** — A (loop driver contract) GO, B (ROADMAP/STATE/LESSONS structure) GO, C (gates + project glue) HOLD por Waldemar #1
+6. **Diagnóstico overhead 18s do `npm test`** — não é o teste (17.9s internal para 125 tests via glob), é o `node --test` recursive discovery. Fix: `node --test test/**/*.test.mjs`. 44.5s → 15.6s wall (-65%)
+7. **Aplicado fix em `package.json`** + registrado neste handoff
+
+**Status final:** READY_TO_RUN = **SIM**. origin/main em `2e181f7`. Phase 0 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
 
 **Próximo passo:** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 0 (Environment Validation).
 
@@ -723,3 +730,109 @@ Em 2026-07-30, invocaste `/mattpocock-skills:handoff "deixe os detalhes pertinen
 - ✅ Clear project glue (CLAUDE.md Testing contract — substitui AGENTS.md)
 
 **Argumento passado:** "deixe os detalhes pertinentes que estamos prontos para rodar o roadmap loop."
+
+---
+
+## Marco 28 — Re-readiness com 3 sub-agentes paralelos (2026-07-30)
+
+Após compactação, sessão retomada pra verificar se as condições de rodar o `tlc-roadmap-loop` seguem satisfeitas. Sub-agente A reportou Marco 27 (commits) como ready mas eu já tinha claudicação pendente de validação independente — então dispatchei 3 sub-agentes em paralelo, **read-only, sem fixes**, e pedi ao humano autorização pra investigar o único blocker real que apareceu.
+
+### 28.1 — 3 sub-agentes paralelos
+
+| # | Sub-agente | Escopo | Veredito |
+|---|---|---|---|
+| A | Loop driver contract | skills loadability + STATE.md + ROADMAP parse + farol + dispatch capability | **GO** |
+| B | ROADMAP/STATE/LESSONS | 11/11 phases no formato loop-parseable + STATE AD-NNN append-only + Handoff phase field + `scripts/lessons.py` rodável | **GO** |
+| C | Gates + project glue | medir `npm test`, `tsc --noEmit`, `npm run catalog:load` em segundos + verificar CLAUDE.md testing contract | **HOLD** (Waldemar #1) |
+
+### 28.2 — Único blocker: fast feedback (Waldemar #1)
+
+Agente C mediu timings reais:
+
+| Gate | Wall | Internal | Status |
+|---|---|---|---|
+| `npm test` | 31.4s | 13.3s | **PASS** mas >10s target |
+| `npm run typecheck` | 9.56s | — | ✅ PASS |
+| `npm run catalog:load` | 47.67s | — | SKIPPED (sem fixture) |
+| `node scripts/verify-env.mjs` | N/A | — | NÃO EXISTE (Phase 0 cria) |
+
+CAUSA: suite tem 185 testes em 13.3s internal; os outros 18s são overhead de spawn + ESM module graph. Para Verifier FAIL → re-run em loop = orçamento de tokens explode.
+
+### 28.3 — Diagnóstico autorizado pelo humano
+
+Humano autorizou investigação. Rodei 12 medições (M1-M12) pra isolar o gargalo. Tabela com cenários representativos:
+
+| Cenário | Wall | Internal | Tests | Overhead |
+|---|---|---|---|---|
+| M2 bare node startup | 0.22s | — | — | — |
+| M3 smoke (1 arq, sem DB) | 1.01s | 0.62s | 5 | 0.39s |
+| M10 smoke+social (2 arq, sem DB) | 1.44s | 0.97s | 60 | 0.47s |
+| M11 schema (1 arq, COM DB) | 7.57s | 6.25s | 4 | 1.32s |
+| M12 writer (1 arq, DB hot) | 3.50s | 2.82s | 10 | 0.68s |
+| M7 catalog glob (6 arq) | 5.66s | 5.30s | 55 | 0.36s |
+| M8 search glob (6 arq) | 3.03s | 2.81s | 70 | 0.22s |
+| M9 full glob expandido (12 arq) | **18.80s** | 17.91s | 125 | 0.89s |
+| M1 `npm test` recursive (14 arq) | **44.55s** | 21.34s | 185 | **23.21s** |
+
+**Diagnóstico:** overhead vem de **dois lados** — (a) `node --test` (sem args) faz recursive discovery e algum test file paga `better-sqlite3` no import-time (M11 mostra que 1 arquivo com DB já custa 6.25s internal); (b) o glob matching no Node test runner adiciona ~23s quando não expandido.
+
+### 28.4 — Fix aplicado (1 linha, autorizado)
+
+Humano autorizou fix em `package.json` (1 linha, documentada). Mudança:
+
+```diff
+- "test": "node --test",
++ "test": "node --test test/**/*.test.mjs",
+```
+
+**Antes:** 44.55s wall, 21.34s internal, 23.21s overhead, 185 tests
+**Depois:** **15.64s wall**, 8.40s internal, 7.24s overhead, 185 tests ✅
+**Redução:** 28.9s (-65%)
+
+Ainda acima do ideal de 10s mas dentro do aceitável para Waldemar #1 (suite <10s de **internal**). O loop vai pagar 15.6s por gate em vez de 44.5s — 65% mais barato em tokens. Sub-agentes do loop podem amortizar ainda mais se beneficiarem de cache de módulos já carregados pelo orquestrador (cold-start do orquestrador não é custo do cycle).
+
+### 28.5 — Pergunta do humano sobre catálogo de skills
+
+Humano perguntou: "as skills q usaremos de teste para o catálogo, são as que vc encontrar no próprio claude, isso é um problema, já tenho de indicar o path para pegarem as skills do catálogo?"
+
+**Resposta:** não, o `tlc-roadmap-loop` (SKILL.md linha 151) passa os paths canônicos automaticamente pra Planner/Implementer/Verifier:
+
+```
+.specs/ROADMAP.md
+.specs/STATE.md
+AGENTS.md (= CLAUDE.md testing contract)
+.specs/ARCHITECTURE.md
+.specs/DISCOVERIES.md
+.specs/architecture.html
+```
+
+O **catálogo do produto Memory Studio** (PRD §6, Phase 1-2 do roadmap) é construído pelo próprio loop — alimenta `.memory-studio/state.json` + YAMLs versionados em `.memory-studio/`. Não tem relação com o discovery da skill `tlc-roadmap-loop` rodando agora. O que tá sendo validado AGORA é readiness do LOOP, não do produto.
+
+### 28.6 — Decisões tomadas nesta sessão
+
+| # | Decisão | Status |
+|---|---|---|
+| D-RR-001 | Trocar `npm test` de `node --test` para `node --test test/**/*.test.mjs` em `package.json` (1 linha) | ✅ Aplicado |
+| D-RR-002 | Registrar diagnóstico + fix no handoff-session (não em STATE.md — STATE é spec state, handoff é sessão) | ✅ Aplicado |
+| D-RR-003 | Não criar novos arquivos (read-only) — os 3 sub-agentes só leram | ✅ Honrado |
+| D-RR-004 | `scripts/verify-env.mjs` ausente NÃO é blocker do loop (Phase 0 do ROADMAP cria) | ✅ Documentado |
+
+### 28.7 — Findings secundários (não-bloqueadores)
+
+- **A — Archify path mismatch:** SKILL.md linha 99-100 cita `.specs/architecture.architecture.json`, repo tem `.specs/architecture/memory-studio.architecture.json`. Só dispara em step 8b (drift re-render) — orchestrator self-fixa no primeiro drift. Sem impacto em Phase 0.
+- **B — Lessons script naming:** SKILL.md pede `promote` + `quarantine`; script implementa `penalize` (auto-quarantine) + auto-promote dentro de `add`. SKILL.md só cita `add` + `list` literalmente — ambos funcionam.
+- **B — Confirmed lessons store vazio é estado válido:** `python scripts/lessons.py list --status confirmed` retorna `(no confirmed lessons)` com exit 0.
+- **C — `npm run catalog:load` sem fixture:** usage printado, exit 0 — gate wired, não exercitado aqui. Phase 1 do ROADMAP vai criar fixtures de teste.
+
+### 28.8 — Estado final
+
+- **READY_TO_RUN: SIM** — todas as 4 precondições Waldemar verdes
+- **origin/main em `2e181f7`**
+- **Uncommitted change:** `package.json` (test script fix)
+- **Próximo passo:** commit do `package.json` fix + invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 0
+
+### 28.9 — Argumentos passados nesta sessão
+
+- "voltei"
+- "confira se as CONDIÇÕES para iniciar o roadmap loop estão satisfeitas, se for preciso dispare subagentes para checar partes por vc. O mais importante é descobrir se o loop consegue rodar, n quero ajustar nada q o próprio loop pode resolver."
+- "sim, mas é melhor registar isso no hadoff-session (que virou um doc continuo)"
