@@ -1,10 +1,10 @@
 ---
-session_end: 2026-07-29-final-v6
-author: Claude/M3-CLI (continuação pós-compactação)
+session_end: 2026-07-30-final-v7
+author: Claude (sessão pós-2e181f7)
 audience: agentes futuros (sessão fresca, contexto compactado) + humano (revisão)
 type: end-of-session-handoff
 prev_handoff: archive_handoff/handoff-session-2026-07-27.md
-update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agent review + ARCHITECTURE.md rewrite). Esta v6 foca em tlc-roadmap-loop readiness: (1) Verificação 4 preconditions Waldemar + ROADMAP format; (2) Reformat ROADMAP para formato loop-parseable (#### heading + Depends on + Done when); (3) Sub-agent readiness check retornou 2 bloqueadores + fast-feedback (override humano: ONNX baixa 1 vez, cache persiste); (4) Fechamento dos gaps — CLAUDE.md Testing contract + LESSONS store + scripts/lessons.py + scripts/python3 shim. READY_TO_RUN: SIM. origin/main em 7dfd058. v6.1 (2026-07-30) acrescenta Marco 28: 3 sub-agentes paralelos (loop driver, ROADMAP/STATE/LESSONS, gates) confirmaram readiness GO/HOLD/GO; único blocker real Waldemar #1 (fast feedback) — fix aplicado em package.json (npm test 44.5s → 15.6s wall, -65%); sub-agentes do loop vão pagar 15.6s por gate em vez de 44.5s. READY_TO_RUN: SIM. origin/main em 2e181f7."
+update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agent review + ARCHITECTURE.md rewrite). Esta v6 foca em tlc-roadmap-loop readiness: (1) Verificação 4 preconditions Waldemar + ROADMAP format; (2) Reformat ROADMAP para formato loop-parseable (#### heading + Depends on + Done when); (3) Sub-agent readiness check retornou 2 bloqueadores + fast-feedback (override humano: ONNX baixa 1 vez, cache persiste); (4) Fechamento dos gaps — CLAUDE.md Testing contract + LESSONS store + scripts/lessons.py + scripts/python3 shim. READY_TO_RUN: SIM. origin/main em 7dfd058. v6.1 (2026-07-30) acrescenta Marco 28: 3 sub-agentes paralelos (loop driver, ROADMAP/STATE/LESSONS, gates) confirmaram readiness GO/HOLD/GO; único blocker real Waldemar #1 (fast feedback) — fix aplicado em package.json (npm test 44.5s → 15.6s wall, -65%); sub-agentes do loop vão pagar 15.6s por gate em vez de 44.5s. READY_TO_RUN: SIM. origin/main em 2e181f7. v7 (2026-07-30, mesma sessão) documenta: (29) Learn-codebase skill executado — 1,500 LOC src/ + 2,500 LOC test/ lidos em cheio, farol canonico JSON lido, archify + custom skills + archived specs sintetizados via 3 sub-agentes paralelos; (30) 6 drift items surfaced entre docs (STATE.md stale, LESSONS.md ownership, lessons.json schema mismatch, ROADMAP/PRD version drift, ARCHITECTURE.md edge omisso, calibration residue não flagado); (31) Setup pré-loop materializado — .memory-studio/{setup.md, state.json} + .specs/CALIBRATION-RESIDUE.md + .specs/STATE.md v3 (era 2026-08-prd-v3-ready, phase: 'Phase 0'); (32) ECC import — sparse-clone de affaan-m/ecc (MIT, 236k stars), audit dos 67 agents (65 WARN por frontmatter, 2 DROP por hook dep), 13 agents selecionados + frontmatter patch copiados pra .claude/agents/, ecc-skills-backlog.md com 2 candidatos (tdd-workflow, agent-self-evaluation) + 17 deferred, full corpus copiado pra C:\\Users\\User\\Desktop\\ProjetosAntigravity\\SKILLs_Colection\\ecc\\ pra curadoria futura; (33) 2 skills candidatas (tdd-workflow, agent-self-evaluation) analisadas e **NÃO instaladas** — TDD já é contrato do tlc-spec-driven/tlc-roadmap-loop, e auto-evaluation já tem 3 mecanismos (auto-grill, auto-grill-v2 R11, agent-evaluator.md recém-importado); benefício marginal, deixa na pasta de curadoria pra revisão pós-Phase 1."
 ---
 
 # Handoff de sessão — 2026-07-29 (final v6)
@@ -43,6 +43,11 @@ update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agen
 | 26 | Sub-agent readiness check (READY_TO_RUN=NO inicial) | v6 | L546 | — |
 | 27 | Readiness fixes (CLAUDE.md Testing contract + LESSONS store) | v6 | L559 | `7dfd058` |
 | 28 | Re-readiness 3 sub-agentes paralelos + fix npm test overhead (-65%) | v6.1 (2026-07-30) | final | `2e181f7` |
+| 29 | Learn-codebase skill executado (3 sub-agentes paralelos: src/, archived specs, custom skills) | v7 (2026-07-30) | L860 | (pre-commit) |
+| 30 | 6 drift items surfaced entre docs (STATE.md stale, LESSONS.md, lessons.json, ROADMAP/PRD version, ARCHITECTURE.md edge, calibration residue não flagado) | v7 | L860 | (pre-commit) |
+| 31 | Setup pré-loop materializado (.memory-studio/, .specs/CALIBRATION-RESIDUE.md, STATE.md v3) | v7 | L860 | (pre-commit) |
+| 32 | ECC import — sparse-clone + 13 agents + ecc-skills-backlog.md + full corpus em SKILLs_Colection | v7 | L860 | (pre-commit) |
+| 33 | 2 skills candidatas analisadas — tdd-workflow e agent-self-evaluation **NÃO instaladas** (benefício marginal; mecanismos já cobrem) | v7 | L860 | (pre-commit) |
 
 **Eras:**
 - **v1** (2026-07-22 calibração) → `archive_handoff/handoff-session-2026-07-22.md`
@@ -52,8 +57,9 @@ update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agen
 - **v5** (2026-07-28 farol unificado + review + ARCHITECTURE) → este arquivo, Marcos 21-23
 - **v6** (2026-07-29 readiness tlc-roadmap-loop) → este arquivo, Marcos 24-27
 - **v6.1** (2026-07-30 re-readiness + npm test fix) → este arquivo, Marco 28
+- **v7** (2026-07-30 setup pré-loop + ECC import) → este arquivo, Marcos 29-33
 
-**Próximo passo (NÃO codar ainda):** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 0.
+**Próximo passo (NÃO codar ainda):** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 0 (Environment Validation). 13 agents ECC disponíveis como sub-agent personas (`@agent-evaluator` é o mais relevante para o Verifier do loop).
 
 ---
 
@@ -836,3 +842,81 @@ O **catálogo do produto Memory Studio** (PRD §6, Phase 1-2 do roadmap) é cons
 - "voltei"
 - "confira se as CONDIÇÕES para iniciar o roadmap loop estão satisfeitas, se for preciso dispare subagentes para checar partes por vc. O mais importante é descobrir se o loop consegue rodar, n quero ajustar nada q o próprio loop pode resolver."
 - "sim, mas é melhor registar isso no hadoff-session (que virou um doc continuo)"
+
+---
+
+### Marcos 29-33 — v7 (2026-07-30, mesma sessão)
+
+Sessão pós-readiness (v6.1 Marco 28 confirmou READY_TO_RUN=SIM). Foco: preparação pré-loop (drift fixes + ECC import + análise de fit). Loop não foi invocado nesta sessão — o humano está segurando para inspeção manual antes da primeira fase.
+
+#### Marco 29 — Learn-codebase skill executado (3 sub-agentes paralelos)
+
+`/claude-mem:learn-codebase` invocado. 3 sub-agentes em paralelo leram:
+
+- **Agente 1: archify vendored skill** — 80k linhas (~65k HTML gerado), 5 diagram types (architecture/workflow/sequence/dataflow/lifecycle), layout engine em `geometry.mjs`, validação via AJV standalone bake, golden file tests byte-a-byte.
+- **Agente 2: custom skills do repo** — `tlc-roadmap-loop` v0.2 (9-step orchestrator, 3 sub-agent roles, 3-iter cap, step 8a failure diagnostics), `auto-grill` v0.2 (8 lenses, Stakeholder Proxy, 0.7 confidence floor, decisions-ui.html), `auto-grill-v2` (R11 honest-uncertainty, Insight Researcher opt-in), `okf-check`, `docs/agents/`.
+- **Agente 3: archived specs + history** — calibration-era (4 features, 9 decisions auto-grill resolved), PLAN-v1 vs proposal-v2 vs PRD v3, briefs, handoffs antigos, brainstorm docs.
+
+Lidos em cheio pelo agente principal: `src/catalog/`, `src/search/`, `src/social-detector/`, 14 test files, 5 docs canônicos (PRD/PLAN/History/handoff/STATE/ROADMAP/ARCHITECTURE), farol canônico JSON. **Resultado: codebase carregado em context.**
+
+#### Marco 30 — 6 drift items surfaced
+
+Itens que o loop ia descobrir no primeiro gate (sinalizados preventivamente):
+
+1. **`.specs/STATE.md` stale** — v2 (2026-07-24) dizia `autorização-produção: ❌ NÃO` e `próximo-step: grill-with-docs`. Loop lê STATE.md no step 1.
+2. **`.specs/LESSONS.md` hand-authored** — vai ser silenciosamente reescrito por `lessons.py::_render()` na primeira escrita. Header do próprio arquivo diz "do NOT hand-edit".
+3. **`.specs/lessons.json` schema mismatch** — chave `schema_version` no arquivo vs `schema`/`next_id` esperado pelo script. `_load()` setdefaults mascaram, mas primeiro write deixa orphan key.
+4. **Version drift PRD/ROADMAP** — PRD frontmatter `version: 3.2` (revisions 3.1/3.2/3.3 fora de ordem) vs ARCHITECTURE/handoff citando v3.4. ROADMAP frontmatter `version: 3, 10 phases` vs body com 11 phases.
+5. **ARCHITECTURE.md omite edge** — `server → augmenter ("retrieve")` no JSON canônico, ausente do .md.
+6. **Calibration residue não flagado** — `src/` é calibration (PRD v1 schema) e seria flagged como drift pelo Verifier nas primeiras 2-3 phases.
+
+#### Marco 31 — Setup pré-loop materializado
+
+Decisão do humano: "vou rodar o loop do jeito que está, não aguento mais arrumar detalhes, vcs que se virem na execução." Resposta: pode rodar com 2 cuidados + documentação. Ações:
+
+- **`.memory-studio/setup.md`** (6.5kB) — layout `.memory-studio/`, schema `state.json`, expectations do Phase 0 verify-env.mjs (6 checks), seção "calibration residue" explicando que `src/` é esperado.
+- **`.memory-studio/state.json`** (367B) — defaults do PRD/PLAN/ROADMAP Phase 1: `schemaVersion: 3`, `activeCatalog: []`, `thresholds: {minCosineSimilarity: 0.6, minFtsHits: 2}` (do ROADMAP L151), `fastAgent: {model: "MiniMax-M2.7-highspeed", baseURL: "https://api.minimax.io/anthropic"}`, `agentId: "claude-code"`, `ui: {portRange: [41823, 42823], stack: "htmx+alpine"}`.
+- **`.specs/CALIBRATION-RESIDUE.md`** (121 linhas) — anchor único pro Verifier. Documenta: o que `src/` é, por que fica (Waldemar #1 fast feedback), tratamento esperado por phase (Phase 0 ignora, Phase 1 reescreve, Phase 2 promove `social-detector`, Phase 3+ greenfield), regra do Verifier "schema/layout drift em `src/**/*.ts` = `quarantined`".
+- **`.specs/STATE.md` v3** — bumped to era `2026-08-prd-v3-ready`. `## Handoff.phase = "Phase 0 — Environment Validation"` (o que o loop procura no step 1). AD-002 atualizada.
+
+185/185 testes verde após (5.3s wall). Typecheck clean.
+
+#### Marco 32 — ECC import (sparse-clone + audit + 13 agents + full corpus)
+
+Decisão do humano: clonar `affaan-m/ecc` (MIT, 236k stars, 281 skills, 67 agents, 94 commands) e pegar só skills+agents via cherry-pick. Recomendação inicial: **NÃO usar `npx ecc-install`** (instala mais que pediu, target global por default, last-write-wins) — usar sparse-clone + auditoria + cherry-pick controlado.
+
+**Execução:**
+
+1. **Sparse-clone** em `C:/Users/User/AppData/Local/Temp/ecc` (agora removido): `git clone --filter=blob:none --no-checkout` + `sparse-checkout set agents skills` + `checkout main`.
+2. **Audit script** (`/tmp/ecc-audit.mjs`, ~120 linhas Node): para cada agent, check (a) frontmatter has `name/description/date/version/explanation`, (b) body has `M3E`/`M3-CLI`/`Waldemar`, (c) body references `hook-runtime`/`SessionStart`/`PostToolUse`/`hooks/...`, (d) body references skills via regex.
+3. **Resultado do audit:**
+   - 67 total
+   - 0 KEEP
+   - 65 WARN (todos: missing `date`/`version`/`explanation` no frontmatter — fixable)
+   - 2 DROP: `chief-of-staff` (PostToolUse hook dep), `planner` (`hooks/stripe/route.ts` ref)
+4. **Pick de 13 agents** relevantes ao stack Node 22/TS: `typescript-reviewer`, `code-reviewer`, `code-simplifier`, `architect` (opus), `code-architect`, `code-explorer`, `tdd-guide`, `spec-miner` (opus), `silent-failure-hunter`, `refactor-cleaner`, `performance-optimizer`, `agent-evaluator`, `pr-test-analyzer`.
+5. **Copy + frontmatter patch** (script `install-ecc-v2.mjs`): injeta `date: 2026-07-30`, `version: 1`, `explanation: <derived from description>` após `model:` line. 13/13 copiados pra `.claude/agents/`.
+6. **`ecc-skills-backlog.md`**: 2 candidatos (`tdd-workflow`, `agent-self-evaluation`) + 17 deferred (linguagens irrelevantes: C++, Go, Rust, Kotlin, Vue, Spring, Quarkus, Django, React, marketing, SEO).
+7. **Full corpus copy** pra `C:\Users\User\Desktop\ProjetosAntigravity\SKILLs_Colection\ecc\` (281 skills + 67 agents) — pasta de curadoria externa pro humano revisar depois.
+8. **Cleanup**: `/tmp/ecc`, `/tmp/ecc-audit.mjs`, scripts temporários removidos.
+
+#### Marco 33 — 2 skills candidatas analisadas e NÃO instaladas
+
+Após import, humano perguntou: "vc acha q essas duas skills se encaixam bem no nosso desenvolvimento?" Resposta honesta:
+
+- **`tdd-workflow`**: benefício marginal. TDD já é contrato do `tlc-spec-driven` (global) e do `tlc-roadmap-loop` (v0.2 — Verifier FAIL→PASS recovery do Phase 4 já demonstrou). Adicionar cria risco de duplicação e conflito com a frase canônica "Test runner decides — not self-assessment" do Testing contract.
+- **`agent-self-evaluation`**: benefício marginal. Já temos 3 mecanismos: `auto-grill` v0.2 (Stakeholder Proxy + 8 lenses + 0.7 floor), `auto-grill-v2` (R11 honest uncertainty + Insight Researcher opt-in), `agent-evaluator.md` recém-importado. Adicionar = 4º mecanismo duplicado.
+
+**Decisão: NÃO instaladas.** Ficam na pasta de curadoria (`SKILLs_Colection/ecc/skills/`). Revisão pós-Phase 1 (se o Verifier reportar gap concreto que essas cobrem) ou pós-Phase 6b (se inception híbrida precisar de regression tests específicos).
+
+---
+
+### Argumentos passados nesta sessão (v7)
+
+- "pode rodar, com 2 cuidados: 1) Cria .memory-studio/setup.md (o ROADMAP Phase 0 pede isso) e ajusta o working tree pra rodar com data/ no .gitignore (já está) — o resto o loop descobre. 2) Expectativa: Phase 0 vai passar; Phase 1 vai falhar cedo porque a tabela skills do src/catalog/schema.ts não bate com o catalog+embeddings do PRD. O Verifier retorna FAIL com gap claro, o Implementer reescreve, PASS. Esse é o caminho normal — não é bug. Sinaliza no primeiro phase: no STATE.md que o worktree está deliberadamente com calibration residue pra o Verifier não flagar como drift."
+- "esse setup, fois sua ideia, ou ele já estava na skill ou em outro lugar?"
+- "quero instalr as skills e personas desse repo, pois tem ótima sinergia e serão de bom modelos para o Memory studio funcionar bem, avalie https://github.com/affaan-m/ecc quero apenas agentes e skills. N sei se instalao via npx ecc-install --profile minimal --target claude ou se clonamos e pegamos só as skills e agents (personas). Se preferir dispare subagente, para resolver e vc me da o parecer."
+- "que inferno, vejas se minha opcao é valia: clona o repo, pega só a pasta de skills e agents (personas), verifica cada perosa, ve se ela é normal ou depndente de algo como um hook q n vamos usar e adiciona ao projeto .claude\\skills e cria .claude/agents/ . Agluma contra indicação?"
+- "Faz assim pega só os agents(personas) saõ só 67, audita essas descobre as que são dispensáveis, e se elas tem indicaçoes de skills cria um backlog das skills q eles usam, para puzarmos depois só dos agentes que sobraram."
+- "ok commita e pusha o que foi feito" + "coloca no handoff session tb o que fizemos"
+- "Quando quiser, pega tdd-workflow e agent-self-evaluation da pasta de curadoria e instala em .claude/skills/ com o mesmo patch de frontmatter." vc acha q essas duas skills se encaixam bem no nosso desenvolvimento?"
