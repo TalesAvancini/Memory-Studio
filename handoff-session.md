@@ -1,19 +1,32 @@
 ---
-session_end: 2026-07-28-final-v5
+session_end: 2026-07-29-final-v6
 author: Claude/M3-CLI (continuação pós-compactação)
 audience: agentes futuros (sessão fresca, contexto compactado) + humano (revisão)
 type: end-of-session-handoff
 prev_handoff: archive_handoff/handoff-session-2026-07-27.md
-update_note: "v5 do handoff 2026-07-28. Substitui v4 (que documentava Phase 6a reframe + SPEC drift). Esta v5 documenta 3 entregas desta sessão: (1) FAROL DO PRODUTO UNIFICADO — single-page archify architecture com 5 módulos runtime, 25 componentes, 26 conexões rotuladas, fundo transparente, sem grade quadriculada. (2) 3-AGENT REVIEW — 20 findings de consistência PRD/SPEC/ROADMAP/Arquitetura; 19 aplicados em batch único (commit 1f773a8). (3) ARCHITECTURE.md v2 — reescrito do zero refletindo JSON canônico; meta-tools removidas do farol do produto; arquivado v1 em .specs/archive/architeture/."
+update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agent review + ARCHITECTURE.md rewrite). Esta v6 foca em tlc-roadmap-loop readiness: (1) Verificação 4 preconditions Waldemar + ROADMAP format; (2) Reformat ROADMAP para formato loop-parseable (#### heading + Depends on + Done when); (3) Sub-agent readiness check retornou 2 bloqueadores + fast-feedback (override humano: ONNX baixa 1 vez, cache persiste); (4) Fechamento dos gaps — CLAUDE.md Testing contract + LESSONS store + scripts/lessons.py + scripts/python3 shim. READY_TO_RUN: SIM. origin/main em 7dfd058."
 ---
 
 # Handoff de sessão — 2026-07-28 (final v5)
 
-# Handoff de sessão — 2026-07-28 (final v5)
+# Handoff de sessão — 2026-07-29 (final v6)
 
 ## TL;DR
 
-**3 entregas desta sessão (v5):**
+**4 entregas desta sessão (v6):**
+
+1. **Verificação readiness tlc-roadmap-loop** — 4 preconditions Waldemar + ROADMAP format + compose target
+2. **ROADMAP reformat** — 11 phases em formato loop-parseable (commit `9c028ee`)
+3. **Sub-agent readiness check** — confirmou 2 bloqueadores + 1 fast-feedback (override humano)
+4. **Readiness fixes** — Testing contract em CLAUDE.md + LESSONS store + scripts/lessons.py + python3 shim (commit `7dfd058`)
+
+**Status final:** READY_TO_RUN = **SIM**. origin/main em `7dfd058`. Phase 0 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.
+
+**Próximo passo:** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 0 (Environment Validation).
+
+---
+
+## v5 (resumo preservado)
 
 1. **Farol do produto unificado** — single-page archify architecture (`memory-studio.html`), 5 módulos runtime, 25 componentes, 26 conexões rotuladas, fundo transparente sem grade quadriculada (commit `08d75fa`).
 2. **3-agent review** — PRD/ROADMAP, SPEC/ROADMAP, Arquitetura/PRD+SPEC retornaram 20 findings; 19 aplicados em batch único (commit `1f773a8`).
@@ -491,3 +504,148 @@ Sessão pós-v4, mesmo dia 2026-07-28, branch `main`. 3 entregas:
 **Backup:** v1 antiga preservada em [`.specs/archive/architeture/architecture.html`](.specs/archive/architeture/architecture.html) + `architecture.architecture.json` (referência histórica, não é mais farol canônico).
 
 **Commit:** `23672ff — docs(architecture): rewrite ARCHITECTURE.md from canonical JSON source` (+168/-74)
+
+---
+
+### Marcos 24-26 (v6 desta sessão — tlc-roadmap-loop readiness)
+
+Continuação 2026-07-29 (mesma sessão pós-compactação, branch `main`). Foco: validar se `tlc-roadmap-loop` consegue operar no ROADMAP, fechar gaps remanescentes.
+
+#### Marco 24 — Verificação manual (4 preconditions Waldemar)
+
+Leitura completa de `tlc-roadmap-loop/SKILL.md` + `tlc-spec-driven/SKILL.md` + `.specs/ROADMAP.md` + `.specs/STATE.md`. Cruzamento contra 4 preconditions Waldemar + ROADMAP format esperado + compose target tlc-spec-driven.
+
+**Resultado:** 4 gaps identificados.
+
+| # | Gap | Severity | Bloqueador? |
+|---|---|---|---|
+| G1 | `AGENTS.md` ausente | cosmético (CLAUDE.md cobre) | não |
+| G2 | ROADMAP phases em `##` em vez de `#### Phase N — Title [ ]` | loop não parseia | **sim** |
+| G3 | `.specs/features/` ausente | degradação (loop cria on demand) | não |
+| G4 | Heading raiz `# Memory Studio v3 — ROADMAP` vs esperado `# Roadmap:` | cosmético | não |
+
+**Análise override:** Tu apontou (corretamente) que sub-agentes puxam CLAUDE.md automaticamente (não AGENTS.md). G1 rebaixado para cosmético — convention do template, não hard requirement.
+
+#### Marco 25 — Reformat ROADMAP (commit `9c028ee`)
+
+Edit cirúrgico: 11 phases convertidas para formato loop-parseable.
+
+**Mudanças (mínimo, body intacto):**
+- `## Phase N — Title` → `#### Phase N — Title [ ]`
+- `**Done when:**` adicionado em cada phase (concise, demoable outcome)
+- `**Depends on:**` adicionado em cada phase (inferido do Sequência diagram + Phase 7b Done)
+
+**Deps inferidas (grafo acíclico):**
+```
+Phase 0 — none
+Phase 1 — Phase 0
+Phase 2 — Phase 1
+Phase 3 — Phase 1
+Phase 4 — Phase 1, Phase 3
+Phase 5a — Phase 1, Phase 3, Phase 4
+Phase 5b — Phase 5a
+Phase 6a — Phase 5b
+Phase 6b — Phase 6a
+Phase 7a — Phase 5b
+Phase 7b — Phase 5b, Phase 6b
+```
+
+**Body preservado 100%** — Scope, Estimate, Done criteria, Output, PRD/SPEC refs, Total table. Apenas wrapping.
+
+**Commit:** `9c028ee — fix(roadmap): add loop-parseable format (#### heading + Depends on + Done when)` (+55/-11)
+
+#### Marco 26 — Sub-agent readiness check (3-agent pattern reusado)
+
+Tu pediu "dispare um sub-agente pra estudar e verificar se tlc-roadmap-loop tem condições de operar". Mesmo padrão dos 3 agentes do Marco 22.
+
+**Sub-agent dispatched:** `general-purpose`, read-only, retornou readiness report estruturado.
+
+**Veredito:** READY_TO_RUN = **NÃO** (2 bloqueadores + 1 fast-feedback parcial).
+
+| # | Bloqueador | Status |
+|---|---|---|
+| G1 | AGENTS.md/testing contract completo | parcialmente fechado (CLAUDE.md cobre autoridade+stack, mas testing contract não estava formalizado) |
+| G2 | LESSONS.md + lessons.json + scripts/lessons.py | loop tenta carregar; sem store, primeira invocação falha |
+| Fast feedback | Phase 0 baixa ONNX 470MB uma vez | agente interpretou como gargalo por-phase (erro) |
+
+**Override humano:** "N precisamos deixar pronto?" — corrigi a leitura. Phase 0 baixa 470MB **1 vez só**; cache local persiste. Demais phases reutilizam modelo local. Fast feedback = OK (npm test/typecheck segundos; Phase 0 única exceção documentada).
+
+#### Marco 27 — Readiness fixes (commit `7dfd058`)
+
+Fechados os 2 bloqueadores.
+
+**G1 — Testing contract em CLAUDE.md:**
+- Nova seção `## Testing contract (sub-agent project glue)` documenta:
+  - Stack (Node 22 LTS + Fastify + SQLite FTS5+vec + multilingual-e5-small ONNX 384d)
+  - Comandos de gate: `npm test`, `npm run typecheck`, `npm run catalog:load`
+  - Layout `test/` + quality bar (1 atomic commit por task, gates via test runner)
+  - Pre-flight Phase 0 (download ONNX uma vez, cache local persiste)
+  - Authority dentro de phases (Implementer auto-commit, Verifier valida)
+
+**G2 — LESSONS store:**
+- `.specs/LESSONS.md` (rendered playbook, status legend: candidate/confirmed/quarantined)
+- `.specs/lessons.json` (machine state, `{"schema_version": 1, "lessons": []}`)
+- `scripts/lessons.py` (copiado do `tlc-spec-driven/scripts/lessons.py` — pure stdlib, deterministic bookkeeping)
+- `scripts/python3` shim (Windows: `python3` → `py` launcher, Unix já tem `python3` direto)
+- Verificação: `PATH=./scripts:$PATH python3 scripts/lessons.py status` → `lessons: 0 total | confirmed=0 candidate=0 quarantined=0`
+
+**Commit:** `7dfd058 — fix: enable tlc-roadmap-loop readiness (testing contract + LESSONS store)`
+
+---
+
+## Estado final v6
+
+**READY_TO_RUN: SIM**
+
+Todas as 4 preconditions Waldemar passam:
+- ✅ Fast feedback (npm test/typecheck em segundos; Phase 0 exceção documentada)
+- ✅ Reliable stop condition (Verifier PASS/FAIL binary + ROADMAP Done criteria binários)
+- ✅ Sufficient backlog (11 phases)
+- ✅ Clear project glue (CLAUDE.md Testing contract substitui AGENTS.md)
+
+ROADMAP format válido, compose target completo, cross-refs consistentes.
+
+**Próximo passo concreto:** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 0 (primeira `[ ]` sem deps). Planner gera `spec.md` atômico em `.specs/features/phase-0-environment-validation/`, Implementer cria `scripts/verify-env.mjs`, Verifier roda 6 checks (Node v22, onnxruntime-node, FTS5, sqlite-vec, ONNX 384d, state.json write).
+
+---
+
+## Handoff size observation (nota do humano)
+
+Tu apontou: "handoff-session está enorme, n sei como resolver agora".
+
+**Tamanho atual:** 492+ linhas, 4 eras (v1-v3 calibração, v4 reframe, v5 farol+review, v6 readiness).
+
+**Possíveis resoluções futuras (não aplicadas agora):**
+1. **Split por era:** `archive_handoff/handoff-session-2026-07-28-v5.md` (farol+review) + `archive_handoff/handoff-session-2026-07-28-v6.md` (readiness) + `handoff-session.md` aponta pra v6
+2. **Compactar Marcos 13-18** (v3 MiMo + Branch B removal) que já foram detalhados em commits (`3bf1034`, `9da2000`, `770f1ee`)
+3. **Mover PRD/PLAN references pra cross-links** em vez de duplicar conteúdo
+4. **Manter append-only** (não quebrar append-only contract do STATE.md Decisions; mas handoff é overwrite)
+
+**Decisão:** deixar como está. Cada commit no git já tem mensagem detalhada; handoff vira índice + o que não está em commit message (decisões, override humanos, framing). Próxima sessão pode resolver.
+
+---
+
+## Commits finais da sessão (v3 + v4 + v5 + v6)
+
+| Commit | Descrição |
+|---|---|
+| `7dfd058` | **v6:** Readiness fixes — Testing contract (CLAUDE.md) + LESSONS store |
+| `9c028ee` | **v6:** ROADMAP reformat (#### heading + Depends on + Done when) |
+| `e10d0a9` | **v5:** Handoff v5 — farol unificado + 3-agent review + ARCHITECTURE.md rewrite |
+| `23672ff` | **v5:** ARCHITECTURE.md reescrito do zero (do JSON canônico) |
+| `1f773a8` | **v5:** 19 consistency fixes do 3-agent review |
+| `08d75fa` | **v5:** Architecture CSS patch — transparent fills + remove grid lines |
+| `6f2c293` | **v5:** Single-page archify architecture diagram (5 módulos runtime) |
+| `322766f` | **v4:** Phase 6a reframe (PRD §16.7 + ROADMAP Phase 6a) — POC hot path PRIMARY |
+| `0fcdb47` | **v4:** SPEC drift fix — "grill" → POC Validation |
+| `3bf1034` | MiMo: §16.4 decisions + reranker removido + Phase 0 + standalone strategy |
+| `eb08f75` | BACKLOG: 12 entries (I-002 a I-013) |
+| `9da2000` | Branch B removido (single branch, Phase 6b mandatory) |
+| `770f1ee` | POC reframe + MiniMax-M2.7-highspeed default |
+| `e8a4c60` | Anthropic fallback removido (Haiku = MiniMax no Claude Code) |
+| `cafadea` | `.env.example` simplificado (vazio) |
+| `2d81254` | `.env.example` template bloated (vazio) |
+| `e2a8646` | `.env.example` deletado |
+| `7142ef6` | `.gitignore` hardening (`.env.*` glob) |
+
+**Estado final (atualizado v6):** Working tree contém `custom-farol.html.bak` (untracked, preservado). origin/main em `7dfd058`. PRD v3.4 + PLAN v3 + SPEC v2 + ROADMAP v5 (reformatado v6) + BACKLOG (13 entries) + .gitignore hardened + farol unificado + 19 consistency fixes + ARCHITECTURE.md v2 + **CLAUDE.md Testing contract + LESSONS store (readiness fechado)**. **Phase 0 do ROADMAP pode começar via `tlc-roadmap-loop` quando autorizado.**
