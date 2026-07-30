@@ -7,9 +7,53 @@ prev_handoff: archive_handoff/handoff-session-2026-07-27.md
 update_note: "v6 do handoff (2026-07-29). Substitui v5 (farol unificado + 3-agent review + ARCHITECTURE.md rewrite). Esta v6 foca em tlc-roadmap-loop readiness: (1) Verificação 4 preconditions Waldemar + ROADMAP format; (2) Reformat ROADMAP para formato loop-parseable (#### heading + Depends on + Done when); (3) Sub-agent readiness check retornou 2 bloqueadores + fast-feedback (override humano: ONNX baixa 1 vez, cache persiste); (4) Fechamento dos gaps — CLAUDE.md Testing contract + LESSONS store + scripts/lessons.py + scripts/python3 shim. READY_TO_RUN: SIM. origin/main em 7dfd058."
 ---
 
-# Handoff de sessão — 2026-07-28 (final v5)
-
 # Handoff de sessão — 2026-07-29 (final v6)
+
+## Índice cronológico
+
+> Navegação por marco. Marcos foram append-only no final do arquivo a cada v4/v5/v6; ordem física ≠ ordem cronológica. Este índice lista em **ordem cronológica real**.
+
+| # | Marco | Era | Linha no arquivo | Commit |
+|---|---|---|---|---|
+| 1 | Auto-grill EXECUTADO em produção (1ª vez) | v1 (M3E+M3-CLI) | L70 | (pré-`2635e91`) |
+| 2 | Skill validation end-to-end (composite target) | v1 | L70 | — |
+| 3 | UX evaluation — gaps identificados | v1 | L70 | — |
+| 4 | Lens exhaustion ambiguity descoberta | v1 | L70 | — |
+| 5 | Decisions-ui.html pré-carregado | v1 | L70 | — |
+| 6 | Gate fechado + 5 fixes + to-spec invocado | v1 | L70 | — |
+| 7 | 6 fixes pendentes aplicadas em PRD/PLAN (D-003 a D-009) | v2 (M3-CLI) | L79 | `2635e91` |
+| 8 | Auto-grill artifacts commitados (10 files) | v2 | L94 | `82ae739` |
+| 9 | Calibration testbed arquivado (`features/` → `archive/`) | v2 | L105 | `c880b63` |
+| 10 | SPEC v2 comprehensive (rebuild do to-spec subdimensionado) | v2 | L111 | — |
+| 11 | ROADMAP v3 extraído do SPEC (10 phases) | v2 | L129 | `20e3c24` |
+| 12 | Auto-grill v2: verifier-honest-uncertainty variant (NOVA skill) | v2 | L152 | `12374b9` |
+| 13 | MiMo analysis aplicado (6 fixes — §16.4 decisions, reranker removido, Phase 0) | v3 (pós-MiMo) | L290 | `3bf1034` |
+| 14 | BACKLOG com 12 entradas (I-002 a I-013) | v3 | L301 | `eb08f75` |
+| 15 | Branch A/B removido + PLAN sync (Phase 6b mandatory) | v3 | L315 | `9da2000` |
+| 16 | Fast agent = MiniMax-M2.7-highspeed (sem fallback Anthropic) | v3 | L334 | `770f1ee`, `e8a4c60` |
+| 17 | POC reframe (hot path overhead <10ms PRIMARY vs latency trick SECONDARY) | v3 | L344 | `770f1ee` |
+| 18 | `.env.example` lifecycle + `.gitignore` hardening | v3 | L357 | `cafadea`, `e2a8646`, `7142ef6` |
+| 19 | Phase 6a reframe (PRD §16.7 + ROADMAP Phase 6a) | v4 (follow-up) | L367 | `322766f` |
+| 20 | SPEC drift fix (cosmetic — "grill" → POC Validation) | v4 | L389 | `0fcdb47` |
+| 21 | Farol do produto unificado (single-page archify, 5 módulos) | v5 (farol+review) | L421 | `6f2c293`, `08d75fa` |
+| 22 | 3-agent review (20 findings, 19 aplicados em batch) | v5 | L466 | `1f773a8` |
+| 23 | ARCHITECTURE.md v2 reescrito do zero (do JSON canônico) | v5 | L479 | `23672ff` |
+| 24 | Verificação manual 4 preconditions Waldemar | v6 (readiness) | L510 | — |
+| 25 | ROADMAP reformat (#### heading + Depends on + Done when) | v6 | L527 | `9c028ee` |
+| 26 | Sub-agent readiness check (READY_TO_RUN=NO inicial) | v6 | L546 | — |
+| 27 | Readiness fixes (CLAUDE.md Testing contract + LESSONS store) | v6 | L559 | `7dfd058` |
+
+**Eras:**
+- **v1** (2026-07-22 calibração) → `archive_handoff/handoff-session-2026-07-22.md`
+- **v2** (2026-07-28 calibração final + spec build) → `archive_handoff/handoff-session-2026-07-27.md` (prev_handoff)
+- **v3** (2026-07-28 MiMo + Branch B + POC reframe) → este arquivo, Marcos 13-18
+- **v4** (2026-07-28 follow-up Phase 6a + SPEC drift) → este arquivo, Marcos 19-20
+- **v5** (2026-07-28 farol unificado + review + ARCHITECTURE) → este arquivo, Marcos 21-23
+- **v6** (2026-07-29 readiness tlc-roadmap-loop) → este arquivo, Marcos 24-27
+
+**Próximo passo (NÃO codar ainda):** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md` → Phase 0.
+
+---
 
 ## TL;DR
 
