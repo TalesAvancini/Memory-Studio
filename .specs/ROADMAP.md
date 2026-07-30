@@ -83,7 +83,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 0 — Environment Validation
+#### Phase 0 — Environment Validation [ ]
+
+**Done when:** ambiente validado — Node 22 + SQLite FTS5+vec + ONNX runtime + multilingual-e5-small ONNX carregam sem erros; `scripts/verify-env.mjs` passa todos os 6 checks.
+
+**Depends on:** none
 
 **Goal:** garantir que o ambiente suporta SQLite + FTS5 + sqlite-vec + ONNX runtime + Node 22 antes de Phase 1 começar. Evita descobrir fricção de setup no meio da Phase 1.
 
@@ -111,7 +115,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 1 — Catalog + Schema + Index
+#### Phase 1 — Catalog + Schema + Index [ ]
+
+**Done when:** catálogo constrói localmente; retrieval index populado; YAML schema versionado; `npm run build-index` <60s pra 100 skills.
+
+**Depends on:** Phase 0
 
 **Goal:** catálogo constrói localmente; retrieval index populado; YAML schema versionado.
 
@@ -150,7 +158,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 2 — Detector + Fingerprint
+#### Phase 2 — Detector + Fingerprint [ ]
+
+**Done when:** bypass de prompts sociais detectado; provenance 4-componente com hashing; audit schema DDL pronto (write runtime é Phase 5b).
+
+**Depends on:** Phase 1
 
 **Goal:** bypass de prompts sociais; provenance 4-componente com hashing; audit schema pronto (vazio).
 
@@ -183,7 +195,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 3 — SDK Cliente
+#### Phase 3 — SDK Cliente [ ]
+
+**Done when:** agentes embedam SDK e coletam estado; SDK funciona prompt-only fallback; `~50KB` build size zero deps nativas.
+
+**Depends on:** Phase 1
 
 **Goal:** agentes embed o SDK e coletam estado; SDK funciona prompt-only fallback.
 
@@ -219,7 +235,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 4 — UI Panel
+#### Phase 4 — UI Panel [ ]
+
+**Done when:** humano controla catálogo via painel; Critical Rules enforcement visível; UI carrega em <1s local; 5 telas (Skills/Rules/Personas/Audit/Settings).
+
+**Depends on:** Phase 1, Phase 3
 
 **Goal:** humano controla catálogo via painel; Critical Rules enforcement visível.
 
@@ -262,7 +282,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 5a — API + Retrieval + Byte-string
+#### Phase 5a — API + Retrieval + Byte-string [ ]
+
+**Done when:** `/augment` smoke test com Claude Code; byte-string determinístico (SHA256); cache do provedor hit verificado em log; p50<50ms.
+
+**Depends on:** Phase 1, Phase 3, Phase 4
 
 **Goal:** `/augment` smoke test com Claude Code; byte-string determinístico; cache do provedor hit.
 
@@ -313,7 +337,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 5b — Audit + Endpoints + Security
+#### Phase 5b — Audit + Endpoints + Security [ ]
+
+**Done when:** 5 auxiliary endpoints respondendo (catalog/catalog-rebuild/audit/audit-summary/health/state-toggle); audit async+fail-open; security invariants honrados.
+
+**Depends on:** Phase 5a
 
 **Goal:** 5 auxiliary endpoints respondendo; audit não bloqueia; security invariants honrados.
 
@@ -368,7 +396,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-## Phase 6a — POC Validation (hot path + fast agent)
+#### Phase 6a — POC Validation (hot path + fast agent) [ ]
+
+**Done when:** inception híbrida valida overhead hot path <10ms E fast agent <3s em 10 amostras; targets medidos, não estimados.
+
+**Depends on:** Phase 5b
 
 **Goal:** validar empiricamente que inception híbrida adiciona <10ms ao hot path E que fast agentuality termina em <3s. Não é binary fork — é validation empírica. Se POC reprova, decisão humana é ajustar (trocar modelo, otimizar query), não collapsar.
 
@@ -411,7 +443,11 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
-## Phase 6b — Fast Agent + Intel Pipeline (mandatory)
+#### Phase 6b — Fast Agent + Intel Pipeline (mandatory) [ ]
+
+**Done when:** Turn N+1 augmenta com intel; latency trick validada em produção; arquitetura NOVEL implementada; cache hit `usage.cache_read_input_tokens > 0` em 2 turns com prefixo estável.
+
+**Depends on:** Phase 6a
 
 **Goal:** Turn N+1 augmenta com intel. Latency trick validated em produção. Arquitetura NOVEL implementada.
 
@@ -454,7 +490,11 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
-## Phase 7a — Metrics Instrumentation
+#### Phase 7a — Metrics Instrumentation [ ]
+
+**Done when:** dashboard emite `request_hit_rate` + `token_cache_coverage` + `p50_latency_ms` + `p99_latency_ms` + `working_set_mb`; atualizado a cada N=10 requests ou T=60s.
+
+**Depends on:** Phase 5b
 
 **Goal:** dashboard emite métricas cache hit + latency + working set.
 
@@ -486,7 +526,11 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
-## Phase 7b — Empirical Tuning + Acceptance Gate
+#### Phase 7b — Empirical Tuning + Acceptance Gate [ ]
+
+**Done when:** cache hit >70% validado em sessão real (≥7 dias wall-clock, ≥10 turns/sessão em ≥5 sessões); thresholds finais documentados.
+
+**Depends on:** Phase 5b, Phase 6b
 
 **Goal:** cache hit >70% validado em sessão real (>10 turns, 1 semana wall-clock).
 
