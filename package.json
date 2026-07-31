@@ -7,6 +7,7 @@
   "engines": {
     "node": ">=22.0.0"
   },
+  "workspaces": ["packages/*"],
   "scripts": {
     "test": "node --test test/**/*.test.mjs",
     "test:smoke": "node --test test/smoke.test.mjs",
