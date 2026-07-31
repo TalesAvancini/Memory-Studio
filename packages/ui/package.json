@@ -9,7 +9,9 @@
     "test": "node --experimental-strip-types --no-warnings --test test/**/*.test.mjs",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "yaml": "^2.6.0"
+  },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.6.0"
