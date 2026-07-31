@@ -83,7 +83,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 0 — Environment Validation [ ]
+#### Phase 0 — Environment Validation [x]
 
 **Done when:** ambiente validado — Node 22 + SQLite FTS5+vec + ONNX runtime + multilingual-e5-small ONNX carregam sem erros; `scripts/verify-env.mjs` passa todos os 6 checks.
 

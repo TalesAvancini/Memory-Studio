@@ -74,13 +74,17 @@ related:
 
 ## Handoff
 
-- **phase:** "Phase 0 — Environment Validation"
+- **phase:** "Phase 1 — Catalog + Schema + Index"
+- **phase-previous:** "Phase 0 — Environment Validation" (DONE 2026-07-30, 6/6 checks PASS, sha256 stable)
 - **era:** `2026-08-prd-v3-ready`
 - **era-anterior:** `2026-07-foundation-complete` (skill calibrada, archived em `archive_handoff/`)
 - **next-epoch:** PRD-driven product build (Phases 0-7b de `.specs/ROADMAP.md`)
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
-- **próximo-step-concreto:** invocar `tlc-roadmap-loop` em `.specs/ROADMAP.md`
-- **working-tree:** working (origin/main em `7dfd058`; novos arquivos untracked: `.memory-studio/setup.md`, `.memory-studio/state.json`, `.specs/CALIBRATION-RESIDUE.md`, `custom-farol.html.bak`, `old_arquive-miscelanea/`, `.specs/archive/architeture/`, `.specs/archive/auto-grill-output/`)
+- **branch-ativa:** `loop/phase-0` (contém phases concluídas; PR ao fim do loop)
+- **próximo-step-concreto:** dispatch Planner para Phase 1 — Catalog + Schema + Index (PRD §6, SPEC §IMod-6/13/14/15)
+- **working-tree:** working (`loop/phase-0` em `218dad1`; novos arquivos untracked: `.specs/architecture/custom-farol.html.bak`, `old_arquive-miscelanea/`, `.specs/archive/architeture/`, `.specs/archive/auto-grill-output/`)
+- **phase-0-feature-dir:** `.specs/features/phase-0-environment-validation/{spec.md, tasks.md, validation.md}` (Verifier PASS commit `218dad1`)
 - **não-congela:** STATE.md `## Decisions` append-only; `## Handoff` overwrite por sessão
 - **calibration residue:** `src/` é esperado até Phase 1 reescrever (ver `.specs/CALIBRATION-RESIDUE.md`)
+- **discoveries:** 0 entries em Phase 0 (Phase 0 não toca `src/`)
