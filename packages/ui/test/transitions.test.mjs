@@ -6,7 +6,11 @@ import { join } from 'node:path';
 import {
   CRITICAL_CONFIRMATION_TOKEN,
   MAX_ACTIVE_PERSONAS,
+  SETTINGS_FIELD_KEYS,
+  SUPPORTED_INTEGRATION_MODES,
   TransitionRequestError,
+  applySettings,
+  applySettingsPatch,
   applyToggle,
   createDefaultProjectState,
   createEmptyCatalogReader,
@@ -405,3 +409,266 @@ test('disabling one persona via toggleCatalogItem releases a slot for the next a
   assert.equal(activated.state.activeCatalog.length, MAX_ACTIVE_PERSONAS);
   assert.equal(activated.state.activeCatalog.includes(PERSONA_D.id), true);
 });
+
+// =============================================================================
+// Phase 4.3 — Settings transition (T4.3-2)
+// =============================================================================
+
+function settingsFixture(overrides = {}) {
+  const base = createDefaultProjectState();
+  return {
+    ...base,
+    thresholds: { ...base.thresholds, ...(overrides.thresholds ?? {}) },
+    activeCatalog: overrides.activeCatalog ?? ['skill-a', 'persona-b'],
+    fastAgent: overrides.fastAgent ?? { ...base.fastAgent, model: 'MiniMax-M2.7-highspeed', baseURL: 'https://api.minimax.io/anthropic' },
+    integrationMode: overrides.integrationMode ?? 'proxy',
+    agentId: overrides.agentId ?? 'claude-code',
+    tenantId: overrides.tenantId ?? '',
+    embeddingModel: overrides.embeddingModel ?? 'multilingual-e5-small',
+    ui: overrides.ui ?? { ...base.ui, portRange: [41_823, 42_823] },
+  };
+}
+
+function validPatch(overrides = {}) {
+  return {
+    minCosineSimilarity: 0.75,
+    minFtsHits: 3,
+    tenantId: 'tenant-1',
+    integrationMode: 'cli',
+    embeddingModel: 'multilingual-e5-small',
+    ...overrides,
+  };
+}
+
+test('SETTINGS_FIELD_KEYS enumerates the five editable settings fields', () => {
+  assert.deepEqual(
+    [...SETTINGS_FIELD_KEYS].sort(),
+    ['embeddingModel', 'integrationMode', 'minCosineSimilarity', 'minFtsHits', 'tenantId'].sort(),
+  );
+});
+
+test('SUPPORTED_INTEGRATION_MODES exposes the four integration modes', () => {
+  assert.deepEqual(
+    [...SUPPORTED_INTEGRATION_MODES].sort(),
+    ['cli', 'hook', 'mcp', 'proxy'].sort(),
+  );
+});
+
+test('applySettings persists all five fields and preserves schema-v3 unrelated data (UI-22)', () => {
+  const before = settingsFixture({
+    activeCatalog: ['skill-a', 'rule-1'],
+    fastAgent: { model: 'gpt-fast', baseURL: 'https://api.example.com/v1' },
+    agentId: 'claude-code',
+    tenantId: '',
+    embeddingModel: 'old-model',
+    integrationMode: 'proxy',
+  });
+  const patch = validPatch();
+
+  const result = applySettings(before, patch);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, true);
+  assert.equal(result.state.thresholds.minCosineSimilarity, patch.minCosineSimilarity);
+  assert.equal(result.state.thresholds.minFtsHits, patch.minFtsHits);
+  assert.equal(result.state.tenantId, patch.tenantId);
+  assert.equal(result.state.integrationMode, patch.integrationMode);
+  assert.equal(result.state.embeddingModel, patch.embeddingModel);
+  // Schema-v3 unrelated fields preserved.
+  assert.equal(result.state.schemaVersion, 3);
+  assert.deepEqual(result.state.activeCatalog, ['skill-a', 'rule-1']);
+  assert.deepEqual(result.state.fastAgent, before.fastAgent);
+  assert.equal(result.state.agentId, 'claude-code');
+  assert.deepEqual(result.state.ui, before.ui);
+});
+
+test('applySettings is idempotent when the patch matches the current state', () => {
+  const current = settingsFixture({
+    thresholds: { minCosineSimilarity: 0.5, minFtsHits: 2 },
+    tenantId: 'tenant-x',
+    integrationMode: 'mcp',
+    embeddingModel: 'multilingual-e5-small',
+  });
+  const patch = validPatch({
+    minCosineSimilarity: 0.5,
+    minFtsHits: 2,
+    tenantId: 'tenant-x',
+    integrationMode: 'mcp',
+    embeddingModel: 'multilingual-e5-small',
+  });
+
+  const result = applySettings(current, patch);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, false);
+  assert.equal(result.state, current, 'no-op should reuse the same state object');
+});
+
+test('applySettings rejects cosine out of range with INVALID_THRESHOLD (UI-23)', () => {
+  const before = settingsFixture();
+  const cases = [-0.01, 1.01, Number.NaN, Number.POSITIVE_INFINITY, 'high'];
+
+  for (const value of cases) {
+    const result = applySettings(before, validPatch({ minCosineSimilarity: value }));
+    assert.equal(result.ok, false, `value ${String(value)} should be rejected`);
+    assert.equal(result.code, 'INVALID_THRESHOLD');
+  }
+});
+
+test('applySettings rejects negative or non-integer minFtsHits with INVALID_THRESHOLD (UI-23)', () => {
+  const before = settingsFixture();
+  const cases = [-1, 1.5, 'three', null];
+
+  for (const value of cases) {
+    const result = applySettings(before, validPatch({ minFtsHits: value }));
+    assert.equal(result.ok, false, `value ${String(value)} should be rejected`);
+    assert.equal(result.code, 'INVALID_THRESHOLD');
+  }
+});
+
+test('applySettings accepts the inclusive bounds 0 and 1 for cosine (UI-23)', () => {
+  const before = settingsFixture();
+
+  const lower = applySettings(before, validPatch({ minCosineSimilarity: 0 }));
+  assert.equal(lower.ok, true);
+  const upper = applySettings(before, validPatch({ minCosineSimilarity: 1 }));
+  assert.equal(upper.ok, true);
+});
+
+test('applySettings accepts minFtsHits = 0 (UI-23)', () => {
+  const before = settingsFixture();
+  const result = applySettings(before, validPatch({ minFtsHits: 0 }));
+  assert.equal(result.ok, true);
+});
+
+test('applySettings rejects unsupported integrationMode with typed error (UI-23)', () => {
+  const before = settingsFixture();
+
+  for (const value of ['websocket', '', null, 42, 'PROXY']) {
+    const result = applySettings(before, validPatch({ integrationMode: value }));
+    assert.equal(result.ok, false, `value ${String(value)} should be rejected`);
+    assert.equal(result.code, 'UNSUPPORTED_INTEGRATION_MODE');
+  }
+});
+
+test('applySettings accepts every supported integrationMode including cli (UI-23)', () => {
+  const before = settingsFixture();
+
+  for (const value of SUPPORTED_INTEGRATION_MODES) {
+    const result = applySettings(before, validPatch({ integrationMode: value }));
+    assert.equal(result.ok, true, `value ${value} should be accepted`);
+    assert.equal(result.state.integrationMode, value);
+  }
+});
+
+test('applySettings rejects empty tenantId and embeddingModel with MISSING_STRING_FIELD (UI-23)', () => {
+  const before = settingsFixture();
+
+  for (const value of ['', null, undefined, 0, {}]) {
+    const tenant = applySettings(before, validPatch({ tenantId: value }));
+    assert.equal(tenant.ok, false, `tenantId ${String(value)} should be rejected`);
+    assert.equal(tenant.code, 'MISSING_STRING_FIELD');
+
+    const embedding = applySettings(before, validPatch({ embeddingModel: value }));
+    assert.equal(embedding.ok, false, `embeddingModel ${String(value)} should be rejected`);
+    assert.equal(embedding.code, 'MISSING_STRING_FIELD');
+  }
+});
+
+test('applySettingsPatch persists the patch via the project state store (UI-22)', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'memory-studio-settings-ok-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = createProjectStateStore(root);
+  await store.update((current) => ({
+    ...current,
+    activeCatalog: ['skill-a', 'persona-b'],
+    fastAgent: { ...current.fastAgent, model: 'gpt-fast', baseURL: 'https://api.example.com/v1' },
+  }));
+
+  const result = await applySettingsPatch(validPatch(), store);
+
+  assert.equal(result.changed, true);
+  assert.equal(result.state.thresholds.minCosineSimilarity, 0.75);
+  assert.equal(result.state.integrationMode, 'cli');
+  assert.equal(result.state.tenantId, 'tenant-1');
+  assert.equal(result.state.embeddingModel, 'multilingual-e5-small');
+
+  const persisted = await store.read();
+  assert.equal(persisted.thresholds.minCosineSimilarity, 0.75);
+  assert.equal(persisted.integrationMode, 'cli');
+  assert.deepEqual(persisted.activeCatalog, ['skill-a', 'persona-b']);
+  assert.equal(persisted.fastAgent.model, 'gpt-fast');
+  assert.equal(persisted.schemaVersion, 3);
+});
+
+test('applySettingsPatch throws TransitionRequestError and leaves state bytes unchanged (UI-23)', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'memory-studio-settings-reject-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = createProjectStateStore(root);
+  await store.update((current) => ({
+    ...current,
+    thresholds: { minCosineSimilarity: 0.42, minFtsHits: 9 },
+    tenantId: 'before-tenant',
+    integrationMode: 'hook',
+    embeddingModel: 'before-model',
+  }));
+  const before = await store.read();
+  const beforeBytes = JSON.stringify(before);
+
+  await assert.rejects(
+    () => applySettingsPatch(validPatch({
+      minCosineSimilarity: 2, // out of range
+      tenantId: 'after-tenant',
+      integrationMode: 'cli',
+      embeddingModel: 'after-model',
+    }), store),
+    (error) => {
+      assert.ok(error instanceof TransitionRequestError);
+      assert.equal(error.code, 'INVALID_THRESHOLD');
+      return true;
+    },
+  );
+
+  // State bytes must remain identical — validation fails before persistence.
+  const after = await store.read();
+  assert.equal(JSON.stringify(after), beforeBytes);
+  assert.equal(after.tenantId, 'before-tenant');
+  assert.equal(after.integrationMode, 'hook');
+  assert.equal(after.embeddingModel, 'before-model');
+  assert.equal(after.thresholds.minCosineSimilarity, 0.42);
+  assert.equal(after.thresholds.minFtsHits, 9);
+});
+
+test('applySettingsPatch returns changed:false without rewriting when patch matches state (UI-22)', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'memory-studio-settings-noop-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = createProjectStateStore(root);
+  await store.update((current) => ({
+    ...current,
+    thresholds: { minCosineSimilarity: 0.6, minFtsHits: 2 },
+    tenantId: 'tenant-keep',
+    integrationMode: 'proxy',
+    embeddingModel: 'multilingual-e5-small',
+  }));
+  const fileBytesBefore = await (await import('node:fs/promises')).readFile(
+    join(root, '.memory-studio', 'state.json'),
+    'utf8',
+  );
+
+  const result = await applySettingsPatch(validPatch({
+    minCosineSimilarity: 0.6,
+    minFtsHits: 2,
+    tenantId: 'tenant-keep',
+    integrationMode: 'proxy',
+    embeddingModel: 'multilingual-e5-small',
+  }), store);
+
+  assert.equal(result.changed, false);
+  // No write was scheduled — file bytes must remain unchanged.
+  const fileBytesAfter = await (await import('node:fs/promises')).readFile(
+    join(root, '.memory-studio', 'state.json'),
+    'utf8',
+  );
+  assert.equal(fileBytesAfter, fileBytesBefore);
+});
+

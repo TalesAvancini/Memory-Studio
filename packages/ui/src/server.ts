@@ -22,6 +22,11 @@ import {
   validateProjectState,
   type ProjectStateStore,
 } from './state.ts';
+import {
+  TransitionRequestError,
+  applySettingsPatch,
+  type SettingsRequest,
+} from './transitions.ts';
 import type { UiTab } from './index.ts';
 
 const DEFAULT_PUBLIC_DIRECTORY = fileURLToPath(new URL('../public/', import.meta.url));
@@ -42,11 +47,13 @@ const PARTIAL_ROUTES = new Map<string, UiTab>([
   ['/ui/settings', 'settings'],
 ]);
 
+const MAX_JSON_BODY_BYTES = 64 * 1024;
+
 export interface UiServerOptions {
   portRange?: PortRange;
   publicDirectory?: string;
   projectRoot?: string;
-  stateStore?: Pick<ProjectStateStore, 'read'>;
+  stateStore?: Pick<ProjectStateStore, 'read' | 'update'>;
   auditReader?: AuditReader;
   catalogReader?: Pick<CatalogReader, 'list'>;
   partialRenderers?: Partial<UiPartialRenderers>;
@@ -96,6 +103,42 @@ async function bind(server: Server, port: number): Promise<void> {
   });
 }
 
+async function readJsonBody(request: IncomingMessage): Promise<{ ok: true; value: unknown } | { ok: false; status: number; message: string }> {
+  const contentType = request.headers['content-type'];
+  const contentTypeString = Array.isArray(contentType) ? contentType.join(',') : (contentType ?? '');
+  if (!contentTypeString.toLowerCase().includes('application/json')) {
+    return { ok: false, status: 415, message: 'Content-Type must be application/json' };
+  }
+  const contentLengthHeader = request.headers['content-length'];
+  if (typeof contentLengthHeader === 'string' && Number(contentLengthHeader) > MAX_JSON_BODY_BYTES) {
+    return { ok: false, status: 413, message: `Request body exceeds ${MAX_JSON_BODY_BYTES} bytes` };
+  }
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+  for await (const chunk of request) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buffer.length;
+    if (totalBytes > MAX_JSON_BODY_BYTES) {
+      return { ok: false, status: 413, message: `Request body exceeds ${MAX_JSON_BODY_BYTES} bytes` };
+    }
+    chunks.push(buffer);
+  }
+  if (chunks.length === 0) {
+    return { ok: false, status: 400, message: 'Request body must be a JSON object' };
+  }
+  const text = Buffer.concat(chunks).toString('utf8');
+  try {
+    return { ok: true, value: JSON.parse(text) };
+  } catch {
+    return { ok: false, status: 400, message: 'Request body must be valid JSON' };
+  }
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 export function createUiServer(
   options: UiServerOptions = {},
   dependencies: UiServerDependencies = { findPort: findFirstFreePort },
@@ -115,17 +158,58 @@ export function createUiServer(
   let activeAddress: { url: string; port: number } | undefined;
   let starting: Promise<{ url: string; port: number }> | undefined;
 
+  async function handleSettings(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const body = await readJsonBody(request);
+    if (!body.ok) {
+      sendJson(response, body.status, {
+        error: { code: body.status === 413 ? 'PAYLOAD_TOO_LARGE' : body.status === 415 ? 'UNSUPPORTED_MEDIA_TYPE' : 'MALFORMED_BODY', message: body.message },
+      });
+      return;
+    }
+    if (!isPlainObject(body.value)) {
+      sendJson(response, 400, {
+        error: { code: 'MALFORMED_BODY', message: 'Settings request must be a JSON object' },
+      });
+      return;
+    }
+    const patch: SettingsRequest = body.value;
+    try {
+      const result = await applySettingsPatch(patch, stateStore);
+      sendJson(response, 200, { ok: true, state: result.state, changed: result.changed });
+    } catch (error) {
+      if (error instanceof TransitionRequestError) {
+        sendJson(response, 400, {
+          error: { code: error.code, message: error.message },
+        });
+        return;
+      }
+      sendJson(response, 500, {
+        error: { code: 'STATE_WRITE_FAILED', message: 'Settings could not be persisted' },
+      });
+    }
+  }
+
   async function handleRequest(
     request: IncomingMessage,
     response: ServerResponse,
   ): Promise<void> {
+    const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+
+    if (pathname === '/state/settings') {
+      if (request.method !== 'POST') {
+        response.setHeader('allow', 'POST');
+        sendText(response, 405, 'Method Not Allowed');
+        return;
+      }
+      await handleSettings(request, response);
+      return;
+    }
+
     if (request.method !== 'GET') {
       response.setHeader('allow', 'GET');
       sendText(response, 405, 'Method Not Allowed');
       return;
     }
-
-    const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
 
     if (pathname === '/state') {
       try {

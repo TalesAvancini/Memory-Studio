@@ -6,6 +6,7 @@ import {
   escapeScriptJson,
   renderAuditPartial,
   renderCatalogPartial,
+  renderSettingsPartial,
 } from '@memory-studio/ui';
 
 const SAMPLE_SKILL = {
@@ -302,3 +303,64 @@ test('renderAuditPartial escapes supplied event markup', () => {
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.match(html, /&lt;svg onload=alert\(1\)&gt;/);
 });
+
+// =============================================================================
+// Phase 4.3 — Settings partial (T4.3-2)
+// =============================================================================
+
+function settingsStateFixture(overrides = {}) {
+  return {
+    schemaVersion: 3,
+    activeCatalog: ['skill-a'],
+    thresholds: { minCosineSimilarity: 0.6, minFtsHits: 2 },
+    fastAgent: { model: 'MiniMax-M2.7-highspeed', baseURL: 'https://api.minimax.io/anthropic' },
+    integrationMode: 'cli',
+    agentId: 'claude-code',
+    tenantId: 'tenant-x',
+    embeddingModel: 'multilingual-e5-small',
+    ui: { portRange: [41_823, 42_823], stack: 'htmx+alpine' },
+    ...overrides,
+  };
+}
+
+test('renderSettingsPartial exposes the five editable fields with state values (UI-21)', () => {
+  const state = settingsStateFixture();
+  const html = renderSettingsPartial(state);
+
+  assert.match(html, /data-tab="settings"/);
+  assert.match(html, /x-data="settingsTab"/);
+  // Five inputs visible with state-sourced values.
+  // Order of attributes in the rendered HTML is `value` then `data-settings-input`.
+  assert.match(html, /value="0\.6"[\s\S]*?data-settings-input="minCosineSimilarity"/);
+  assert.match(html, /value="2"[\s\S]*?data-settings-input="minFtsHits"/);
+  assert.match(html, /value="tenant-x"[\s\S]*?data-settings-input="tenantId"/);
+  assert.match(html, /data-settings-input="integrationMode"/);
+  assert.match(html, /<option value="cli" selected/);
+  assert.match(html, /value="multilingual-e5-small"[\s\S]*?data-settings-input="embeddingModel"/);
+  // Status and error regions are bound to Alpine state.
+  assert.match(html, /data-settings-status[^>]*x-show="statusMessage"/);
+  assert.match(html, /data-settings-error[^>]*x-show="errorMessage"/);
+  assert.match(html, /data-settings-submit[^>]*:disabled="submitting"/);
+});
+
+test('renderSettingsPartial enumerates all four integration modes', () => {
+  const html = renderSettingsPartial(settingsStateFixture({ integrationMode: 'hook' }));
+
+  assert.match(html, /<option value="proxy"/);
+  assert.match(html, /<option value="hook" selected/);
+  assert.match(html, /<option value="mcp"/);
+  assert.match(html, /<option value="cli"/);
+});
+
+test('renderSettingsPartial HTML-escapes tenant and embedding model values', () => {
+  const html = renderSettingsPartial(settingsStateFixture({
+    tenantId: '</span><img src=x onerror=alert(1)>',
+    embeddingModel: '<script>window.PWNED=1</script>',
+  }));
+
+  assert.doesNotMatch(html, /<img[^>]*onerror=alert/);
+  assert.doesNotMatch(html, /<script>window\.PWNED/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.match(html, /&lt;script&gt;window\.PWNED=1&lt;\/script&gt;/);
+});
+

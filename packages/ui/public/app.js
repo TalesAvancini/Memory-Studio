@@ -2,6 +2,14 @@ document.addEventListener('alpine:init', () => {
   const tabs = ['skills', 'rules', 'personas', 'audit', 'settings'];
   const CRITICAL_CONFIRMATION_TOKEN = 'CONFIRMAR';
   const MAX_ACTIVE_PERSONAS = 3;
+  const SETTINGS_FIELDS = [
+    'minCosineSimilarity',
+    'minFtsHits',
+    'tenantId',
+    'integrationMode',
+    'embeddingModel',
+  ];
+  const SUPPORTED_INTEGRATION_MODES = ['proxy', 'hook', 'mcp', 'cli'];
 
   function describeCatalogMeta(item) {
     if (!item) return '';
@@ -139,6 +147,103 @@ document.addEventListener('alpine:init', () => {
     },
     displayMeta(item) {
       return describeCatalogMeta(item);
+    },
+  }));
+
+  Alpine.data('settingsTab', () => ({
+    statusMessage: '',
+    errorMessage: '',
+    submitting: false,
+    init() {
+      // Bind the form submission handler directly so the standard browser
+      // form validation still runs before Alpine intercepts the payload.
+      const root = this.$el;
+      const form = root?.querySelector?.('form[data-settings-form]');
+      if (form) {
+        form.addEventListener('submit', (event) => {
+          event.preventDefault();
+          this.submit();
+        });
+      }
+    },
+    readFormPatch() {
+      const root = this.$el;
+      const patch = {};
+      for (const key of SETTINGS_FIELDS) {
+        const input = root?.querySelector?.(`[data-settings-input="${key}"]`);
+        if (!input) return null;
+        if (key === 'minCosineSimilarity' || key === 'minFtsHits') {
+          const parsed = Number(input.value);
+          if (!Number.isFinite(parsed)) return null;
+          patch[key] = parsed;
+        } else {
+          patch[key] = String(input.value ?? '');
+        }
+      }
+      return patch;
+    },
+    setStatus(message) {
+      this.statusMessage = message;
+      this.errorMessage = '';
+    },
+    setError(message) {
+      this.errorMessage = message;
+      this.statusMessage = '';
+    },
+    applyStateToForm(state) {
+      const root = this.$el;
+      const cosineInput = root?.querySelector?.('[data-settings-input="minCosineSimilarity"]');
+      const ftsInput = root?.querySelector?.('[data-settings-input="minFtsHits"]');
+      const tenantInput = root?.querySelector?.('[data-settings-input="tenantId"]');
+      const integrationSelect = root?.querySelector?.('[data-settings-input="integrationMode"]');
+      const embeddingInput = root?.querySelector?.('[data-settings-input="embeddingModel"]');
+      if (cosineInput) cosineInput.value = String(state?.thresholds?.minCosineSimilarity ?? '');
+      if (ftsInput) ftsInput.value = String(state?.thresholds?.minFtsHits ?? '');
+      if (tenantInput) tenantInput.value = state?.tenantId ?? '';
+      if (integrationSelect) integrationSelect.value = state?.integrationMode ?? 'proxy';
+      if (embeddingInput) embeddingInput.value = state?.embeddingModel ?? '';
+    },
+    async submit() {
+      if (this.submitting) return null;
+      const patch = this.readFormPatch();
+      if (!patch) {
+        this.setError('Form fields must contain valid values before saving.');
+        return null;
+      }
+      this.submitting = true;
+      try {
+        const response = await fetch('/state/settings', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok && payload?.state) {
+          this.applyStateToForm(payload.state);
+          this.setStatus(payload.changed ? 'Settings saved.' : 'No changes to save.');
+          return payload.state;
+        }
+        const code = payload?.error?.code ?? 'UNKNOWN';
+        const message = payload?.error?.message ?? `Settings update failed (HTTP ${response.status})`;
+        if (code === 'INVALID_THRESHOLD') {
+          this.setError(`Threshold out of range: ${message}`);
+        } else if (code === 'UNSUPPORTED_INTEGRATION_MODE') {
+          this.setError(message);
+        } else if (code === 'MISSING_STRING_FIELD') {
+          this.setError(`Required field is empty: ${message}`);
+        } else {
+          this.setError(message);
+        }
+        return null;
+      } catch (error) {
+        this.setError(`Settings request failed: ${error?.message ?? error}`);
+        return null;
+      } finally {
+        this.submitting = false;
+      }
+    },
+    isIntegrationModeSupported(mode) {
+      return SUPPORTED_INTEGRATION_MODES.includes(mode);
     },
   }));
 });

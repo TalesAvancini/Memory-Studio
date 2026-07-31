@@ -213,7 +213,79 @@ export function renderAuditPartial(
 }
 
 export function renderSettingsPartial(state: ProjectStateV3): string {
-  return section('settings', `<p>Project state schema ${state.schemaVersion} is loaded.</p>`);
+  const integrationModeOptions = [
+    'proxy',
+    'hook',
+    'mcp',
+    'cli',
+  ]
+    .map((value) => `<option value="${escapeAttr(value)}"${value === state.integrationMode ? ' selected' : ''}>${escapeHtml(value)}</option>`)
+    .join('');
+
+  const body = `
+<section class="settings-tab" x-data="settingsTab">
+<p class="settings-intro" data-settings-intro>Schema ${state.schemaVersion} project settings.</p>
+<p class="settings-status" data-settings-status role="status" aria-live="polite" x-show="statusMessage" x-text="statusMessage"></p>
+<p class="settings-error" data-settings-error role="alert" x-show="errorMessage" x-text="errorMessage"></p>
+<form class="settings-form" data-settings-form aria-labelledby="settings-heading">
+  <label class="settings-field">
+    <span class="settings-field-label">Minimum cosine similarity</span>
+    <input
+      type="number"
+      name="minCosineSimilarity"
+      step="0.01"
+      min="0"
+      max="1"
+      value="${escapeAttr(String(state.thresholds.minCosineSimilarity))}"
+      data-settings-input="minCosineSimilarity"
+      required
+    >
+  </label>
+  <label class="settings-field">
+    <span class="settings-field-label">Minimum FTS hits</span>
+    <input
+      type="number"
+      name="minFtsHits"
+      step="1"
+      min="0"
+      value="${escapeAttr(String(state.thresholds.minFtsHits))}"
+      data-settings-input="minFtsHits"
+      required
+    >
+  </label>
+  <label class="settings-field">
+    <span class="settings-field-label">Tenant</span>
+    <input
+      type="text"
+      name="tenantId"
+      value="${escapeAttr(state.tenantId ?? '')}"
+      data-settings-input="tenantId"
+      required
+    >
+  </label>
+  <label class="settings-field">
+    <span class="settings-field-label">Integration mode</span>
+    <select name="integrationMode" data-settings-input="integrationMode" required>
+      ${integrationModeOptions}
+    </select>
+  </label>
+  <label class="settings-field">
+    <span class="settings-field-label">Embedding model</span>
+    <input
+      type="text"
+      name="embeddingModel"
+      value="${escapeAttr(state.embeddingModel ?? '')}"
+      data-settings-input="embeddingModel"
+      required
+    >
+  </label>
+  <div class="settings-actions">
+    <button type="submit" data-settings-submit :disabled="submitting" x-text="submitting ? 'Saving…' : 'Save settings'"></button>
+  </div>
+</form>
+</section>`.trim();
+
+  return section('settings', body);
 }
 
 export function renderSafeErrorPartial(tab: UiTab): string {

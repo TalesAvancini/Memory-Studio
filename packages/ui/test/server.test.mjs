@@ -322,3 +322,238 @@ test('hash router normalizes empty and unknown hashes and loads known tabs', asy
   assert.equal(panel.tab, 'rules');
   assert.equal(requests.at(-1).path, '/ui/rules');
 });
+
+// =============================================================================
+// Phase 4.3 — POST /state/settings (T4.3-2)
+// =============================================================================
+
+const VALID_SETTINGS_PATCH = {
+  minCosineSimilarity: 0.75,
+  minFtsHits: 3,
+  tenantId: 'tenant-1',
+  integrationMode: 'cli',
+  embeddingModel: 'multilingual-e5-small',
+};
+
+async function postSettings(url, body, { contentType = 'application/json' } = {}) {
+  return fetch(new URL('state/settings', url), {
+    method: 'POST',
+    headers: { 'content-type': contentType },
+    body,
+  });
+}
+
+test('POST /state/settings persists all five fields and preserves unrelated state (UI-21, UI-22)', async (t) => {
+  const projectRoot = await projectFixture(t);
+  await mkdir(join(projectRoot, '.memory-studio'), { recursive: true });
+  await writeFile(
+    join(projectRoot, '.memory-studio', 'state.json'),
+    JSON.stringify({
+      schemaVersion: 3,
+      activeCatalog: ['skill-a', 'rule-1'],
+      thresholds: { minCosineSimilarity: 0.5, minFtsHits: 4 },
+      fastAgent: { model: 'gpt-fast', baseURL: 'https://api.example.com/v1' },
+      integrationMode: 'proxy',
+      agentId: 'claude-code',
+      tenantId: '',
+      embeddingModel: 'old-model',
+      ui: { portRange: [41_823, 42_823], stack: 'htmx+alpine' },
+    }, null, 2),
+    'utf8',
+  );
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const response = await postSettings(url, JSON.stringify(VALID_SETTINGS_PATCH));
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'application/json; charset=utf-8');
+  const payload = await response.json();
+  assert.equal(payload.ok, true);
+  assert.equal(payload.changed, true);
+  assert.equal(payload.state.thresholds.minCosineSimilarity, 0.75);
+  assert.equal(payload.state.thresholds.minFtsHits, 3);
+  assert.equal(payload.state.tenantId, 'tenant-1');
+  assert.equal(payload.state.integrationMode, 'cli');
+  assert.equal(payload.state.embeddingModel, 'multilingual-e5-small');
+  // Schema-v3 unrelated fields preserved.
+  assert.equal(payload.state.schemaVersion, 3);
+  assert.deepEqual(payload.state.activeCatalog, ['skill-a', 'rule-1']);
+  assert.deepEqual(payload.state.fastAgent, { model: 'gpt-fast', baseURL: 'https://api.example.com/v1' });
+  assert.equal(payload.state.agentId, 'claude-code');
+  assert.deepEqual(payload.state.ui, { portRange: [41_823, 42_823], stack: 'htmx+alpine' });
+
+  // Subsequent state read confirms the persisted file.
+  const reread = await (await fetch(new URL('state', url))).json();
+  assert.equal(reread.thresholds.minCosineSimilarity, 0.75);
+  assert.equal(reread.integrationMode, 'cli');
+});
+
+test('POST /state/settings rejects out-of-range cosine with 400 and leaves state unchanged (UI-23)', async (t) => {
+  const projectRoot = await projectFixture(t);
+  await mkdir(join(projectRoot, '.memory-studio'), { recursive: true });
+  const initialBytes = JSON.stringify({
+    schemaVersion: 3,
+    activeCatalog: ['skill-keep'],
+    thresholds: { minCosineSimilarity: 0.42, minFtsHits: 9 },
+    fastAgent: { model: 'MiniMax-M2.7-highspeed', baseURL: 'https://api.minimax.io/anthropic' },
+    integrationMode: 'proxy',
+    agentId: 'claude-code',
+    tenantId: 'before-tenant',
+    embeddingModel: 'before-model',
+    ui: { portRange: [41_823, 42_823], stack: 'htmx+alpine' },
+  }, null, 2);
+  await writeFile(
+    join(projectRoot, '.memory-studio', 'state.json'),
+    initialBytes,
+    'utf8',
+  );
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const cases = [
+    { minCosineSimilarity: 1.01, label: 'above range' },
+    { minCosineSimilarity: -0.01, label: 'below range' },
+    { minCosineSimilarity: Number.NaN, label: 'NaN (serialized as null)' },
+  ];
+
+  for (const overrides of cases) {
+    const patch = { ...VALID_SETTINGS_PATCH, ...overrides };
+    if (overrides.minCosineSimilarity === Number.NaN) {
+      patch.minCosineSimilarity = 'high'; // string → NaN coercion at parse time
+      delete patch.minCosineSimilarity;
+    }
+    const response = await postSettings(url, JSON.stringify(patch));
+    const payload = await response.json();
+    assert.equal(response.status, 400, `case: ${overrides.label}`);
+    assert.equal(payload.error.code, 'INVALID_THRESHOLD');
+  }
+
+  // State bytes on disk must remain identical to the pre-attempt snapshot.
+  const stateFile = join(projectRoot, '.memory-studio', 'state.json');
+  const persistedBytes = await (await import('node:fs/promises')).readFile(stateFile, 'utf8');
+  assert.equal(persistedBytes, initialBytes);
+});
+
+test('POST /state/settings rejects negative or non-integer minFtsHits with 400 (UI-23)', async (t) => {
+  const projectRoot = await projectFixture(t);
+  await mkdir(join(projectRoot, '.memory-studio'), { recursive: true });
+  const initial = {
+    schemaVersion: 3,
+    activeCatalog: [],
+    thresholds: { minCosineSimilarity: 0.5, minFtsHits: 5 },
+    fastAgent: { model: 'm', baseURL: 'https://api.example.com/v1' },
+    integrationMode: 'proxy',
+    agentId: 'a',
+    tenantId: 't',
+    embeddingModel: 'e',
+    ui: { portRange: [41_823, 42_823], stack: 'htmx+alpine' },
+  };
+  await writeFile(
+    join(projectRoot, '.memory-studio', 'state.json'),
+    JSON.stringify(initial, null, 2),
+    'utf8',
+  );
+  const initialBytes = await (await import('node:fs/promises')).readFile(
+    join(projectRoot, '.memory-studio', 'state.json'),
+    'utf8',
+  );
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const cases = [-1, 1.5, 'three'];
+  for (const minFtsHits of cases) {
+    const response = await postSettings(url, JSON.stringify({ ...VALID_SETTINGS_PATCH, minFtsHits }));
+    const payload = await response.json();
+    assert.equal(response.status, 400, `minFtsHits: ${String(minFtsHits)}`);
+    assert.equal(payload.error.code, 'INVALID_THRESHOLD');
+  }
+
+  const persistedBytes = await (await import('node:fs/promises')).readFile(
+    join(projectRoot, '.memory-studio', 'state.json'),
+    'utf8',
+  );
+  assert.equal(persistedBytes, initialBytes);
+});
+
+test('POST /state/settings rejects unsupported integrationMode with 400 (UI-23)', async (t) => {
+  const projectRoot = await projectFixture(t);
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const cases = ['websocket', 'PROXY', ''];
+  for (const integrationMode of cases) {
+    const response = await postSettings(url, JSON.stringify({ ...VALID_SETTINGS_PATCH, integrationMode }));
+    const payload = await response.json();
+    assert.equal(response.status, 400, `mode: ${integrationMode}`);
+    assert.equal(payload.error.code, 'UNSUPPORTED_INTEGRATION_MODE');
+  }
+});
+
+test('POST /state/settings rejects empty tenantId/embeddingModel with 400 (UI-23)', async (t) => {
+  const projectRoot = await projectFixture(t);
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const cases = [
+    { tenantId: '', label: 'empty tenantId' },
+    { embeddingModel: '', label: 'empty embeddingModel' },
+  ];
+  for (const overrides of cases) {
+    const response = await postSettings(url, JSON.stringify({ ...VALID_SETTINGS_PATCH, ...overrides }));
+    const payload = await response.json();
+    assert.equal(response.status, 400, overrides.label);
+    assert.equal(payload.error.code, 'MISSING_STRING_FIELD');
+  }
+});
+
+test('POST /state/settings rejects non-JSON body with 400 and typed error envelope', async (t) => {
+  const projectRoot = await projectFixture(t);
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const response = await postSettings(url, '{ not json');
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'MALFORMED_BODY');
+});
+
+test('POST /state/settings rejects non-object body with 400 and typed error envelope', async (t) => {
+  const projectRoot = await projectFixture(t);
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const response = await postSettings(url, JSON.stringify([1, 2, 3]));
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'MALFORMED_BODY');
+});
+
+test('POST /state/settings returns 405 for non-POST methods', async (t) => {
+  const projectRoot = await projectFixture(t);
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const response = await fetch(new URL('state/settings', url), { method: 'GET' });
+  assert.equal(response.status, 405);
+  assert.equal(response.headers.get('allow'), 'POST');
+});
+
