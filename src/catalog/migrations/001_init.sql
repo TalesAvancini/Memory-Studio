@@ -127,12 +127,15 @@ END;
 CREATE TRIGGER IF NOT EXISTS embeddings_au
 AFTER UPDATE ON embeddings
 BEGIN
-  INSERT INTO catalog_vec(catalog_vec, rowid, embedding) VALUES ('delete', old.rowid, old.vector);
+  -- sqlite-vec 0.1.9 (vec0) uses regular SQL DELETE on the virtual table,
+  -- NOT the FTS5 ('delete', ...) command. FTS5 delete-command syntax only
+  -- works on contentless/external-content FTS5 tables; vec0 is not FTS5.
+  DELETE FROM catalog_vec WHERE rowid = old.rowid;
   INSERT INTO catalog_vec(rowid, embedding) VALUES (new.rowid, new.vector);
 END;
 
 CREATE TRIGGER IF NOT EXISTS embeddings_ad
 AFTER DELETE ON embeddings
 BEGIN
-  INSERT INTO catalog_vec(catalog_vec, rowid, embedding) VALUES ('delete', old.rowid, old.vector);
+  DELETE FROM catalog_vec WHERE rowid = old.rowid;
 END;
