@@ -1,0 +1,4 @@
+import test from 'node:test'; import assert from 'node:assert/strict'; import { hashSha256_16 } from '../src/hash.ts';
+test('SHA-256 golden vectors and shape', () => { assert.equal(hashSha256_16(''), 'e3b0c44298fc1c149afbf4c8996fb924'); assert.equal(hashSha256_16('abc'), 'ba7816bf8f01cfea414140de5dae2223'); assert.equal(hashSha256_16('The quick brown fox jumps over the lazy dog'), 'd7a8fbb307d7809469ca9abcb0082e4f'); assert.equal(hashSha256_16('The quick brown fox jumps over the lazy cog'), 'e4c4d8f3bf76b692de791a173e053211'); });
+test('hash is deterministic and 32 lowercase hex chars', () => { const input = 'deterministic'; assert.equal(hashSha256_16(input), hashSha256_16(input)); assert.match(hashSha256_16(input), /^[0-9a-f]{32}$/); });
+test('hashes 1MB promptly', () => { const start = performance.now(); hashSha256_16('x'.repeat(1024 * 1024)); assert.ok(performance.now() - start < 100); });

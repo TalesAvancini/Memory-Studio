@@ -1,4 +1,4 @@
-import type { RedactionMode } from './types.js';
+import type { RedactionMode } from './types.ts';
 export const REDACTED = '<REDACTED>';
 const MINIMAL = [
   /\b(?:sk|pk)[-_][A-Za-z0-9]{20,}\b/g,
