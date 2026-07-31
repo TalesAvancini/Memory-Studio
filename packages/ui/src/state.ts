@@ -21,7 +21,7 @@ export interface ProjectStateV3 {
     baseURL: string;
     [key: string]: unknown;
   };
-  integrationMode: 'proxy' | 'hook' | 'mcp';
+  integrationMode: 'proxy' | 'hook' | 'mcp' | 'cli';
   agentId: string;
   tenantId?: string;
   embeddingModel?: string;
@@ -134,8 +134,9 @@ export function validateProjectState(value: unknown): asserts value is ProjectSt
 
   if (value.integrationMode !== 'proxy'
     && value.integrationMode !== 'hook'
-    && value.integrationMode !== 'mcp') {
-    invalid('integrationMode must be proxy, hook, or mcp');
+    && value.integrationMode !== 'mcp'
+    && value.integrationMode !== 'cli') {
+    invalid('integrationMode must be proxy, hook, mcp, or cli');
   }
   if (!isNonEmptyString(value.agentId)) invalid('agentId must be a non-empty string');
   if (value.tenantId !== undefined && typeof value.tenantId !== 'string') {

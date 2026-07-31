@@ -9,6 +9,7 @@ import {
   createDefaultProjectState,
   createProjectStateStore,
   readProjectState,
+  validateProjectState,
   writeProjectState,
 } from '@memory-studio/ui';
 
@@ -200,4 +201,32 @@ test('temp write failure preserves prior bytes and removes partial temporary fil
 
   assert.equal(await readFile(statePath, 'utf8'), before);
   assert.deepEqual((await readdir(join(root, '.memory-studio'))).filter((name) => name.endsWith('.tmp')), []);
+});
+
+test('integrationMode accepts the "cli" enum extension', () => {
+  // Pure in-memory check — no filesystem involved.
+  const state = validState({ integrationMode: 'cli' });
+  assert.doesNotThrow(() => validateProjectState(state));
+});
+
+test('integrationMode still rejects unknown values after extension', () => {
+  const state = validState({ integrationMode: 'websocket' });
+  assert.throws(
+    () => validateProjectState(state),
+    (error) => {
+      assert.ok(error instanceof ProjectStateConflictError);
+      assert.equal(error.code, 'INVALID_STATE');
+      return true;
+    },
+  );
+});
+
+test('integrationMode "cli" round-trips through atomic write and read', async (t) => {
+  const { statePath } = await fixture(t);
+  const state = validState({ integrationMode: 'cli' });
+
+  await writeProjectState(statePath, state);
+  const persisted = await readProjectState(statePath);
+
+  assert.equal(persisted.integrationMode, 'cli');
 });
