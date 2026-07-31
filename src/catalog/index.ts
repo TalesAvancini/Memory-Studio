@@ -13,6 +13,10 @@
  *   - Typed error surface (Phase 1.2): from `./errors.js`
  *   - Migration runner (Phase 1.2): from `./migrations/runner.js`
  *   - DB opener + sqlite-vec load (Phase 1.2): from `./db/open.js`
+ *   - Embedder interface + multilingual-e5-small impl (Phase 1.3):
+ *     from `./embedder/index.js`
+ *   - CatalogLoader orchestration (Phase 1.3): from `./loader.js`
+ *   - Schema version helper (Phase 1.3): from `./version.js`
  *   - Calibration-residue compat (DDL helper for `test/search/**`):
  *     from `./schema.js`
  */
@@ -47,6 +51,39 @@ export {
   openAndMigrate,
   EMBEDDING_DIMENSIONS,
 } from './db/open.ts';
+
+// Phase 1.3 — Embedder interface + multilingual-e5-small implementation
+// + model-path utilities. Re-exported through the new barrel module.
+export {
+  EMBEDDING_DIMENSIONS as EMBEDDER_MODEL_DIMS,
+  MultilingualE5SmallEmbedder,
+  defaultCacheDir,
+  defaultModelId,
+  expectedModelPath,
+  assertMultilingualE5SmallCached,
+  MULTILINGUAL_E5_SMALL_REPO,
+} from './embedder/index.ts';
+export type {
+  Embedder,
+  EmbedderKind,
+  MultilingualE5SmallEmbedderOptions,
+} from './embedder/index.ts';
+
+// Phase 1.3 — CatalogLoader orchestration (parse → validate → embed →
+// upsert → prune). Re-exported for Phase 1.4 build-index CLI and Phase 5
+// tooling that wants to drive catalog rebuilds programmatically.
+export { CatalogLoader } from './loader.ts';
+export type {
+  CatalogLoaderOptions,
+  LoadResult,
+} from './loader.ts';
+
+// Phase 1.3 — schemaVersion helper. Phase 5 wires the literal 3 into
+// /catalog GET responses per PRD §6.4.
+export {
+  CATALOG_SCHEMA_VERSION,
+  getCatalogSchemaVersion,
+} from './version.ts';
 
 // Calibration-residue DDL helper. `test/search/**` opens an in-memory DB
 // and calls `createSchema` to seed the legacy `skills` table for its FTS5
