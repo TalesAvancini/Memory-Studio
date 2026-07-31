@@ -1,46 +1,27 @@
-# Lessons
+# LESSONS — auto-maintained by scripts/lessons.py
 
-Self-improving lessons playbook. **Rendered from `.specs/lessons.json` via `scripts/lessons.py`** — do NOT hand-edit.
+> Machine-owned. Do NOT hand-edit. Changes are overwritten on the next `lessons.py` write.
+> Canonical state lives in `.specs/lessons.json`. Edit lessons only via the script.
+> promote_threshold=2 distinct features · window_days=45 · quarantine_threshold=2
 
-## Status legend
+## Confirmed (load these at Specify/Design)
 
-- **candidate** — Verifier FAIL surfaced a grounded lesson. Not yet confirmed.
-- **confirmed** — Validated across ≥2 phases OR human-confirmed. Loaded before Planner dispatch.
-- **quarantined** — Marked false-positive. Kept for audit, never loaded.
+Corroborated across multiple features. Safe to apply as guidance.
 
-## Schema (per lesson)
+_none_
 
-```json
-{
-  "id": "L-NNN",
-  "status": "candidate | confirmed | quarantined",
-  "category": "correctness | robustness | perf | ux | integration",
-  "summary": "One-sentence actionable lesson",
-  "evidence": [
-    {"phase": "N", "finding": "Description of grounded failure", "ref": "path:line"}
-  ],
-  "added_at": "ISO-8601",
-  "promoted_at": "ISO-8601 (when status → confirmed)"
-}
-```
+## Candidates (under observation — do NOT load as guidance yet)
 
-## Confirmed lessons (loaded by tlc-roadmap-loop before Planner dispatch)
+Seen once or not yet corroborated. Tracked, not trusted.
 
-*(empty — first confirmed lesson will be added after first Verifier FAIL or human-curated entry)*
+### L-001 — vec0 virtual tables (sqlite-vec) reject FTS5-style ('delete', ...) trigger command syntax; use plain 'DELETE FROM vec_table WHERE rowid = old.rowid' instead. Triggers on catalog_fts (FTS5) keep ('delete', ...) syntax because they target FTS5 not vec0.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `src/catalog/migrations/*.sql` · harmful: 0
+- features: phase-1.2
+- evidence: src/catalog/migrations/001_init.sql:embeddings_au (src/catalog/migrations/*.sql)
+- last seen: 2026-07-31T02:33:03Z
 
-## Candidate lessons (audit log only, never loaded)
+## Quarantined (failed when applied — ignore)
 
-*(empty)*
+A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
 
-## Quarantined (audit only, never loaded)
-
-*(empty)*
-
----
-
-## Maintenance contract
-
-- `scripts/lessons.py add` — append candidate from grounded failure (called by Verifier)
-- `scripts/lessons.py promote <id>` — candidate → confirmed (manual, after ≥2 phase validations)
-- `scripts/lessons.py list --status confirmed` — what tlc-roadmap-loop loads before dispatch
-- `scripts/lessons.py quarantine <id>` — false-positive, marked and skipped
+_none_

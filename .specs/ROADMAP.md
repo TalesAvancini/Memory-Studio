@@ -183,7 +183,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 1.2 — Migrations + FTS5 + sqlite-vec [ ]
+#### Phase 1.2 — Migrations + FTS5 + sqlite-vec [x]
 
 **Done when:** SQLite DDL creates `catalog`, `embeddings`, `audit_events`, `schema_migrations`, `catalog_fts` (FTS5), `catalog_vec` (sqlite-vec 384d); triggers sync correctly; migration runner is idempotent.
 

@@ -74,18 +74,21 @@ related:
 
 ## Handoff
 
-- **phase:** "Phase 1.2 — Migrations + FTS5 + sqlite-vec"
-- **phase-previous:** "Phase 1.1 — YAML Schema + Zod Validation" (DONE 2026-07-30, 2 iterations, Verifier PASS commit `ea4bc54`)
-- **phase-zero:** "Phase 0 — Environment Validation" (DONE 2026-07-30, 6/6 checks PASS, sha256 stable)
+- **phase:** "Phase 1.3 — CatalogLoader + Embedder"
+- **phase-previous:** "Phase 1.2 — Migrations + FTS5 + sqlite-vec" (DONE 2026-07-30, 1 iteration, Verifier PASS commit `b49ae4f`)
+- **phase-1.1:** "Phase 1.1 — YAML Schema + Zod Validation" (DONE 2026-07-30, 2 iterations)
+- **phase-zero:** "Phase 0 — Environment Validation" (DONE 2026-07-30, 6/6 checks PASS)
 - **era:** `2026-08-prd-v3-ready`
 - **era-anterior:** `2026-07-foundation-complete` (skill calibrada, archived em `archive_handoff/`)
 - **next-epoch:** PRD-driven product build (Phases 0-7b de `.specs/ROADMAP.md`)
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Planner para Phase 1.2 — Migrations + FTS5 + sqlite-vec
-- **working-tree:** working (`loop/phase-0` em `ea4bc54`)
-- **phase-1.1-feature-dir:** `.specs/features/phase-1-catalog-schema-index/{spec.md, design.md, tasks.md, validation.md, fix-tasks.md}` (Verifier PASS commit `ea4bc54`)
+- **próximo-step-concreto:** dispatch Implementer para Phase 1.3 — CatalogLoader + Embedder
+- **working-tree:** working (`loop/phase-0` em `b49ae4f`)
+- **lessons-store:** L-001 added (status=candidate, recurrence=1) — vec0 ≠ FTS5 trigger syntax
+- **phase-1.2-feature-dir:** `.specs/features/phase-1-catalog-schema-index/validation-phase-1.2.md` (commit `b49ae4f`)
+- **phase-1.1-feature-dir:** `.specs/features/phase-1-catalog-schema-index/{spec.md, design.md, tasks.md, validation.md, fix-tasks.md}` (commit `ea4bc54`)
 - **phase-0-feature-dir:** `.specs/features/phase-0-environment-validation/{spec.md, tasks.md, validation.md}` (Verifier PASS commit `218dad1`)
 - **não-congela:** STATE.md `## Decisions` append-only; `## Handoff` overwrite por sessão
-- **calibration residue:** `src/catalog/**` reescrito em Phase 1.1 (YAML+Zod); DB layer + load+embed é Phase 1.2/1.3. `src/social-detector/` untouched (Phase 2 promotes).
+- **calibration residue:** `src/catalog/**` schema+DB reescrito em Phase 1.1+1.2; loader+embedder é Phase 1.3. `src/social-detector/` untouched (Phase 2 promotes).

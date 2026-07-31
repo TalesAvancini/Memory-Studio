@@ -1,4 +1,28 @@
 {
   "schema_version": 1,
-  "lessons": []
+  "lessons": [
+    {
+      "id": "L-001",
+      "key": "surviving_mutant::vec0 virtual tables sqlite vec reject fts5 style delete trigger command syntax use plain delete from vec table where rowid old rowid instead triggers on catalog fts fts5 keep delete syntax because they target fts5 not vec0",
+      "text": "vec0 virtual tables (sqlite-vec) reject FTS5-style ('delete', ...) trigger command syntax; use plain 'DELETE FROM vec_table WHERE rowid = old.rowid' instead. Triggers on catalog_fts (FTS5) keep ('delete', ...) syntax because they target FTS5 not vec0.",
+      "signal": "surviving_mutant",
+      "scope": "src/catalog/migrations/*.sql",
+      "status": "candidate",
+      "features": [
+        "phase-1.2"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "src/catalog/migrations/001_init.sql:embeddings_au (src/catalog/migrations/*.sql)"
+      ],
+      "created": "2026-07-31T02:33:03Z",
+      "last_seen": "2026-07-31T02:33:03Z"
+    }
+  ],
+  "promote_threshold": 2,
+  "window_days": 45,
+  "quarantine_threshold": 2,
+  "schema": 1,
+  "next_id": 2
 }
