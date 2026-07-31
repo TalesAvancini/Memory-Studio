@@ -13,7 +13,6 @@
 //   5. embedding           — multilingual-e5-small ONNX produces a 384d Float32Array
 //   6. filesystem          — .memory-studio/state.json write+read roundtrip preserves original content
 
-import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -181,7 +180,7 @@ async function checkEmbedding() {
     );
     return;
   }
-  const { pipeline, env, AutoTokenizer } = transformers;
+  const { pipeline, env } = transformers;
   if (!pipeline || typeof pipeline !== 'function') {
     record(
       'embedding',
