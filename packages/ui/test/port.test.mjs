@@ -22,21 +22,18 @@ async function close(server) {
 }
 
 async function findFreePair() {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    const firstProbe = await listen();
-    const address = firstProbe.address();
-    assert.notEqual(address, null);
-    assert.equal(typeof address, 'object');
-    const first = address.port;
-    await close(firstProbe);
-    if (first === 65_535) continue;
-
+  for (let first = 43_000; first < 43_999; first += 2) {
+    let firstProbe;
+    let secondProbe;
     try {
-      const secondProbe = await listen(first + 1);
-      await close(secondProbe);
+      firstProbe = await listen(first);
+      secondProbe = await listen(first + 1);
       return first;
     } catch (error) {
-      if (error?.code !== 'EADDRINUSE') throw error;
+      if (error?.code !== 'EADDRINUSE' && error?.code !== 'EACCES') throw error;
+    } finally {
+      if (firstProbe) await close(firstProbe);
+      if (secondProbe) await close(secondProbe);
     }
   }
   throw new Error('Could not locate two consecutive free ports for test fixture');

@@ -29,6 +29,24 @@ async function freePort() {
   return address.port;
 }
 
+async function findFreePair(start, end) {
+  for (let first = start; first < end; first += 2) {
+    let firstProbe;
+    let secondProbe;
+    try {
+      firstProbe = await listen(first);
+      secondProbe = await listen(first + 1);
+      return first;
+    } catch (error) {
+      if (error?.code !== 'EADDRINUSE' && error?.code !== 'EACCES') throw error;
+    } finally {
+      if (firstProbe) await close(firstProbe);
+      if (secondProbe) await close(secondProbe);
+    }
+  }
+  throw new Error('Could not locate two consecutive free ports for test fixture');
+}
+
 function launch(portRange) {
   return spawn(process.execPath, ['--experimental-strip-types', '--no-warnings', launcherPath], {
     env: { ...process.env, MEMORY_STUDIO_UI_PORT_RANGE: portRange },
@@ -71,37 +89,37 @@ async function waitForUrl(child) {
 }
 
 test('server selects the next port when the first is occupied and closes cleanly', async (t) => {
-  const occupied = await listen();
+  const first = await findFreePair(44_000, 44_999);
+  const occupied = await listen(first);
   t.after(() => close(occupied));
-  const occupiedAddress = occupied.address();
-  assert.notEqual(occupiedAddress, null);
-  assert.equal(typeof occupiedAddress, 'object');
 
-  const server = createUiServer({ portRange: [occupiedAddress.port, occupiedAddress.port + 20] });
+  const server = createUiServer({ portRange: [first, first + 1] });
   t.after(() => server.close());
 
   const started = await server.start();
 
-  assert.equal(started.port, occupiedAddress.port + 1);
+  assert.equal(started.port, first + 1);
   assert.equal(started.url, `http://${UI_HOST}:${started.port}/`);
   await server.close();
   await assert.doesNotReject(() => server.close());
 });
 
 test('server retries upward when the probed port is claimed before bind', async (t) => {
-  let first = await freePort();
-  while (first > 65_515) first = await freePort();
-  const rangeEnd = first + 20;
+  const first = await findFreePair(45_000, 45_999);
+  const rangeEnd = first + 1;
   const occupiedAfterProbe = await listen(first);
   t.after(() => close(occupiedAfterProbe));
-  const expected = await findFirstFreePort([first + 1, rangeEnd]);
   const requestedRanges = [];
+  const selectedByProbe = [];
   const server = createUiServer(
     { portRange: [first, rangeEnd] },
     {
       findPort: async (range) => {
         requestedRanges.push(range);
-        return requestedRanges.length === 1 ? first : findFirstFreePort(range);
+        if (requestedRanges.length === 1) return first;
+        const selected = await findFirstFreePort(range);
+        selectedByProbe.push(selected);
+        return selected;
       },
     },
   );
@@ -109,7 +127,7 @@ test('server retries upward when the probed port is claimed before bind', async 
 
   const started = await server.start();
 
-  assert.equal(started.port, expected);
+  assert.equal(started.port, selectedByProbe.at(-1));
   assert.deepEqual(requestedRanges, [[first, rangeEnd], [first + 1, rangeEnd]]);
 });
 
