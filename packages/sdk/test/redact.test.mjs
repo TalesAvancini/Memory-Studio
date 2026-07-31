@@ -1,0 +1,6 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { redactString, redactValue } from '../src/redact.ts';
+test('minimal redacts API key, env value, and JWT', () => { assert.equal(redactString('My API key is sk-1234567890abcdef1234567890abcdef', 'minimal'), 'My API key is <REDACTED>'); assert.equal(redactString('password=hunter2 in my .env', 'minimal'), '<REDACTED> in my .env'); assert.equal(redactString('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c is my JWT', 'minimal'), '<REDACTED> is my JWT'); });
+test('strict-only AWS key is preserved minimally and redacted strictly', () => { assert.equal(redactString('AKIAIOSFODNN7EXAMPLE', 'minimal'), 'AKIAIOSFODNN7EXAMPLE'); assert.equal(redactString('AKIAIOSFODNN7EXAMPLE', 'strict'), '<REDACTED>'); });
+test('redactValue recursively preserves safe values and primitives', () => { assert.deepEqual(redactValue({ api_key: 'sk-1234567890abcdef1234567890abcdef', safe: 'public' }, 'minimal'), { api_key: '<REDACTED>', safe: 'public' }); assert.deepEqual(redactValue([{ token: 'sk-1234567890abcdef1234567890abcdef' }, 'safe'], 'minimal'), [{ token: '<REDACTED>' }, 'safe']); assert.equal(redactValue(null, 'minimal'), null); assert.equal(redactValue(undefined, 'minimal'), undefined); assert.equal(redactValue(42, 'minimal'), 42); });
