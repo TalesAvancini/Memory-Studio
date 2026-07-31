@@ -18,5 +18,16 @@ export {
   type AugmentServerHandle,
 } from './boot.ts';
 
+export {
+  AugmentRequestSchema,
+  AugmentResponseSchema,
+  ContextSchema,
+  FingerprintSchema,
+  type AugmentRequest,
+  type AugmentResponse,
+  type Context,
+  type Fingerprint,
+} from './schema.ts';
+
 export { registerAugmentRoute, recordAugmentSuccess } from './augment.ts';
 export { registerHealthRoute } from './health.ts';
