@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Memory Studio</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+    <script defer src="/assets/htmx.min.js"></script>
+    <script defer src="/assets/app.js"></script>
+    <script defer src="/assets/alpine.min.js"></script>
+  </head>
+  <body x-data="uiPanel" @hashchange.window="route()">
+    <header>
+      <h1>Memory Studio</h1>
+      <nav aria-label="Memory Studio sections">
+        <a href="#skills" :aria-current="tab === 'skills' ? 'page' : null">Skills</a>
+        <a href="#rules" :aria-current="tab === 'rules' ? 'page' : null">Rules</a>
+        <a href="#personas" :aria-current="tab === 'personas' ? 'page' : null">Personas</a>
+        <a href="#audit" :aria-current="tab === 'audit' ? 'page' : null">Audit</a>
+        <a href="#settings" :aria-current="tab === 'settings' ? 'page' : null">Settings</a>
+      </nav>
+    </header>
+    <main id="panel-content" aria-live="polite">
+      <p>Loading Skills…</p>
+    </main>
+  </body>
+</html>
