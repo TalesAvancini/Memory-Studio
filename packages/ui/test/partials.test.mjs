@@ -4,6 +4,7 @@ import {
   CRITICAL_RULE_EXAMPLE_COPY,
   PERSONA_CAP_MESSAGE,
   escapeScriptJson,
+  renderAuditPartial,
   renderCatalogPartial,
 } from '@memory-studio/ui';
 
@@ -241,4 +242,63 @@ test('Critical Rule row exposes critical marker on the toggle button', () => {
   assert.match(html, /:data-critical="item\.type === 'rule' &amp;&amp; item\.critical"/);
   // One template instance contains the data-catalog-toggle marker.
   assert.match(html, /data-catalog-toggle/);
+});
+
+test('renderAuditPartial renders the newest N supplied events with required evidence', () => {
+  const html = renderAuditPartial([
+    {
+      timestamp: '2026-07-31T08:00:00.000Z',
+      redactedPrompt: 'older prompt',
+      matchedIds: ['skill-old'],
+      pruningReasons: ['below threshold'],
+      latencyMs: 19,
+    },
+    {
+      timestamp: '2026-07-31T10:00:00.000Z',
+      redactedPrompt: 'newest prompt',
+      matchedIds: ['rule-new', 'persona-new'],
+      pruningReasons: ['token budget'],
+      latencyMs: 7,
+    },
+    {
+      timestamp: '2026-07-31T09:00:00.000Z',
+      redactedPrompt: 'middle prompt',
+      matchedIds: ['skill-middle'],
+      pruningReasons: [],
+      latencyMs: 11,
+    },
+  ], 2);
+
+  assert.match(html, /2026-07-31T10:00:00\.000Z/);
+  assert.match(html, /newest prompt/);
+  assert.match(html, /rule-new/);
+  assert.match(html, /persona-new/);
+  assert.match(html, /token budget/);
+  assert.match(html, />7 ms</);
+  assert.match(html, /2026-07-31T09:00:00\.000Z/);
+  assert.doesNotMatch(html, /older prompt/);
+  assert.ok(html.indexOf('newest prompt') < html.indexOf('middle prompt'));
+});
+
+test('renderAuditPartial renders honest empty state and canonical recentFiles tooltip', () => {
+  const html = renderAuditPartial([]);
+
+  assert.match(html, /no audit events yet/i);
+  assert.match(html, /title="[^"]*recentFiles[^"]*"/);
+  assert.doesNotMatch(html, /gitStatus|recent_files|recentFilesList|lastFiles/);
+});
+
+test('renderAuditPartial escapes supplied event markup', () => {
+  const html = renderAuditPartial([{
+    timestamp: '<time onmouseover=alert(1)>',
+    redactedPrompt: '<script>alert(1)</script>',
+    matchedIds: ['<img src=x onerror=alert(1)>'],
+    pruningReasons: ['<svg onload=alert(1)>'],
+    latencyMs: 3,
+  }]);
+
+  assert.doesNotMatch(html, /<script>alert|<img src=x|<svg onload|<time onmouseover/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
+  assert.match(html, /&lt;svg onload=alert\(1\)&gt;/);
 });

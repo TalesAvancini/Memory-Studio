@@ -1,4 +1,9 @@
-import type { AuditReader, AuditViewEvent } from './audit.ts';
+import {
+  DEFAULT_AUDIT_LIMIT,
+  selectRecentAuditEvents,
+  type AuditReader,
+  type AuditViewEvent,
+} from './audit.ts';
 import type { CatalogReader, UiCatalogItem } from './catalog.ts';
 import type { UiTab } from './index.ts';
 import type { ProjectStateStore, ProjectStateV3 } from './state.ts';
@@ -187,10 +192,23 @@ export async function buildCatalogViewModel(
   return { items, activeIds: new Set(state.activeCatalog) };
 }
 
-export function renderAuditPartial(events: readonly AuditViewEvent[]): string {
-  const body = events.length === 0
-    ? '<p>No audit events yet.</p>'
-    : `<p>${events.length} audit event${events.length === 1 ? '' : 's'} available.</p>`;
+export function renderAuditPartial(
+  events: readonly AuditViewEvent[],
+  limit = DEFAULT_AUDIT_LIMIT,
+): string {
+  const recentEvents = selectRecentAuditEvents(events, limit);
+  const contextHelp = '<p class="audit-context-help" title="Collected context is reported using the canonical recentFiles field.">Context evidence</p>';
+  const body = recentEvents.length === 0
+    ? `${contextHelp}<p data-state="empty">No audit events yet.</p>`
+    : `${contextHelp}<ol class="audit-events" data-audit-events>${recentEvents.map((event) => `<li class="audit-event">
+  <time datetime="${escapeAttr(event.timestamp)}">${escapeHtml(event.timestamp)}</time>
+  <dl>
+    <dt>Redacted prompt</dt><dd>${escapeHtml(event.redactedPrompt)}</dd>
+    <dt>Matched IDs</dt><dd>${event.matchedIds.length > 0 ? event.matchedIds.map(escapeHtml).join(', ') : 'None'}</dd>
+    <dt>Pruning reasons</dt><dd>${event.pruningReasons.length > 0 ? event.pruningReasons.map(escapeHtml).join(', ') : 'None'}</dd>
+    <dt>Latency</dt><dd>${escapeHtml(String(event.latencyMs))} ms</dd>
+  </dl>
+</li>`).join('')}</ol>`;
   return section('audit', body);
 }
 
@@ -204,6 +222,7 @@ export function renderSafeErrorPartial(tab: UiTab): string {
 
 export interface DefaultPartialRendererOptions {
   catalogReader?: Pick<CatalogReader, 'list'>;
+  auditLimit?: number;
 }
 
 export function createDefaultPartialRenderers(
@@ -211,7 +230,7 @@ export function createDefaultPartialRenderers(
   auditReader: AuditReader,
   options: DefaultPartialRendererOptions = {},
 ): UiPartialRenderers {
-  const { catalogReader } = options;
+  const { catalogReader, auditLimit = DEFAULT_AUDIT_LIMIT } = options;
   const skillsRenderer: PartialRenderer = catalogReader
     ? async () => {
         const model = await buildCatalogViewModel(catalogReader, stateStore);
@@ -235,7 +254,7 @@ export function createDefaultPartialRenderers(
     skills: skillsRenderer,
     rules: rulesRenderer,
     personas: personasRenderer,
-    audit: async () => renderAuditPartial(await auditReader.latest(20)),
+    audit: async () => renderAuditPartial(await auditReader.latest(auditLimit), auditLimit),
     settings: async () => renderSettingsPartial(await stateStore.read()),
   };
 }
