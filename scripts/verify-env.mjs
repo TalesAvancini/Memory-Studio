@@ -173,8 +173,118 @@ function checkEmbedding() {
 }
 
 function checkFilesystem() {
-  record('filesystem', false, 'TODO: implemented in T-04', 'placeholder — replaced in T-04');
-  throw new Error('TODO: filesystem check not yet implemented (T-04)');
+  // R-08 / AC-10: write+read roundtrip on .memory-studio/state.json, original content preserved.
+  const dir = dirname(STATE_JSON);
+
+  // Ensure .memory-studio/ exists.
+  try {
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  } catch (err) {
+    record(
+      'filesystem',
+      false,
+      `mkdir ${dir} failed: ${err && err.message ? err.message : err}`,
+      `create the .memory-studio/ directory manually (e.g. \`mkdir .memory-studio\`) and rerun.`
+    );
+    return;
+  }
+
+  // Capture original content (sha256) so we can restore it byte-for-byte.
+  const existedBefore = existsSync(STATE_JSON);
+  let originalContent = null;
+  let originalSha = null;
+  if (existedBefore) {
+    try {
+      originalContent = readFileSync(STATE_JSON);
+      originalSha = createHash('sha256').update(originalContent).digest('hex');
+    } catch (err) {
+      record(
+        'filesystem',
+        false,
+        `read ${STATE_JSON} failed: ${err && err.message ? err.message : err}`,
+        'fix file permissions on .memory-studio/state.json and rerun.'
+      );
+      return;
+    }
+  }
+
+  // Write a minimal valid JSON test marker.
+  const testMarker = JSON.stringify({ schemaVersion: 3, _verifyEnvTest: true }, null, 2) + '\n';
+  try {
+    writeFileSync(STATE_JSON, testMarker, 'utf8');
+  } catch (err) {
+    record(
+      'filesystem',
+      false,
+      `write ${STATE_JSON} failed: ${err && err.message ? err.message : err}`,
+      'fix filesystem permissions on .memory-studio/ (the loop needs write access to persist state).'
+    );
+    return;
+  }
+
+  // Read back and parse — roundtrip OK only if JSON.parse succeeds.
+  let roundtripOk = false;
+  try {
+    const readBack = readFileSync(STATE_JSON, 'utf8');
+    const parsed = JSON.parse(readBack);
+    roundtripOk = parsed && parsed._verifyEnvTest === true;
+  } catch (err) {
+    // Restore before reporting failure.
+    restoreOriginal(originalContent, existedBefore);
+    record(
+      'filesystem',
+      false,
+      `read-back / parse failed: ${err && err.message ? err.message : err}`,
+      'filesystem write succeeded but read-back is corrupt — check disk health and rerun.'
+    );
+    return;
+  }
+
+  // Restore original content (or remove marker if no prior file).
+  const restored = restoreOriginal(originalContent, existedBefore);
+
+  // Verify restoration actually produced the original sha256 (when there was one).
+  let preserved = true;
+  if (existedBefore) {
+    try {
+      const afterContent = readFileSync(STATE_JSON);
+      const afterSha = createHash('sha256').update(afterContent).digest('hex');
+      preserved = afterSha === originalSha;
+    } catch {
+      preserved = false;
+    }
+  }
+
+  const ok = roundtripOk && restored && preserved;
+  const observedParts = [];
+  observedParts.push(roundtripOk ? 'roundtrip OK' : 'roundtrip FAILED');
+  observedParts.push(restored ? 'restored' : 'restore FAILED');
+  if (existedBefore) observedParts.push(`original sha256 ${originalSha.slice(0, 12)}... preserved`);
+  else observedParts.push('no prior file (marker removed)');
+  record(
+    'filesystem',
+    ok,
+    observedParts.join(', '),
+    ok ? null : 'state.json preservation failed — investigate write/read race or filesystem buffering.'
+  );
+}
+
+function restoreOriginal(originalContent, existedBefore) {
+  try {
+    if (existedBefore && originalContent !== null) {
+      writeFileSync(STATE_JSON, originalContent);
+    } else {
+      // No original — remove the test marker so we leave nothing behind.
+      try {
+        writeFileSync(STATE_JSON, '');
+      } catch {
+        // best-effort
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ─── Orchestrator ────────────────────────────────────────────────────────────
