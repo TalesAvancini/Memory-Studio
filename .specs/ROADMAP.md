@@ -158,6 +158,79 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
+> **Phase 1 split (2026-07-30) — 4 subchapters per SUBCHAPTER_BREAKDOWN trigger (>15 tasks).**
+> Each subchapter is a fresh phase with its own Planner→Implementer→Verifier cycle.
+> Source: `.specs/features/phase-1-catalog-schema-index/{spec.md, design.md, tasks.md}` (commit `d8d2318`).
+
+#### Phase 1.1 — YAML Schema + Zod Validation [ ]
+
+**Done when:** Zod schemas for Skill, Rule, Persona parse valid YAML → typed objects; reject invalid with deterministic error codes; coverage in `test/catalog/schema.test.mjs`.
+
+**Depends on:** Phase 0, Phase 1
+
+**Scope (T-01..T-04):**
+- `src/catalog/schema/skill.ts`, `rule.ts`, `persona.ts` — Zod schemas enforcing R-01..R-05
+- Calibration residue `src/catalog/**` deleted (per AD-002 + `.specs/CALIBRATION-RESIDUE.md`)
+- Fixtures: `test/catalog/fixtures/{valid,invalid}/*.yaml`
+- AC gates: AC-1, AC-2, AC-3 (enum categories, critical flag, isDefault)
+
+**Output do Processador:**
+- 3 Zod schema modules + barrel export
+- Test suite (deterministic error codes)
+- Atomic commits T-01..T-04
+- **Do NOT touch `src/social-detector/`** (Phase 2 promotes)
+- **Do NOT touch DB or embeddings** (Phase 1.2 / 1.3)
+
+---
+
+#### Phase 1.2 — Migrations + FTS5 + sqlite-vec [ ]
+
+**Done when:** SQLite DDL creates `catalog`, `embeddings`, `audit_events`, `schema_migrations`, `catalog_fts` (FTS5), `catalog_vec` (sqlite-vec 384d); triggers sync correctly; migration runner is idempotent.
+
+**Depends on:** Phase 1.1
+
+**Scope (T-05..T-08):**
+- `src/catalog/migrations/001_init.sql` — initial schema
+- `src/catalog/migrations/runner.ts` — idempotent migration runner with `schema_migrations` table
+- FTS5 virtual table + INSERT/UPDATE/DELETE triggers on `catalog.text`
+- sqlite-vec virtual table + sync triggers on `embeddings`
+- `test/catalog/{migrations,fts5-triggers,vec-triggers}.test.mjs`
+- AC gates: AC-4, AC-5, AC-6 (FTS5 sync, vec sync, migration idempotency)
+
+---
+
+#### Phase 1.3 — CatalogLoader + Embedder [ ]
+
+**Done when:** CatalogLoader parses YAML → validates via Zod → embeds via multilingual-e5-small → upserts into SQLite; embedder produces 384d Float32Array deterministically; YAML re-run is no-op for unchanged items.
+
+**Depends on:** Phase 1.2
+
+**Scope (T-09..T-12):**
+- `src/catalog/embedder.ts` — wraps `@huggingface/transformers` pipeline with `embed(text) → Float32Array(384)`
+- `src/catalog/loader.ts` — orchestration (parse → validate → embed → upsert → prune)
+- Idempotency: content hash column on `catalog`, re-run skips unchanged
+- Error handling: invalid YAML → stderr + skip (per R-12 from Phase 1 spec)
+- `test/catalog/{embedder,loader}.test.mjs`
+- AC gates: AC-7, AC-8, AC-9 (loader idempotency, 384d deterministic, skip on invalid)
+
+---
+
+#### Phase 1.4 — build-index + Perf + API Schema Version [ ]
+
+**Done when:** `npm run build-index` runs in <60s for 100-skill fixture (measured); `schemaVersion: 3` exposed via `getSchemaVersion()` helper consumed by Phase 5a API; thresholds initial in `.memory-studio/state.json` match PRD §10.4.
+
+**Depends on:** Phase 1.3
+
+**Scope (T-13..T-16):**
+- `scripts/build-index.ts` — orchestration CLI with progress reporting
+- `src/catalog/version.ts` — `getSchemaVersion(): 3`
+- `npm run build-index` script in `package.json`
+- 100-skill fixture (`test/catalog/fixtures/perf-100/`) for perf measurement
+- `test/catalog/perf.test.mjs` — assert wall time <60s
+- AC gates: AC-10, AC-11, AC-12, AC-13 (perf SLA, schemaVersion exposure, threshold default values)
+
+---
+
 #### Phase 2 — Detector + Fingerprint [ ]
 
 **Done when:** bypass de prompts sociais detectado; provenance 4-componente com hashing; audit schema DDL pronto (write runtime é Phase 5b).
