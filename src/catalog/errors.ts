@@ -1,34 +1,21 @@
-// Compatibility shim — Phase 5 search tests reference the legacy
-// `CatalogError`/`EmbedderError` hierarchy. Phase 1.1 rewires this through
-// `src/catalog/schema/index.ts`, which now exports a single `SchemaError`.
-// This stub keeps the surface stable until the search suite is re-pointed.
-export class CatalogError extends Error {
-  readonly code: string;
-  constructor(code: string, message: string) {
+// Compatibility shim — Phase 5 search suite (out of Phase 1.1 scope) used
+// to consume `CatalogError` / `EmbedderError` / `MigrationError` /
+// `LoaderError` classes from this module. Phase 1.1 collapses the typed
+// error surface into a single `SchemaError` (see src/catalog/schema/index.ts)
+// plus driver-level errors thrown directly from better-sqlite3 / ONNX
+// runtime.
+//
+// `EmbedderError` is preserved here in its calibration residue shape because
+// `test/search/search.test.mjs` (T-ORCH-13b, SEARCH-13 privacy regression)
+// imports it directly. Phase 5 will re-point the search suite to a new
+// embedder-error surface; until then, this class keeps T-ORCH-13b green.
+
+export class EmbedderError extends Error {
+  readonly code: 'ENCODING_FAILED';
+  constructor(message: string, code: 'ENCODING_FAILED') {
     super(message);
-    this.name = 'CatalogError';
-    this.code = code;
-  }
-}
-
-export class EmbedderError extends CatalogError {
-  constructor(message: string) {
-    super('EMBEDDER_ERROR', message);
     this.name = 'EmbedderError';
-  }
-}
-
-export class MigrationError extends CatalogError {
-  constructor(message: string) {
-    super('MIGRATION_ERROR', message);
-    this.name = 'MigrationError';
-  }
-}
-
-export class LoaderError extends CatalogError {
-  constructor(message: string) {
-    super('LOADER_ERROR', message);
-    this.name = 'LoaderError';
+    this.code = code;
   }
 }
 
