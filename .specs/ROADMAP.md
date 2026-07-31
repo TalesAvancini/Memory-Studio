@@ -480,6 +480,78 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
+> **Phase 5a split (2026-07-31) — 4 subchapters per SUBCHAPTER_BREAKDOWN trigger (13 tasks, 2 Implementer batches).**
+> Each subchapter is a fresh phase with own Planner→Implementer→Verifier cycle.
+> Source: `.specs/features/phase-5a-api-retrieval/{spec.md, design.md, tasks.md}` (commit `c41a4df`).
+> Key decisions: Fastify `^5.x` server (PRD §8 mandates); 2 cache blocks (persona stable + Skills/Rules/matched/context variable); systemMessage = SHA-256 hex of canonical-JSON-serialized blocks; tiebreak stress 1000 requests with deterministic PRNG proving byte-string equivalence; perf N=3 rounds × 1000 requests reporting min/median/p95/p99 (per Phase 4.4 Verifier feedback); server at `src/server/**` (not workspace, preserves Phase 1+2 import graph); reuse Phase 1 calibration residue `src/search/*` (per CALIBRATION-RESIDUE.md); fail-open (timeout → 200 + `emptyReason: "timeout"` + persona-only system message).
+
+#### Phase 5a.1 — Server Foundation [ ]
+
+**Done when:** Fastify `^5.x` bootstrap running; Zod schemas validate `/augment` request shape; route handler returns structured 400 on missing fields; structured pino logger emits JSON lines; `/health` GET returns 200 with uptime; entry point wired into root `package.json`.
+
+**Depends on:** Phase 1, Phase 4 (Phase 5a parent)
+
+**Scope (T-01..T-04):**
+- Fastify bootstrap: `src/server/boot.ts` + `src/server/index.ts` entry point
+- Zod schemas matching `/augment` request/response per PRD §7.1
+- POST `/augment` route handler with validation (400 on missing required fields)
+- Structured pino logger emitting JSON with `usage.cache_read_input_tokens` field ready
+- GET `/health` returning `{ status: "ok", uptime_ms, last_request_ts }`
+
+**Output:** Fastify server boots on free port (range 41823-42823); 400 + ZodIssue on bad request; logs structured.
+
+---
+
+#### Phase 5a.2 — Retrieval Pipeline [ ]
+
+**Done when:** retrieval composes RRF + double threshold + top-3-to-5 + tiebreak; pipeline orchestrator builds 2-block systemMessage with SHA-256 byte-string; empty/timeout cases fail-open.
+
+**Depends on:** Phase 5a.1
+
+**Scope (T-05..T-08):**
+- Compose existing `src/search/{fts,rrf,schema,vector}` calibration residue
+- Double threshold gate: `min_cosine_similarity=0.75` AND `min_fts_hits=1`
+- Top-K = 3-5 items (PRD §10.1 item 2, not generic K)
+- Tiebreak: `matched.sort((a,b) => a.id.localeCompare(b.id))` (D-006)
+- Augmenter + byte-string = SHA-256 of canonical-JSON-serialized 2-block system message
+- 2 cache blocks: persona(s) joined = block 1; Skills + Rules + matched + context = block 2
+- Fail-open: retrieval errors → 200 with `emptyReason: "timeout"` + persona-only system message
+
+**Output:** deterministic, fail-open retrieval; SHA-256 byte-string stable across equivalent inputs.
+
+---
+
+#### Phase 5a.3 — Tests + Smoke [ ]
+
+**Done when:** SHA-256 equality test proves 2 equivalent inputs → same byte-string; tiebreak stress test runs 1000 randomized requests with same matched IDs → all 1000 same byte-string; smoke script + Claude Code guide draft complete.
+
+**Depends on:** Phase 5a.2
+
+**Scope (T-09..T-11):**
+- `test/augment/byte-string.test.mjs` — 2 equivalent requests → same SHA-256
+- `test/augment/tiebreak-stress.test.mjs` — 1000 randomized requests with deterministic PRNG (seedrandom); all same matched IDs + same SHA-256 byte-string
+- `scripts/smoke-augment-server.mjs` — boot server, POST twice, forward system messages to MiniMax Anthropic-compatible API OR deterministic stub fixture, assert `usage.cache_read_input_tokens > 0` on 2nd call
+- `docs/guides/claude-code-baseurl.md` — Claude Code SDK-level custom baseURL integration
+
+**Output:** tests pass + smoke script + Claude Code guide.
+
+---
+
+#### Phase 5a.4 — Perf + Hardening [ ]
+
+**Done when:** perf harness reports `min/median/p95/p99` across N=3 rounds × 1000 requests; gates `median < 50ms` AND `p99 < 200ms`; e2e route + entry point + `package.json` wiring complete; full gate passes.
+
+**Depends on:** Phase 5a.3
+
+**Scope (T-12..T-13):**
+- `test/augment/perf.test.mjs` — N=3 rounds × 1000 requests, 100 warmup excluded; aggregate `min/median/p95/p99`; assert gates
+- End-to-end route wiring + entry point + root `package.json` script (e.g. `"server:start"`)
+- Final phase closeout smoke + full gate
+
+**Output:** measured perf within budget; server fully integrated.
+
+---
+
 #### Phase 5b — Audit + Endpoints + Security [ ]
 
 **Done when:** 5 auxiliary endpoints respondendo (catalog/catalog-rebuild/audit/audit-summary/health/state-toggle); audit async+fail-open; security invariants honrados.
