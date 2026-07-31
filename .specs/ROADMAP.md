@@ -233,7 +233,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 2 — Detector + Fingerprint [ ]
+#### Phase 2 — Detector + Fingerprint [x]
 
 **Done when:** bypass de prompts sociais detectado; provenance 4-componente com hashing; audit schema DDL pronto (write runtime é Phase 5b).
 
