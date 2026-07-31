@@ -314,6 +314,8 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 **Done when:** humano controla catálogo via painel; Critical Rules enforcement visível; UI carrega em <1s local; 5 telas (Skills/Rules/Personas/Audit/Settings).
 
+> **Phase 4 status 2026-07-31:** Completed via subchapters 4.1, 4.2, 4.3, 4.4 (all `[x]`). 375 tests total (207 root + 152 UI + 16 SDK). DO NOT mark this `[x]` directly — subchapter entries are the verification record. `/state/toggle` HTTP implemented in 4.4 (Phase 5b later subsumes endpoint contract per Planner design). Critical Rules `CONFIRMAR` exact enforcement; persona cap 3 (browser+server defense in depth). Cold first-byte <1000ms (measured 11-136ms on Windows; future perf gates should report min/median across N≥3). `verifier-http-check.mjs` was load-bearing; should be promoted to regression test (`packages/ui/test/verifier-http.test.mjs`).
+
 **Depends on:** Phase 1, Phase 3
 
 **Goal:** humano controla catálogo via painel; Critical Rules enforcement visível.
@@ -408,7 +410,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 4.4 — Toggle enforcement + perf + responsive closeout [ ]
+#### Phase 4.4 — Toggle enforcement + perf + responsive closeout [x]
 
 **Done when:** `POST /state/toggle` returns 400 on critical without confirmation; UI loads cold+warm <1000ms; layout works at 1024px viewport.
 

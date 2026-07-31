@@ -74,10 +74,9 @@ related:
 
 ## Handoff
 
-- **phase:** "Phase 4.4 — Toggle enforcement + perf + responsive closeout"
-- **phase-previous:** "Phase 4.3 — Audit + Settings tabs" (DONE 2026-07-31, 2 iterations, Verifier PASS commit `5718c60`, 349 tests: 207 root + 126 UI + 16 SDK; included scope-expand correction on integrationMode enum)
-- **phase-4.2:** "Phase 4.2 — Skills + Rules + Personas tabs" (DONE 2026-07-31, 1 iteration)
-- **phase-4.1:** "Phase 4.1 — UI workspace + state schema" (DONE 2026-07-31, 1 iteration)
+- **phase:** "Phase 5a — API + Retrieval + Byte-string"
+- **phase-previous:** "Phase 4.4 — Toggle enforcement + perf + responsive closeout" (DONE 2026-07-31, 1 iteration, Verifier PASS commit `d51c408`)
+- **phase-4-status:** "Phase 4 (UI Panel) entire phase DONE via subchapters 4.1, 4.2, 4.3, 4.4 — all `[x]`. 375 tests total."
 - **phase-3:** "Phase 3 — SDK Cliente" (DONE 2026-07-31, 1 iteration)
 - **phase-2:** "Phase 2 — Detector + Fingerprint" (DONE 2026-07-31, 1 iteration)
 - **phase-1-status:** "Phase 1 (Catalog + Schema + Index) entire phase DONE via subchapters 1.1, 1.2, 1.3, 1.4 — all `[x]`"
@@ -88,8 +87,8 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Implementer para Phase 4.4 — /state/toggle integration + perf + responsive (3 tasks, ~1.5h, FINAL phase 4 subchapter)
-- **working-tree:** working (`loop/phase-0` em `5718c60`)
+- **próximo-step-concreto:** dispatch Planner para Phase 5a — API + Retrieval + Byte-string (FTS5+vec+RRF+tiebreak, cache_control: ephemeral, p50<50ms, /augment endpoint with Claude Code smoke)
+- **working-tree:** working (`loop/phase-0` em `d51c408`)
 - **lessons-store:** L-001..L-004 (Phase 1) + L-005/L-006 (Phase 3)
 - **phase-3-feature-dir:** `.specs/features/phase-3-sdk-client/{spec.md, design.md, tasks.md, validation.md}` (commit `fe20a66`)
 - **phase-2-feature-dir:** `.specs/features/phase-2-detector-fingerprint/{spec.md, tasks.md, validation.md}` (commit `74b4cdc`)
