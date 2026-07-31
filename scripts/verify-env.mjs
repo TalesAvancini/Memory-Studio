@@ -167,9 +167,79 @@ async function checkSqliteVec() {
   );
 }
 
-function checkEmbedding() {
-  record('embedding', false, 'TODO: implemented in T-05', 'placeholder — replaced in T-05');
-  throw new Error('TODO: embedding check not yet implemented (T-05)');
+async function checkEmbedding() {
+  // R-07 / AC-6: multilingual-e5-small ONNX must produce a 384d Float32Array.
+  let transformers;
+  try {
+    transformers = await import('@huggingface/transformers');
+  } catch (err) {
+    record(
+      'embedding',
+      false,
+      `import('@huggingface/transformers') failed: ${err && err.message ? err.message : err}`,
+      'install @huggingface/transformers (`npm install @huggingface/transformers`) — required for the multilingual-e5-small embedding pipeline in Phase 1+.'
+    );
+    return;
+  }
+  const { pipeline, env, AutoTokenizer } = transformers;
+  if (!pipeline || typeof pipeline !== 'function') {
+    record(
+      'embedding',
+      false,
+      '@huggingface/transformers has no pipeline() export',
+      '@huggingface/transformers 4.x changed exports — pin to ^3.x or check the API reference at https://huggingface.co/docs/transformers.js.'
+    );
+    return;
+  }
+
+  // Cap local cache to project-local node_modules/.../.cache (default) so we don't leak outside.
+  env.allowLocalModels = true;
+  env.allowRemoteModels = true;
+
+  let embedder;
+  const loadStart = Date.now();
+  try {
+    embedder = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small');
+  } catch (err) {
+    record(
+      'embedding',
+      false,
+      `pipeline('feature-extraction', 'Xenova/multilingual-e5-small') failed: ${err && err.message ? err.message : err}`,
+      'one-time ~470MB model download failed — check network access to huggingface.co / hf-mirror.com, or pre-populate the local cache at ' + (env.cacheDir || '<cache>')
+    );
+    return;
+  }
+  const loadMs = Date.now() - loadStart;
+
+  // multilingual-e5-small expects "passage: ..." / "query: ..." prefixes for asymmetric retrieval,
+  // but for a sanity check plain "test" works (model returns 384d for any text).
+  let result;
+  const inferStart = Date.now();
+  try {
+    result = await embedder('test', { pooling: 'mean', normalize: true });
+  } catch (err) {
+    record(
+      'embedding',
+      false,
+      `embedder('test') failed: ${err && err.message ? err.message : err}`,
+      'inference threw — verify the ONNX runtime matches the model format; try `npm rebuild onnxruntime-node`.'
+    );
+    return;
+  }
+  const inferMs = Date.now() - inferStart;
+
+  // Pull the Float32Array out of the result tensor.
+  const data = result && result.data;
+  const isFloat32 = data instanceof Float32Array;
+  const dim = isFloat32 ? data.length : 0;
+  const ok = isFloat32 && dim === 384;
+  const observed = `${dim}d ${isFloat32 ? data.constructor.name : typeof data} embedding (load ${loadMs}ms, infer ${inferMs}ms)`;
+  record(
+    'embedding',
+    ok,
+    observed,
+    ok ? null : 'expected Float32Array of length 384 from multilingual-e5-small — check the pooling/normalize options and the model identifier.'
+  );
 }
 
 function checkFilesystem() {

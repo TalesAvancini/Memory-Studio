@@ -13,9 +13,11 @@
     "test:catalog": "node --test test/catalog/",
     "test:coverage": "node --experimental-test-coverage --test test/search/*.test.mjs",
     "typecheck": "tsc --noEmit",
-    "catalog:load": "tsx src/catalog/cli.ts"
+    "catalog:load": "tsx src/catalog/cli.ts",
+    "verify-env": "node scripts/verify-env.mjs"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
     "better-sqlite3": "^11.5.0",
     "onnxruntime-node": "^1.27.0",
     "pino": "^9.5.0",
