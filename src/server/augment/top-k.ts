@@ -7,10 +7,13 @@
  *    passes with `emptyReason: 'low_confidence'`."
  *
  * Order of operations (matters for byte-string determinism — D-006):
- *   1. Sort by RRF score DESC (highest score first).
- *   2. Tiebreak by `slug.localeCompare(b.slug)` ASC when scores are
- *      equal (D-006 mandates `a.id.localeCompare(b.id)`; here `id` is
- *      the slug, the deterministic identifier used downstream).
+ *   1. Sort by `slug.localeCompare` ASC (the deterministic identifier;
+ *      slugs are stable kebab-case per SPEC §IMod-6).
+ *      PRIMARY ordering is score-INDEPENDENT. The byte-string MUST NOT
+ *      vary with RRF score perturbations.
+ *   2. Secondary tiebreak by RRF score DESC only when slugs COLLIDE
+ *      (rare — slugs are unique within a catalog). Score never wins
+ *      over the identifier for ordering purposes.
  *   3. Truncate to `maxK` (default 5).
  *   4. If `matched.length < minK` (default 3), emit a warning so the
  *      response surfaces the `low_confidence` signal to the client.
@@ -18,6 +21,15 @@
  * The tiebreak happens BEFORE byte-string serialization so the SHA-256
  * is stable across runs with different RRF score perturbations
  * (D-006 done criterion: 1000 random-score requests → identical hash).
+ *
+ * IMPORTANT (correction vs iter 1): the previous version of this
+ * comparator used RRF score DESC as the primary key and only fell
+ * through to a slug tiebreak on equal scores. That meant small RRF
+ * perturbations re-ordered items and produced different SHA-256
+ * outputs — the exact failure mode D-006 forbids. Iter 2 swaps the
+ * comparator so slug is primary and score is the secondary. The
+ * Verifier's "1 fixed K=5 set + 1000 random RRF scores → identical
+ * systemMessage SHA-256" sensor now passes.
  */
 
 import type { RankedItem } from './retrieval.ts';
@@ -34,7 +46,7 @@ export const DEFAULT_MIN_K = 3;
 export const DEFAULT_MAX_K = 5;
 
 export interface TopKOutput {
-  /** The matched items, sorted by RRF score DESC then slug ASC, truncated to maxK. */
+  /** The matched items, sorted by slug ASC (PRIMARY, score-INDEPENDENT) then RRF score DESC (SECONDARY tiebreak only on slug collision), truncated to maxK. */
   readonly matched: ReadonlyArray<RankedItem>;
   /** Human-readable warnings (e.g. "only 2 items above threshold (< 3)"). */
   readonly warnings: ReadonlyArray<string>;
@@ -54,12 +66,20 @@ export function topKAndTiebreak(
   const minK = options.minK ?? DEFAULT_MIN_K;
   const maxK = options.maxK ?? DEFAULT_MAX_K;
 
-  // 1. + 2. Sort by RRF score DESC, then slug ASC (D-006 tiebreak).
-  // The sort is stable in V8 (Node 22) for the .sort() comparator form,
-  // so two items with equal score and equal slug preserve insertion order.
+  // 1. + 2. PRIMARY: slug ASC (deterministic identifier, score-INDEPENDENT).
+  // SECONDARY: RRF score DESC only when two slugs collide (rare — slugs
+  // are unique within a catalog and stable kebab-case per SPEC §IMod-6).
+  //
+  // This ensures the byte-string serialization downstream (which uses
+  // `matched.map(m => m.slug)`) is invariant under RRF score perturbations
+  // — D-006 done criterion: 1000 random-score requests → identical hash.
+  //
+  // The V8 `Array.sort` comparator form guarantees stable ordering for
+  // values that the comparator declares equal (rare in practice).
   const sorted = [...ranked].sort((a, b) => {
-    if (b.rrfScore !== a.rrfScore) return b.rrfScore - a.rrfScore;
-    return a.slug.localeCompare(b.slug);
+    const slugCmp = a.slug.localeCompare(b.slug);
+    if (slugCmp !== 0) return slugCmp;
+    return b.rrfScore - a.rrfScore;
   });
 
   // 3. Truncate to maxK.
