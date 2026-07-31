@@ -64,14 +64,83 @@ function checkOnnxRuntimeNode() {
   throw new Error('TODO: onnxruntime-node check not yet implemented (T-03)');
 }
 
-function checkFts5() {
-  record('fts5', false, 'TODO: implemented in T-02', 'placeholder — replaced in T-02');
-  throw new Error('TODO: fts5 check not yet implemented (T-02)');
+async function checkFts5() {
+  // R-05 / AC-4: PRAGMA compile_options must include ENABLE_FTS5.
+  let Database;
+  try {
+    const mod = await import('better-sqlite3');
+    Database = mod.default;
+  } catch (err) {
+    record(
+      'fts5',
+      false,
+      `better-sqlite3 import failed: ${err && err.message ? err.message : err}`,
+      'install better-sqlite3 (`npm install better-sqlite3`) or run `npm install` to restore node_modules.'
+    );
+    return;
+  }
+  let options;
+  try {
+    const db = new Database(':memory:');
+    options = db.pragma('compile_options');
+    db.close();
+  } catch (err) {
+    record(
+      'fts5',
+      false,
+      `PRAGMA compile_options failed: ${err && err.message ? err.message : err}`,
+      'better-sqlite3 binary may be missing or incompatible — run `npm rebuild better-sqlite3`.'
+    );
+    return;
+  }
+  const has = Array.isArray(options) && options.some((row) => row.compile_options === 'ENABLE_FTS5');
+  record(
+    'fts5',
+    has,
+    has ? 'ENABLE_FTS5 present in compile_options' : 'ENABLE_FTS5 missing from compile_options',
+    has ? null : 'install a SQLite build with FTS5 enabled (better-sqlite3 11.x ships FTS5 — check `npm rebuild better-sqlite3`).'
+  );
 }
 
-function checkSqliteVec() {
-  record('sqlite-vec', false, 'TODO: implemented in T-02', 'placeholder — replaced in T-02');
-  throw new Error('TODO: sqlite-vec check not yet implemented (T-02)');
+async function checkSqliteVec() {
+  // R-06 / AC-5: SELECT vec_version() must return a non-empty string.
+  let Database, sqliteVec;
+  try {
+    const dbMod = await import('better-sqlite3');
+    Database = dbMod.default;
+    sqliteVec = await import('sqlite-vec');
+  } catch (err) {
+    record(
+      'sqlite-vec',
+      false,
+      `module import failed: ${err && err.message ? err.message : err}`,
+      'install sqlite-vec (`npm install sqlite-vec`) — required for vector search in Phase 1+.'
+    );
+    return;
+  }
+  let version;
+  try {
+    const db = new Database(':memory:');
+    sqliteVec.load(db);
+    const row = db.prepare('SELECT vec_version() AS v').get();
+    version = row && row.v;
+    db.close();
+  } catch (err) {
+    record(
+      'sqlite-vec',
+      false,
+      `SELECT vec_version() failed: ${err && err.message ? err.message : err}`,
+      'sqlite-vec extension could not be loaded — check the prebuilt matches your Node version and OS; try `npm rebuild sqlite-vec`.'
+    );
+    return;
+  }
+  const ok = typeof version === 'string' && version.length > 0;
+  record(
+    'sqlite-vec',
+    ok,
+    ok ? `vec_version=${version}` : 'vec_version returned empty',
+    ok ? null : 'sqlite-vec returned an empty version string — reinstall `sqlite-vec` and verify it matches your platform.'
+  );
 }
 
 function checkEmbedding() {
