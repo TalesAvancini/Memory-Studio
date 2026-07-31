@@ -1,0 +1,5 @@
+id: auth-jwt-01
+type: skill
+title: JWT authentication
+category: procedural
+text: Validate JWT tokens before authorizing requests.

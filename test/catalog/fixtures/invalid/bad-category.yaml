@@ -1,0 +1,5 @@
+id: bad-category
+type: skill
+title: Invalid
+category: unsupported
+text: Invalid category.
