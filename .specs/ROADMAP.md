@@ -162,7 +162,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 > Each subchapter is a fresh phase with its own Planner→Implementer→Verifier cycle.
 > Source: `.specs/features/phase-1-catalog-schema-index/{spec.md, design.md, tasks.md}` (commit `d8d2318`).
 
-#### Phase 1.1 — YAML Schema + Zod Validation [ ]
+#### Phase 1.1 — YAML Schema + Zod Validation [x]
 
 **Done when:** Zod schemas for Skill, Rule, Persona parse valid YAML → typed objects; reject invalid with deterministic error codes; coverage in `test/catalog/schema.test.mjs`.
 
