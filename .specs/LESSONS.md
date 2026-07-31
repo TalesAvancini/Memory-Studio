@@ -38,6 +38,20 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: ROADMAP.md:60,150 spec.md:705 (.specs/ROADMAP.md + PRD/PLAN/SPEC)
 - last seen: 2026-07-31T03:58:21Z
 
+### L-005 — Implementer 'true observation, wrong reason' pattern: Implementer correctly observed 
+> memory-studio@0.0.0 build-index
+> node --experimental-strip-types --no-warnings scripts/build-index.ts exit 2 but misattributed to 'config/catalog has 0 items' (actual cause: idempotent rerun exit contract). Verifier must audit reasoning AND observation, not just trust either.
+- signal: `spec_deviation` · recurrence: 1 feature(s) · scope: `lessons learned about sub-agent honesty` · harmful: 0
+- features: phase-3
+- evidence: validation.md:Implementer-audit (lessons learned about sub-agent honesty)
+- last seen: 2026-07-31T15:12:58Z
+
+### L-006 — Dispatch (orchestrator's prompt) assertions about expected exit code/output can themselves be wrong — orchestrator must read actual implementation contract (e.g.  in scripts/build-index.ts) before claiming 'expected: X' to sub-agents. Verifier re-verifies, but introducing false expectations wastes tokens.
+- signal: `spec_deviation` · recurrence: 1 feature(s) · scope: `loop-orchestrator discipline` · harmful: 0
+- features: phase-3
+- evidence: loop-orchestrator-dispatch (loop-orchestrator discipline)
+- last seen: 2026-07-31T15:12:58Z
+
 ## Quarantined (failed when applied — ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

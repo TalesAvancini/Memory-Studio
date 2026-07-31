@@ -72,11 +72,47 @@
       ],
       "created": "2026-07-31T03:58:21Z",
       "last_seen": "2026-07-31T03:58:21Z"
+    },
+    {
+      "id": "L-005",
+      "key": "spec_deviation::implementer true observation wrong reason pattern implementer correctly observed memory studio 0 0 0 build index node experimental strip types no warnings scripts build index ts exit 2 but misattributed to config catalog has 0 items actual cause idempotent rerun exit contract verifier must audit reasoning and observation not just trust either",
+      "text": "Implementer 'true observation, wrong reason' pattern: Implementer correctly observed \n> memory-studio@0.0.0 build-index\n> node --experimental-strip-types --no-warnings scripts/build-index.ts exit 2 but misattributed to 'config/catalog has 0 items' (actual cause: idempotent rerun exit contract). Verifier must audit reasoning AND observation, not just trust either.",
+      "signal": "spec_deviation",
+      "scope": "lessons learned about sub-agent honesty",
+      "status": "candidate",
+      "features": [
+        "phase-3"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "validation.md:Implementer-audit (lessons learned about sub-agent honesty)"
+      ],
+      "created": "2026-07-31T15:12:58Z",
+      "last_seen": "2026-07-31T15:12:58Z"
+    },
+    {
+      "id": "L-006",
+      "key": "spec_deviation::dispatch orchestrator s prompt assertions about expected exit code output can themselves be wrong orchestrator must read actual implementation contract e g in scripts build index ts before claiming expected x to sub agents verifier re verifies but introducing false expectations wastes tokens",
+      "text": "Dispatch (orchestrator's prompt) assertions about expected exit code/output can themselves be wrong — orchestrator must read actual implementation contract (e.g.  in scripts/build-index.ts) before claiming 'expected: X' to sub-agents. Verifier re-verifies, but introducing false expectations wastes tokens.",
+      "signal": "spec_deviation",
+      "scope": "loop-orchestrator discipline",
+      "status": "candidate",
+      "features": [
+        "phase-3"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "loop-orchestrator-dispatch (loop-orchestrator discipline)"
+      ],
+      "created": "2026-07-31T15:12:58Z",
+      "last_seen": "2026-07-31T15:12:58Z"
     }
   ],
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
   "schema": 1,
-  "next_id": 5
+  "next_id": 7
 }

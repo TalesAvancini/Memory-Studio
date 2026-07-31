@@ -270,7 +270,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 3 — SDK Cliente [ ]
+#### Phase 3 — SDK Cliente [x]
 
 **Done when:** agentes embedam SDK e coletam estado; SDK funciona prompt-only fallback; `~50KB` build size zero deps nativas.
 
