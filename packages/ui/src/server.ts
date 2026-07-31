@@ -10,7 +10,10 @@ import {
   type PortRange,
 } from './port.ts';
 import { createEmptyAuditReader, type AuditReader } from './audit.ts';
-import type { CatalogReader } from './catalog.ts';
+import {
+  createFileSystemCatalogReader,
+  type CatalogReader,
+} from './catalog.ts';
 import {
   createDefaultPartialRenderers,
   renderSafeErrorPartial,
@@ -25,7 +28,9 @@ import {
 import {
   TransitionRequestError,
   applySettingsPatch,
+  toggleCatalogItem,
   type SettingsRequest,
+  type ToggleRequest,
 } from './transitions.ts';
 import type { UiTab } from './index.ts';
 
@@ -55,7 +60,7 @@ export interface UiServerOptions {
   projectRoot?: string;
   stateStore?: Pick<ProjectStateStore, 'read' | 'update'>;
   auditReader?: AuditReader;
-  catalogReader?: Pick<CatalogReader, 'list'>;
+  catalogReader?: Pick<CatalogReader, 'get' | 'list'>;
   partialRenderers?: Partial<UiPartialRenderers>;
 }
 
@@ -106,11 +111,13 @@ async function bind(server: Server, port: number): Promise<void> {
 async function readJsonBody(request: IncomingMessage): Promise<{ ok: true; value: unknown } | { ok: false; status: number; message: string }> {
   const contentType = request.headers['content-type'];
   const contentTypeString = Array.isArray(contentType) ? contentType.join(',') : (contentType ?? '');
-  if (!contentTypeString.toLowerCase().includes('application/json')) {
+  const mediaType = contentTypeString.split(';', 1)[0]?.trim().toLowerCase();
+  if (mediaType !== 'application/json') {
     return { ok: false, status: 415, message: 'Content-Type must be application/json' };
   }
   const contentLengthHeader = request.headers['content-length'];
   if (typeof contentLengthHeader === 'string' && Number(contentLengthHeader) > MAX_JSON_BODY_BYTES) {
+    request.resume();
     return { ok: false, status: 413, message: `Request body exceeds ${MAX_JSON_BODY_BYTES} bytes` };
   }
 
@@ -145,18 +152,63 @@ export function createUiServer(
 ): UiServer {
   const range = options.portRange ?? DEFAULT_PORT_RANGE;
   const publicDirectory = options.publicDirectory ?? DEFAULT_PUBLIC_DIRECTORY;
-  const stateStore = options.stateStore ?? createProjectStateStore(options.projectRoot ?? process.cwd());
+  const projectRoot = options.projectRoot ?? process.cwd();
+  const stateStore = options.stateStore ?? createProjectStateStore(projectRoot);
+  const catalogReader = options.catalogReader
+    ?? createFileSystemCatalogReader(join(projectRoot, 'config', 'catalog'));
   const partialRenderers: UiPartialRenderers = {
     ...createDefaultPartialRenderers(
       stateStore,
       options.auditReader ?? createEmptyAuditReader(),
-      { catalogReader: options.catalogReader },
+      { catalogReader },
     ),
     ...options.partialRenderers,
   };
   let activeServer: Server | undefined;
   let activeAddress: { url: string; port: number } | undefined;
   let starting: Promise<{ url: string; port: number }> | undefined;
+
+  async function handleToggle(request: IncomingMessage, response: ServerResponse): Promise<void> {
+    const body = await readJsonBody(request);
+    if (!body.ok) {
+      sendJson(response, body.status, {
+        error: { code: body.status === 413 ? 'PAYLOAD_TOO_LARGE' : body.status === 415 ? 'UNSUPPORTED_MEDIA_TYPE' : 'MALFORMED_BODY', message: body.message },
+      });
+      return;
+    }
+    if (!isPlainObject(body.value)) {
+      sendJson(response, 400, {
+        error: { code: 'MALFORMED_BODY', message: 'Toggle request must be a JSON object' },
+      });
+      return;
+    }
+    const toggleRequest = body.value as unknown as ToggleRequest;
+    try {
+      const result = await toggleCatalogItem(toggleRequest, catalogReader, stateStore);
+      sendJson(response, 200, {
+        ok: true,
+        itemId: result.itemId,
+        active: result.active,
+        state: result.state,
+      });
+    } catch (error) {
+      if (error instanceof TransitionRequestError) {
+        sendJson(response, 400, {
+          error: { code: error.code, message: error.message },
+        });
+        return;
+      }
+      if (error instanceof ProjectStateConflictError) {
+        sendJson(response, 409, {
+          error: { code: error.code, message: 'Project state is invalid' },
+        });
+        return;
+      }
+      sendJson(response, 500, {
+        error: { code: 'STATE_WRITE_FAILED', message: 'Toggle could not be persisted' },
+      });
+    }
+  }
 
   async function handleSettings(request: IncomingMessage, response: ServerResponse): Promise<void> {
     const body = await readJsonBody(request);
@@ -194,6 +246,16 @@ export function createUiServer(
     response: ServerResponse,
   ): Promise<void> {
     const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+
+    if (pathname === '/state/toggle') {
+      if (request.method !== 'POST') {
+        response.setHeader('allow', 'POST');
+        sendText(response, 405, 'Method Not Allowed');
+        return;
+      }
+      await handleToggle(request, response);
+      return;
+    }
 
     if (pathname === '/state/settings') {
       if (request.method !== 'POST') {

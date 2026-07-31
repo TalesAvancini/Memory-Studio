@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import vm from 'node:vm';
 import {
   createDefaultProjectState,
+  createEmptyCatalogReader,
   createUiServer,
   findFirstFreePort,
   UI_HOST,
@@ -203,6 +204,7 @@ test('launcher prints the selected full URL', async (t) => {
 
 async function projectFixture(t) {
   const root = await mkdtemp(join(tmpdir(), 'memory-studio-ui-server-'));
+  await mkdir(join(root, 'config', 'catalog'), { recursive: true });
   t.after(() => rm(root, { recursive: true, force: true }));
   return root;
 }
@@ -555,5 +557,345 @@ test('POST /state/settings returns 405 for non-POST methods', async (t) => {
   const response = await fetch(new URL('state/settings', url), { method: 'GET' });
   assert.equal(response.status, 405);
   assert.equal(response.headers.get('allow'), 'POST');
+});
+
+// =============================================================================
+// Phase 4.4 — POST /state/toggle (T4.4-1)
+// =============================================================================
+
+const TOGGLE_CATALOG_ITEMS = [
+  {
+    id: 'skill-a',
+    type: 'skill',
+    title: 'Skill A',
+    category: 'procedural',
+    text: 'A non-critical skill.',
+  },
+  {
+    id: 'rule-critical',
+    type: 'rule',
+    critical: true,
+    text: 'A critical rule.',
+  },
+  ...['a', 'b', 'c', 'd'].map((suffix) => ({
+    id: `persona-${suffix}`,
+    type: 'persona',
+    isDefault: suffix === 'a',
+    text: `Persona ${suffix.toUpperCase()}.`,
+  })),
+];
+
+async function seedToggleState(projectRoot, activeCatalog = []) {
+  const stateFile = join(projectRoot, '.memory-studio', 'state.json');
+  await mkdir(join(projectRoot, '.memory-studio'), { recursive: true });
+  const initialBytes = JSON.stringify({
+    ...createDefaultProjectState(),
+    activeCatalog,
+  }, null, 2);
+  await writeFile(stateFile, initialBytes, 'utf8');
+  return { stateFile, initialBytes };
+}
+
+async function startToggleServer(t, activeCatalog = []) {
+  const projectRoot = await projectFixture(t);
+  const seeded = await seedToggleState(projectRoot, activeCatalog);
+  const port = await freePort();
+  const server = createUiServer({
+    portRange: [port, port],
+    projectRoot,
+    catalogReader: createEmptyCatalogReader(TOGGLE_CATALOG_ITEMS),
+  });
+  t.after(() => server.close());
+  const { url } = await server.start();
+  return { ...seeded, url };
+}
+
+async function postToggle(url, body, contentType = 'application/json') {
+  const headers = contentType === undefined ? {} : { 'content-type': contentType };
+  return fetch(new URL('state/toggle', url), {
+    method: 'POST',
+    headers,
+    body,
+  });
+}
+
+test('POST /state/toggle persists valid non-critical and confirmed-critical transitions (UI-09, UI-11)', async (t) => {
+  const { stateFile, url } = await startToggleServer(t, ['rule-critical']);
+
+  const skillResponse = await postToggle(url, JSON.stringify({ itemId: 'skill-a', action: 'on' }));
+  const skillPayload = await skillResponse.json();
+  assert.equal(skillResponse.status, 200);
+  assert.equal(skillResponse.headers.get('content-type'), 'application/json; charset=utf-8');
+  assert.equal(skillPayload.ok, true);
+  assert.equal(skillPayload.itemId, 'skill-a');
+  assert.equal(skillPayload.active, true);
+  assert.equal(skillPayload.state.activeCatalog.includes('skill-a'), true);
+
+  const criticalResponse = await postToggle(url, JSON.stringify({
+    itemId: 'rule-critical',
+    action: 'off',
+    critical_confirm: 'CONFIRMAR',
+  }));
+  const criticalPayload = await criticalResponse.json();
+  assert.equal(criticalResponse.status, 200);
+  assert.equal(criticalPayload.ok, true);
+  assert.equal(criticalPayload.itemId, 'rule-critical');
+  assert.equal(criticalPayload.active, false);
+  assert.equal(criticalPayload.state.activeCatalog.includes('rule-critical'), false);
+
+  const persisted = JSON.parse(await readFile(stateFile, 'utf8'));
+  assert.equal(persisted.activeCatalog.includes('skill-a'), true);
+  assert.equal(persisted.activeCatalog.includes('rule-critical'), false);
+});
+
+test('POST /state/toggle returns 400 for unconfirmed critical off and preserves exact state bytes (UI-10)', async (t) => {
+  const { stateFile, initialBytes, url } = await startToggleServer(t, ['rule-critical']);
+  const cases = [
+    { label: 'missing', body: { itemId: 'rule-critical', action: 'off' } },
+    { label: 'wrong case', body: { itemId: 'rule-critical', action: 'off', critical_confirm: 'confirmar' } },
+    { label: 'wrong type', body: { itemId: 'rule-critical', action: 'off', critical_confirm: true } },
+  ];
+
+  for (const fixture of cases) {
+    const response = await postToggle(url, JSON.stringify(fixture.body));
+    const payload = await response.json();
+    assert.equal(response.status, 400, fixture.label);
+    assert.equal(payload.error.code, 'CRITICAL_CONFIRMATION_REQUIRED', fixture.label);
+    assert.equal(await readFile(stateFile, 'utf8'), initialBytes, fixture.label);
+  }
+});
+
+test('POST /state/toggle returns 400 for a fourth Persona and preserves exact state bytes (UI-16)', async (t) => {
+  const { stateFile, initialBytes, url } = await startToggleServer(
+    t,
+    ['persona-a', 'persona-b', 'persona-c'],
+  );
+
+  const response = await postToggle(url, JSON.stringify({ itemId: 'persona-d', action: 'on' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.equal(payload.error.code, 'PERSONA_LIMIT_EXCEEDED');
+  assert.equal(await readFile(stateFile, 'utf8'), initialBytes);
+});
+
+test('POST /state/toggle returns typed 400 errors for unknown items and wrong field types without mutation (UI-14)', async (t) => {
+  const { stateFile, initialBytes, url } = await startToggleServer(t);
+  const cases = [
+    {
+      label: 'unknown item',
+      body: { itemId: 'missing-item', action: 'on' },
+      code: 'UNKNOWN_ITEM',
+    },
+    {
+      label: 'wrong itemId type',
+      body: { itemId: 42, action: 'on' },
+      code: 'MALFORMED_FIELD',
+    },
+    {
+      label: 'unsupported action',
+      body: { itemId: 'skill-a', action: 'toggle' },
+      code: 'UNSUPPORTED_ACTION',
+    },
+  ];
+
+  for (const fixture of cases) {
+    const response = await postToggle(url, JSON.stringify(fixture.body));
+    const payload = await response.json();
+    assert.equal(response.status, 400, fixture.label);
+    assert.equal(payload.error.code, fixture.code, fixture.label);
+    assert.equal(await readFile(stateFile, 'utf8'), initialBytes, fixture.label);
+  }
+});
+
+test('POST /state/toggle bounds malformed JSON and non-object bodies with typed 400 errors', async (t) => {
+  const { stateFile, initialBytes, url } = await startToggleServer(t);
+  const cases = [
+    { label: 'malformed JSON', body: '{ not json' },
+    { label: 'array body', body: JSON.stringify(['skill-a', 'on']) },
+    { label: 'empty body', body: undefined },
+  ];
+
+  for (const fixture of cases) {
+    const response = await postToggle(url, fixture.body);
+    const payload = await response.json();
+    assert.equal(response.status, 400, fixture.label);
+    assert.equal(payload.error.code, 'MALFORMED_BODY', fixture.label);
+    assert.equal(await readFile(stateFile, 'utf8'), initialBytes, fixture.label);
+  }
+});
+
+test('POST /state/toggle returns 413 for a body larger than 64 KiB without mutation', async (t) => {
+  const { stateFile, initialBytes, url } = await startToggleServer(t);
+  const oversized = JSON.stringify({
+    itemId: 'skill-a',
+    action: 'on',
+    padding: 'x'.repeat((64 * 1024) + 1),
+  });
+
+  const response = await postToggle(url, oversized);
+  const payload = await response.json();
+
+  assert.equal(response.status, 413);
+  assert.equal(payload.error.code, 'PAYLOAD_TOO_LARGE');
+  assert.equal(await readFile(stateFile, 'utf8'), initialBytes);
+});
+
+test('POST /state/toggle requires application/json and returns typed 415 without mutation', async (t) => {
+  const { stateFile, initialBytes, url } = await startToggleServer(t);
+
+  const response = await postToggle(
+    url,
+    JSON.stringify({ itemId: 'skill-a', action: 'on' }),
+    'text/plain',
+  );
+  const payload = await response.json();
+
+  assert.equal(response.status, 415);
+  assert.equal(payload.error.code, 'UNSUPPORTED_MEDIA_TYPE');
+  assert.equal(await readFile(stateFile, 'utf8'), initialBytes);
+});
+
+test('/state/toggle rejects non-POST methods with 405 and Allow: POST', async (t) => {
+  const { url } = await startToggleServer(t);
+
+  const response = await fetch(new URL('state/toggle', url), { method: 'GET' });
+
+  assert.equal(response.status, 405);
+  assert.equal(response.headers.get('allow'), 'POST');
+});
+
+test('POST /state/toggle treats an already-current action as a 200 logical no-op', async (t) => {
+  const { stateFile, initialBytes, url } = await startToggleServer(t, ['skill-a']);
+
+  const response = await postToggle(url, JSON.stringify({ itemId: 'skill-a', action: 'on' }));
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.ok, true);
+  assert.equal(payload.active, true);
+  assert.equal(payload.state.activeCatalog.filter((id) => id === 'skill-a').length, 1);
+  assert.equal(await readFile(stateFile, 'utf8'), initialBytes);
+});
+
+const APP_SOURCE = await readFile(
+  fileURLToPath(new URL('../public/app.js', import.meta.url)),
+  'utf8',
+);
+
+function loadToggleClient(fetchImpl) {
+  const listeners = new Map();
+  const registrations = new Map();
+  const refreshes = [];
+  const createdNodes = [];
+  const inlineConfig = JSON.stringify({
+    type: 'skill',
+    items: [TOGGLE_CATALOG_ITEMS[0]],
+    activeIds: [],
+  });
+  const root = {
+    ownerDocument: {
+      createElement(tagName) {
+        const node = {
+          tagName,
+          attributes: {},
+          hidden: true,
+          textContent: '',
+          setAttribute(name, value) {
+            this.attributes[name] = value;
+          },
+        };
+        createdNodes.push(node);
+        return node;
+      },
+    },
+    prepend(node) {
+      this.statusNode = node;
+    },
+    querySelector(selector) {
+      if (selector === 'script[data-catalog-config]') return { textContent: inlineConfig };
+      if (selector === '[data-catalog-request-error]') return this.statusNode ?? null;
+      return null;
+    },
+  };
+  const sandbox = {
+    console: { error() {} },
+    document: { addEventListener: (name, listener) => listeners.set(name, listener) },
+    history: { replaceState() {} },
+    window: {
+      fetch: fetchImpl,
+      location: { hash: '#skills' },
+      htmx: {
+        ajax(method, path, options) {
+          refreshes.push({ method, path, options });
+        },
+      },
+    },
+    Alpine: { data: (name, factory) => registrations.set(name, factory) },
+  };
+  vm.runInNewContext(APP_SOURCE, sandbox);
+  listeners.get('alpine:init')();
+  const state = registrations.get('catalogTab')();
+  state.$el = root;
+  state.init();
+  return { createdNodes, refreshes, root, state };
+}
+
+test('catalog toggle client refreshes its current partial only after a successful server response', async () => {
+  const requests = [];
+  const resultingState = {
+    ...createDefaultProjectState(),
+    activeCatalog: ['skill-a'],
+  };
+  const client = loadToggleClient(async (path, options) => {
+    requests.push({ path, options });
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return { ok: true, itemId: 'skill-a', active: true, state: resultingState };
+      },
+    };
+  });
+
+  const result = await client.state.submitToggle({ itemId: 'skill-a', action: 'on' });
+
+  assert.equal(result.activeCatalog.includes('skill-a'), true);
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].path, '/state/toggle');
+  assert.equal(requests[0].options.method, 'POST');
+  assert.equal(requests[0].options.headers['content-type'], 'application/json');
+  assert.deepEqual(JSON.parse(requests[0].options.body), { itemId: 'skill-a', action: 'on' });
+  assert.equal(client.refreshes.length, 1);
+  assert.equal(client.refreshes[0].method, 'GET');
+  assert.equal(client.refreshes[0].path, '/ui/skills');
+  assert.equal(client.refreshes[0].options.target, '#panel-content');
+});
+
+test('catalog toggle client renders server errors inline and does not refresh the partial', async () => {
+  const client = loadToggleClient(async () => ({
+    ok: false,
+    status: 400,
+    async json() {
+      return {
+        error: {
+          code: 'CRITICAL_CONFIRMATION_REQUIRED',
+          message: 'Critical rule requires exact CONFIRMAR confirmation',
+        },
+      };
+    },
+  }));
+
+  const result = await client.state.submitToggle({ itemId: 'rule-critical', action: 'off' });
+
+  assert.equal(result, null);
+  assert.equal(client.refreshes.length, 0);
+  assert.equal(client.state.errorMessage, 'Critical rule requires exact CONFIRMAR confirmation');
+  assert.equal(client.createdNodes.length, 1);
+  assert.equal(client.root.statusNode.attributes.role, 'alert');
+  assert.equal(client.root.statusNode.attributes['aria-live'], 'assertive');
+  assert.equal(client.root.statusNode.attributes['data-catalog-request-error'], '');
+  assert.equal(client.root.statusNode.hidden, false);
+  assert.equal(client.root.statusNode.textContent, 'Critical rule requires exact CONFIRMAR confirmation');
 });
 

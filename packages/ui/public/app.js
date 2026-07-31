@@ -48,6 +48,8 @@ document.addEventListener('alpine:init', () => {
     selectedId: null,
     pendingCriticalId: null,
     criticalConfirmInput: '',
+    errorMessage: '',
+    submittingToggle: false,
     init() {
       const root = this.$el;
       const dataEl = root?.querySelector?.('script[data-catalog-config]');
@@ -113,16 +115,83 @@ document.addEventListener('alpine:init', () => {
       if (this.isActive(item.id)) return false; // deactivating always allowed
       return this.isAtPersonaCap();
     },
+    ensureToggleErrorRegion(message) {
+      let region = this.$el?.querySelector?.('[data-catalog-request-error]') ?? null;
+      if (!region && message && this.$el?.ownerDocument?.createElement && this.$el?.prepend) {
+        region = this.$el.ownerDocument.createElement('p');
+        region.setAttribute('data-catalog-request-error', '');
+        region.setAttribute('role', 'alert');
+        region.setAttribute('aria-live', 'assertive');
+        region.className = 'catalog-request-error';
+        this.$el.prepend(region);
+      }
+      return region;
+    },
+    setToggleError(message) {
+      this.errorMessage = message;
+      const region = this.ensureToggleErrorRegion(message);
+      if (region) {
+        region.textContent = message;
+        region.hidden = !message;
+      }
+    },
+    currentPartialPath() {
+      const tabByType = { skill: 'skills', rule: 'rules', persona: 'personas' };
+      const tab = tabByType[this.type];
+      return tab ? `/ui/${tab}` : null;
+    },
+    refreshCurrentPartial() {
+      const path = this.currentPartialPath();
+      if (!path) return;
+      window.htmx?.ajax('GET', path, {
+        target: '#panel-content',
+        swap: 'innerHTML',
+      });
+    },
+    async submitToggle(request) {
+      if (!request || this.submittingToggle) return null;
+      this.submittingToggle = true;
+      try {
+        const response = await window.fetch('/state/toggle', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(request),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok && payload?.state) {
+          this.activeIds = Array.isArray(payload.state.activeCatalog)
+            ? [...payload.state.activeCatalog]
+            : this.activeIds;
+          this.setToggleError('');
+          this.refreshCurrentPartial();
+          return payload.state;
+        }
+        const message = payload?.error?.message
+          ?? `Toggle update failed (HTTP ${response.status})`;
+        this.setToggleError(message);
+        return null;
+      } catch (error) {
+        this.setToggleError(`Toggle request failed: ${error?.message ?? error}`);
+        return null;
+      } finally {
+        this.submittingToggle = false;
+      }
+    },
     toggleItem(item) {
       if (!item) return null;
-      if (this.shouldBlockForPersonaCap(item)) return null;
+      if (this.shouldBlockForPersonaCap(item)) {
+        this.setToggleError('Persona cap reached (3 active). Disable one persona to activate another.');
+        return null;
+      }
       const currentlyActive = this.isActive(item.id);
       // Deactivating a critical Rule always requires the CONFIRMAR modal.
       if (currentlyActive && this.isCriticalRule(item)) {
         this.startCriticalToggle(item.id);
         return null;
       }
-      return { itemId: item.id, action: currentlyActive ? 'off' : 'on', critical_confirm: undefined };
+      const request = { itemId: item.id, action: currentlyActive ? 'off' : 'on', critical_confirm: undefined };
+      void this.submitToggle(request);
+      return request;
     },
     startCriticalToggle(itemId) {
       this.pendingCriticalId = itemId;
@@ -140,7 +209,9 @@ document.addEventListener('alpine:init', () => {
       const itemId = this.pendingCriticalId;
       this.pendingCriticalId = null;
       this.criticalConfirmInput = '';
-      return { itemId, action: 'off', critical_confirm: CRITICAL_CONFIRMATION_TOKEN };
+      const request = { itemId, action: 'off', critical_confirm: CRITICAL_CONFIRMATION_TOKEN };
+      void this.submitToggle(request);
+      return request;
     },
     displayTitle(item) {
       return catalogDisplayTitle(item);
