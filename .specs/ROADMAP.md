@@ -362,7 +362,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 > Source: `.specs/features/phase-4-ui-panel/{spec.md, design.md, tasks.md}` (commit `ae4b6f6`).
 > Key decisions: option (a) for /state/toggle (Phase 4 owns real endpoint, Phase 5b subsumes); UI server = Node 22 `http` in `scripts/ui-server.mjs` (NOT Fastify); HTMX+Alpine vendored locally (zero build step); cold+warm first-byte <1000ms.
 
-#### Phase 4.1 — UI workspace + state schema [ ]
+#### Phase 4.1 — UI workspace + state schema [x]
 
 **Done when:** `packages/ui` workspace scaffolded; HTMX+Alpine vendored locally; `.memory-studio/state.json` schema is a TS type with read+write; minimal index page renders.
 
