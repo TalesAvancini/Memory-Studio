@@ -485,18 +485,18 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 > Source: `.specs/features/phase-5a-api-retrieval/{spec.md, design.md, tasks.md}` (commit `c41a4df`).
 > Key decisions: Fastify `^5.x` server (PRD §8 mandates); 2 cache blocks (persona stable + Skills/Rules/matched/context variable); systemMessage = SHA-256 hex of canonical-JSON-serialized blocks; tiebreak stress 1000 requests with deterministic PRNG proving byte-string equivalence; perf N=3 rounds × 1000 requests reporting min/median/p95/p99 (per Phase 4.4 Verifier feedback); server at `src/server/**` (not workspace, preserves Phase 1+2 import graph); reuse Phase 1 calibration residue `src/search/*` (per CALIBRATION-RESIDUE.md); fail-open (timeout → 200 + `emptyReason: "timeout"` + persona-only system message).
 
-#### Phase 5a.1 — Server Foundation [ ]
+#### Phase 5a.1 — Server Foundation [x]
 
 **Done when:** Fastify `^5.x` bootstrap running; Zod schemas validate `/augment` request shape; route handler returns structured 400 on missing fields; structured pino logger emits JSON lines; `/health` GET returns 200 with uptime; entry point wired into root `package.json`.
 
 **Depends on:** Phase 1, Phase 4 (Phase 5a parent)
 
 **Scope (T-01..T-04):**
-- Fastify bootstrap: `src/server/boot.ts` + `src/server/index.ts` entry point
+- Fastify bootstrap: `src/server/boot.ts` + `src/server/index.ts` entry point (port range `[42900, 43000]`, separate from Phase 4 UI's `[41823, 42823]`; corrected from earlier draft; Phase 5a.4 may add `MEMORY_STUDIO_AUGMENT_PORT_RANGE` env override)
 - Zod schemas matching `/augment` request/response per PRD §7.1
 - POST `/augment` route handler with validation (400 on missing required fields)
 - Structured pino logger emitting JSON with `usage.cache_read_input_tokens` field ready
-- GET `/health` returning `{ status: "ok", uptime_ms, last_request_ts }`
+- GET `/health` returning `{ status: "ok", uptime_ms, last_request_ts, request_id }`
 
 **Output:** Fastify server boots on free port (range 41823-42823); 400 + ZodIssue on bad request; logs structured.
 

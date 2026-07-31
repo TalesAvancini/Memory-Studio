@@ -74,8 +74,8 @@ related:
 
 ## Handoff
 
-- **phase:** "Phase 5a — API + Retrieval + Byte-string"
-- **phase-previous:** "Phase 4.4 — Toggle enforcement + perf + responsive closeout" (DONE 2026-07-31, 1 iteration, Verifier PASS commit `d51c408`)
+- **phase:** "Phase 5a.2 — Retrieval Pipeline"
+- **phase-previous:** "Phase 5a.1 — Server Foundation" (DONE 2026-07-31, 1 iteration, Verifier PASS commit `5cf6894`, ~395 tests: 227 root + 152 UI + 16 SDK)
 - **phase-4-status:** "Phase 4 (UI Panel) entire phase DONE via subchapters 4.1, 4.2, 4.3, 4.4 — all `[x]`. 375 tests total."
 - **phase-3:** "Phase 3 — SDK Cliente" (DONE 2026-07-31, 1 iteration)
 - **phase-2:** "Phase 2 — Detector + Fingerprint" (DONE 2026-07-31, 1 iteration)
@@ -87,8 +87,8 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Planner para Phase 5a — API + Retrieval + Byte-string (FTS5+vec+RRF+tiebreak, cache_control: ephemeral, p50<50ms, /augment endpoint with Claude Code smoke)
-- **working-tree:** working (`loop/phase-0` em `d51c408`)
+- **próximo-step-concreto:** dispatch Implementer para Phase 5a.2 — Retrieval Pipeline (compose src/search/* + double threshold + top-3-to-5 + tiebreak + 2-block SHA-256 byte-string, fail-open) — 4 tasks T-05..T-08
+- **working-tree:** working (`loop/phase-0` em `5cf6894`)
 - **lessons-store:** L-001..L-004 (Phase 1) + L-005/L-006 (Phase 3)
 - **phase-3-feature-dir:** `.specs/features/phase-3-sdk-client/{spec.md, design.md, tasks.md, validation.md}` (commit `fe20a66`)
 - **phase-2-feature-dir:** `.specs/features/phase-2-detector-fingerprint/{spec.md, tasks.md, validation.md}` (commit `74b4cdc`)
