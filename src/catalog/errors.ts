@@ -19,4 +19,20 @@ export class EmbedderError extends Error {
   }
 }
 
+/**
+ * Phase 1.2 deliverable. Thrown by the migration runner when a DDL statement
+ * fails or a migration file cannot be read. Carries a stable `code` so callers
+ * (build-index CLI in Phase 1.4) can branch on `'MIGRATION_FAILED'` without
+ * sniffing error messages. The optional `options` second arg mirrors the
+ * built-in `Error` constructor signature so callers can attach `{ cause }`.
+ */
+export class MigrationError extends Error {
+  readonly code: 'MIGRATION_FAILED';
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'MigrationError';
+    this.code = 'MIGRATION_FAILED';
+  }
+}
+
 export { SchemaError } from './schema/index.ts';
