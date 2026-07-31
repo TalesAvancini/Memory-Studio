@@ -16,6 +16,7 @@
 import { execSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,8 +61,31 @@ function checkNodeVersion() {
 // ─── Stubs (replaced in T-02..T-05) ──────────────────────────────────────────
 
 function checkOnnxRuntimeNode() {
-  record('onnxruntime-node', false, 'TODO: implemented in T-03', 'placeholder — replaced in T-03');
-  throw new Error('TODO: onnxruntime-node check not yet implemented (T-03)');
+  // R-04 / AC-2: onnxruntime-node must load without throwing (ESM-friendly via createRequire).
+  const localRequire = createRequire(import.meta.url);
+  let ort;
+  try {
+    ort = localRequire('onnxruntime-node');
+  } catch (err) {
+    record(
+      'onnxruntime-node',
+      false,
+      `require('onnxruntime-node') threw: ${err && err.message ? err.message : err}`,
+      'install the package (`npm install onnxruntime-node`) or rebuild the native binary (`npm rebuild onnxruntime-node --build-from-source` if no prebuilt matches your platform).'
+    );
+    return;
+  }
+  let observed = 'loaded';
+  try {
+    const v = ort && ort.env && ort.env.versions ? ort.env.versions : null;
+    if (v && typeof v === 'object') {
+      const common = v.common || v.node || 'unknown';
+      observed = `loaded (version=${common})`;
+    }
+  } catch {
+    // Fall back to "loaded" if version probe fails — module still imported.
+  }
+  record('onnxruntime-node', true, observed, null);
 }
 
 async function checkFts5() {

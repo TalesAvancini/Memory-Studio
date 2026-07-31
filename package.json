@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "better-sqlite3": "^11.5.0",
+    "onnxruntime-node": "^1.27.0",
     "pino": "^9.5.0",
     "sqlite-vec": "^0.1.9",
     "yaml": "^2.6.0"
