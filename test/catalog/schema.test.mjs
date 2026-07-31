@@ -2,9 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SkillSchema, RuleSchema, PersonaSchema, validateCatalogItem, CatalogSchema } from '../../src/catalog/schema/index.ts';
 
-const __typeTest: typeof SkillSchema = SkillSchema;
-void __typeTest;
-
 test('valid Skill parses with category enum', () => {
   const result = SkillSchema.parse({ id: 'auth-jwt-01', type: 'skill', title: 'JWT', category: 'procedural', text: 'Validate tokens.' });
   assert.equal(result.category, 'procedural');
