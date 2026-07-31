@@ -3,10 +3,25 @@
   font-family: system-ui, sans-serif;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
 body {
-  margin: 0 auto;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 100%;
   max-width: 72rem;
+  margin: 0 auto;
   padding: 1.5rem;
+  min-width: 0;
+  overflow-x: hidden;
 }
 
 nav {
@@ -17,9 +32,125 @@ nav {
 
 nav a[aria-current="page"] {
   font-weight: 700;
+  text-decoration: underline;
 }
 
 #panel-content {
   margin-top: 1.5rem;
   min-width: 0;
+}
+
+#panel-content > * {
+  min-width: 0;
+}
+
+/* Catalog layout: two columns at >=1024 px, single column below. */
+.catalog-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (min-width: 64rem) {
+  .catalog-layout {
+    grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  }
+}
+
+.catalog-list-region,
+.catalog-side-panel {
+  min-width: 0;
+}
+
+.catalog-list,
+.catalog-row,
+.catalog-detail {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.catalog-row {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.25rem 0;
+}
+
+.catalog-row-select,
+.catalog-row-toggle {
+  min-width: 0;
+}
+
+.catalog-row-select {
+  flex: 1 1 auto;
+  max-width: 100%;
+  text-align: left;
+  white-space: normal;
+}
+
+.catalog-row-toggle {
+  flex: 0 0 auto;
+}
+
+.catalog-detail-text {
+  max-width: 100%;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.catalog-search {
+  display: block;
+  max-width: 100%;
+}
+
+.catalog-search input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
+.catalog-side-panel {
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}
+
+.catalog-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  padding: 1rem;
+}
+
+.catalog-modal-content {
+  background: Canvas;
+  color: CanvasText;
+  max-width: 32rem;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.catalog-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.catalog-request-error {
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  margin: 0 0 0.75rem 0;
 }

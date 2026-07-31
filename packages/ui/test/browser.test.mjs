@@ -47,6 +47,22 @@ function loadCatalogTab(config) {
   return state;
 }
 
+function loadAppRoot() {
+  const listeners = new Map();
+  const registrations = new Map();
+  const errors = [];
+  const sandbox = {
+    console: { error: (...args) => errors.push(args) },
+    document: { addEventListener: (name, listener) => listeners.set(name, listener) },
+    history: { replaceState() {} },
+    window: { location: { hash: '' }, htmx: { ajax() {} } },
+    Alpine: { data: (name, factory) => registrations.set(name, factory) },
+  };
+  vm.runInNewContext(APP_SOURCE, sandbox);
+  listeners.get('alpine:init')();
+  return { registrations, errors, sandbox };
+}
+
 const SKILL_JWT = {
   id: 'skill-jwt-validation',
   type: 'skill',
@@ -418,4 +434,200 @@ test('catalogTab disabling a persona releases a slot for the next activation', (
   assert.equal(state.shouldBlockForPersonaCap(items[3]), false);
   const next = state.toggleItem(items[3]);
   assert.equal(JSON.stringify(next), JSON.stringify({ itemId: 'persona-d', action: 'on', critical_confirm: undefined }));
+});
+
+// =============================================================================
+// Phase 4.4 — Responsive closeout + accessibility (T4.4-2)
+// =============================================================================
+
+test('uiPanel renders the selected tab with aria-current and falls back to skills on unknown hash', () => {
+  const { registrations, sandbox } = loadAppRoot();
+  const factory = registrations.get('uiPanel');
+  assert.ok(factory, 'uiPanel factory must be registered');
+  const sandboxWindow = sandbox.window;
+
+  const panel = factory();
+  panel.$el = {
+    ownerDocument: { activeElement: null },
+  };
+  panel.init();
+
+  assert.equal(panel.tab, 'skills');
+  assert.equal(sandboxWindow.location.hash, '#skills');
+
+  sandboxWindow.location.hash = '#personas';
+  panel.route();
+  assert.equal(panel.tab, 'personas');
+
+  sandboxWindow.location.hash = '#totally-unknown';
+  panel.route();
+  assert.equal(panel.tab, 'skills');
+  assert.equal(sandboxWindow.location.hash, '#skills');
+});
+
+test('critical modal traps focus, closes on Escape, and restores focus to the source toggle', () => {
+  const items = [RULE_NO_SECRETS];
+  const state = loadCatalogTab({
+    type: 'rule',
+    items,
+    activeIds: ['rule-no-secrets'],
+  });
+
+  const focusedToggles = [];
+  const docListeners = new Map();
+  const focusableInput = {
+    focus() {
+      focusedToggles.push('input');
+    },
+  };
+  const toggle = {
+    focus() {
+      focusedToggles.push('toggle');
+    },
+  };
+  let keydownHandler = null;
+  const document = {
+    addEventListener(name, handler) {
+      docListeners.set(name, handler);
+      if (name === 'keydown') keydownHandler = handler;
+    },
+    removeEventListener(name) {
+      docListeners.delete(name);
+    },
+    activeElement: toggle,
+  };
+  const modal = {
+    querySelector: (selector) => (selector === '[data-catalog-critical-input]' ? focusableInput : null),
+  };
+  const root = {
+    ownerDocument: document,
+    querySelector: (selector) => (selector === '[data-catalog-critical-input]' ? focusableInput : null),
+    prepend() {},
+  };
+  state.$el = root;
+  state.init();
+
+  // Simulate the toggle button being focused before opening the modal.
+  state.startCriticalToggle('rule-no-secrets');
+  // $nextTick is asynchronous in real Alpine; await the focus microtask.
+  return Promise.resolve()
+    .then(() => {
+      assert.equal(focusedToggles[0], 'input', 'modal must move focus to confirmation input');
+      assert.equal(state.pendingCriticalId, 'rule-no-secrets');
+
+      keydownHandler?.({ key: 'Escape' });
+      assert.equal(state.pendingCriticalId, null, 'Escape closes the modal');
+      assert.equal(focusedToggles[focusedToggles.length - 1], 'toggle', 'cancel restores focus to the originating toggle');
+      assert.equal(state.errorMessage, '');
+    });
+});
+
+test('critical modal keeps keyboard focus inside the dialog while open', () => {
+  const state = loadCatalogTab({
+    type: 'rule',
+    items: [RULE_NO_SECRETS],
+    activeIds: ['rule-no-secrets'],
+  });
+  let keydownHandler = null;
+  const document = {
+    activeElement: null,
+    addEventListener(name, handler) {
+      if (name === 'keydown') keydownHandler = handler;
+    },
+    removeEventListener() {},
+  };
+  const first = {
+    focus() {
+      document.activeElement = first;
+    },
+  };
+  const last = {
+    focus() {
+      document.activeElement = last;
+    },
+  };
+  const modal = { querySelectorAll: () => [first, last] };
+  const root = {
+    ownerDocument: document,
+    querySelector(selector) {
+      if (selector === '[data-catalog-critical-modal]') return modal;
+      return null;
+    },
+    prepend() {},
+  };
+  state.$el = root;
+  state.init();
+  state.pendingCriticalId = 'rule-no-secrets';
+
+  let prevented = false;
+  document.activeElement = last;
+  keydownHandler?.({
+    key: 'Tab',
+    shiftKey: false,
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  assert.equal(prevented, true);
+  assert.equal(document.activeElement, first);
+
+  prevented = false;
+  document.activeElement = first;
+  keydownHandler?.({
+    key: 'Tab',
+    shiftKey: true,
+    preventDefault() {
+      prevented = true;
+    },
+  });
+  assert.equal(prevented, true);
+  assert.equal(document.activeElement, last);
+});
+
+test('inline toggle request errors surface in an aria-live region and are not auto-cleared on a stale error', () => {
+  const state = loadCatalogTab({
+    type: 'skill',
+    items: [SKILL_JWT],
+    activeIds: [],
+  });
+
+  let createdNode = null;
+  const root = {
+    ownerDocument: {
+      activeElement: null,
+      createElement(tagName) {
+        createdNode = {
+          tagName,
+          attributes: {},
+          hidden: true,
+          textContent: '',
+          setAttribute(name, value) {
+            this.attributes[name] = value;
+          },
+        };
+        return createdNode;
+      },
+    },
+    prepend(node) {
+      this.statusNode = node;
+    },
+    querySelector(selector) {
+      if (selector === '[data-catalog-request-error]') return this.statusNode ?? null;
+      if (selector === 'script[data-catalog-config]') return null;
+      return null;
+    },
+  };
+  state.$el = root;
+
+  state.setToggleError('Server unavailable');
+  assert.equal(state.errorMessage, 'Server unavailable');
+  assert.equal(createdNode?.attributes.role, 'alert');
+  assert.equal(createdNode?.attributes['aria-live'], 'assertive');
+  assert.equal(createdNode?.hidden, false);
+  assert.equal(createdNode?.textContent, 'Server unavailable');
+
+  // A subsequent success clears the error and re-hides the region.
+  state.setToggleError('');
+  assert.equal(state.errorMessage, '');
+  assert.equal(createdNode.hidden, true);
 });

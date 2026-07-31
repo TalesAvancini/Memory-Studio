@@ -12,12 +12,12 @@
   <body x-data="uiPanel" @hashchange.window="route()">
     <header>
       <h1>Memory Studio</h1>
-      <nav aria-label="Memory Studio sections">
-        <a href="#skills" :aria-current="tab === 'skills' ? 'page' : null">Skills</a>
-        <a href="#rules" :aria-current="tab === 'rules' ? 'page' : null">Rules</a>
-        <a href="#personas" :aria-current="tab === 'personas' ? 'page' : null">Personas</a>
-        <a href="#audit" :aria-current="tab === 'audit' ? 'page' : null">Audit</a>
-        <a href="#settings" :aria-current="tab === 'settings' ? 'page' : null">Settings</a>
+      <nav aria-label="Memory Studio sections" role="tablist">
+        <a href="#skills" :aria-current="tab === 'skills' ? 'page' : null" role="tab">Skills</a>
+        <a href="#rules" :aria-current="tab === 'rules' ? 'page' : null" role="tab">Rules</a>
+        <a href="#personas" :aria-current="tab === 'personas' ? 'page' : null" role="tab">Personas</a>
+        <a href="#audit" :aria-current="tab === 'audit' ? 'page' : null" role="tab">Audit</a>
+        <a href="#settings" :aria-current="tab === 'settings' ? 'page' : null" role="tab">Settings</a>
       </nav>
     </header>
     <main id="panel-content" aria-live="polite">

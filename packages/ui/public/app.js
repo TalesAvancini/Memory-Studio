@@ -32,7 +32,14 @@ document.addEventListener('alpine:init', () => {
     route() {
       const requested = window.location.hash.slice(1).toLowerCase();
       this.tab = tabs.includes(requested) ? requested : 'skills';
-      if (requested !== this.tab) history.replaceState(null, '', `#${this.tab}`);
+      if (requested !== this.tab) {
+        const normalizedHash = `#${this.tab}`;
+        history.replaceState(null, '', normalizedHash);
+        // A lightweight test harness (and a few embedded hosts) may provide a
+        // replaceState shim that does not update location. Keep the URL state
+        // and Alpine state synchronized in that case.
+        if (window.location.hash !== normalizedHash) window.location.hash = normalizedHash;
+      }
       window.htmx?.ajax('GET', `/ui/${this.tab}`, {
         target: '#panel-content',
         swap: 'innerHTML',
@@ -50,6 +57,7 @@ document.addEventListener('alpine:init', () => {
     criticalConfirmInput: '',
     errorMessage: '',
     submittingToggle: false,
+    activeElementBeforeModal: null,
     init() {
       const root = this.$el;
       const dataEl = root?.querySelector?.('script[data-catalog-config]');
@@ -65,6 +73,38 @@ document.addEventListener('alpine:init', () => {
       }
       if (this.selectedId && !this.items.some((item) => item.id === this.selectedId)) {
         this.selectedId = null;
+      }
+      const doc = root?.ownerDocument;
+      if (doc?.addEventListener) {
+        this._onKeyDown = (event) => {
+          if (!this.pendingCriticalId) return;
+          if (event?.key === 'Escape') {
+            event.preventDefault?.();
+            this.cancelCriticalToggle();
+            return;
+          }
+          if (event?.key !== 'Tab') return;
+          const modal = root?.querySelector?.('[data-catalog-critical-modal]');
+          const focusable = modal?.querySelectorAll?.(
+            'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])',
+          );
+          if (!focusable || focusable.length === 0) return;
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          const active = doc.activeElement;
+          if ((event.shiftKey && active === first) || (!event.shiftKey && active === last)) {
+            event.preventDefault?.();
+            (event.shiftKey ? last : first)?.focus?.();
+          }
+        };
+        doc.addEventListener('keydown', this._onKeyDown);
+      }
+    },
+    destroy() {
+      const doc = this.$el?.ownerDocument;
+      if (doc?.removeEventListener && this._onKeyDown) {
+        doc.removeEventListener('keydown', this._onKeyDown);
+        this._onKeyDown = null;
       }
     },
     filtered() {
@@ -194,12 +234,24 @@ document.addEventListener('alpine:init', () => {
       return request;
     },
     startCriticalToggle(itemId) {
+      this.activeElementBeforeModal = this.$el?.ownerDocument?.activeElement ?? null;
       this.pendingCriticalId = itemId;
       this.criticalConfirmInput = '';
+      const tick = this.$nextTick?.bind(this) ?? ((fn) => Promise.resolve().then(fn));
+      tick(() => {
+        const input = this.$el?.querySelector?.('[data-catalog-critical-input]');
+        input?.focus?.();
+      });
+    },
+    restoreModalFocus() {
+      const target = this.activeElementBeforeModal;
+      this.activeElementBeforeModal = null;
+      if (target && typeof target.focus === 'function') target.focus();
     },
     cancelCriticalToggle() {
       this.pendingCriticalId = null;
       this.criticalConfirmInput = '';
+      this.restoreModalFocus();
     },
     criticalConfirmMatches() {
       return this.criticalConfirmInput === CRITICAL_CONFIRMATION_TOKEN;
@@ -209,6 +261,7 @@ document.addEventListener('alpine:init', () => {
       const itemId = this.pendingCriticalId;
       this.pendingCriticalId = null;
       this.criticalConfirmInput = '';
+      this.restoreModalFocus();
       const request = { itemId, action: 'off', critical_confirm: CRITICAL_CONFIRMATION_TOKEN };
       void this.submitToggle(request);
       return request;
