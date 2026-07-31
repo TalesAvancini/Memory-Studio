@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test test/**/*.test.mjs",
     "test:smoke": "node --test test/smoke.test.mjs",
-    "test:catalog": "node --test test/catalog/",
+    "test:catalog": "node --test test/catalog/*.test.mjs",
     "test:coverage": "node --experimental-test-coverage --test test/search/*.test.mjs",
     "typecheck": "tsc --noEmit",
     "catalog:load": "tsx src/catalog/cli.ts",
@@ -22,7 +22,8 @@
     "onnxruntime-node": "^1.27.0",
     "pino": "^9.5.0",
     "sqlite-vec": "^0.1.9",
-    "yaml": "^2.6.0"
+    "yaml": "^2.6.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",

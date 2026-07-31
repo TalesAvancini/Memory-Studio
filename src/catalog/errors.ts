@@ -1,69 +1,35 @@
-/**
- * Error hierarchy for the catalog domain.
- *
- * Every public failure surface in the catalog raises a typed error so the CLI
- * can map it to the right exit code and log level.
- *
- * Note: Node 22's native TS strip-only mode (--no-warnings=ExperimentalWarning)
- * does NOT yet support TypeScript parameter properties (`constructor(readonly code: ...)`),
- * so every class below declares fields explicitly. Tests that consume these errors
- * pin the public surface (`name`, `code`, `path`).
- */
-
-/** Loader: parse / validate a skill YAML. */
-export class LoaderError extends Error {
-  readonly code:
-    | 'INVALID_KIND'
-    | 'INVALID_SLUG'
-    | 'MISSING_CONTENT'
-    | 'YAML_PARSE_ERROR';
-  readonly path: string;
-
-  constructor(
-    message: string,
-    code:
-      | 'INVALID_KIND'
-      | 'INVALID_SLUG'
-      | 'MISSING_CONTENT'
-      | 'YAML_PARSE_ERROR',
-    path: string,
-  ) {
+// Compatibility shim — Phase 5 search tests reference the legacy
+// `CatalogError`/`EmbedderError` hierarchy. Phase 1.1 rewires this through
+// `src/catalog/schema/index.ts`, which now exports a single `SchemaError`.
+// This stub keeps the surface stable until the search suite is re-pointed.
+export class CatalogError extends Error {
+  readonly code: string;
+  constructor(code: string, message: string) {
     super(message);
-    this.name = 'LoaderError';
-    this.code = code;
-    this.path = path;
-  }
-}
-
-/** Writer: insert / upsert into SQLite. */
-export class WriterError extends Error {
-  readonly code: 'HASH_COLLISION' | 'DB_ERROR';
-
-  constructor(message: string, code: 'HASH_COLLISION' | 'DB_ERROR') {
-    super(message);
-    this.name = 'WriterError';
+    this.name = 'CatalogError';
     this.code = code;
   }
 }
 
-/** Schema: DDL failure (missing table, bad SQL, etc). */
-export class SchemaError extends Error {
-  readonly code: 'DB_ERROR';
-
-  constructor(message: string, code: 'DB_ERROR') {
-    super(message);
-    this.name = 'SchemaError';
-    this.code = code;
-  }
-}
-
-/** Embedder: encoding failure (model not loaded, NaN, etc). */
-export class EmbedderError extends Error {
-  readonly code: 'ENCODING_FAILED';
-
-  constructor(message: string, code: 'ENCODING_FAILED') {
-    super(message);
+export class EmbedderError extends CatalogError {
+  constructor(message: string) {
+    super('EMBEDDER_ERROR', message);
     this.name = 'EmbedderError';
-    this.code = code;
   }
 }
+
+export class MigrationError extends CatalogError {
+  constructor(message: string) {
+    super('MIGRATION_ERROR', message);
+    this.name = 'MigrationError';
+  }
+}
+
+export class LoaderError extends CatalogError {
+  constructor(message: string) {
+    super('LOADER_ERROR', message);
+    this.name = 'LoaderError';
+  }
+}
+
+export { SchemaError } from './schema/index.ts';

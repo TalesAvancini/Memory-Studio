@@ -1,36 +1,27 @@
-/**
- * Public types for the catalog domain.
- *
- * SkillRecord is what the loader emits; StoredSkill is what comes from the DB
- * (with id + updatedAt). RawSkillYaml is the boundary type for unvalidated YAML
- * (per CLAUDE.md "sem any exceto em boundary com JSON dinamico").
- */
-
+// Compatibility shim — Phase 5 search tests reference the legacy
+// `SkillKind` enum from the calibration residue. Phase 1.1 collapses this
+// into a single `CatalogItem` discriminated union; this file keeps the
+// alias stable for downstream imports.
 export type SkillKind = 'skill' | 'rule' | 'persona';
+export type SkillCategory = 'procedural' | 'diagnostic' | 'reference' | 'pattern';
 
 export interface SkillRecord {
-  readonly slug: string; // kebab-case, unico
-  readonly kind: SkillKind;
-  readonly content: string; // texto cru do procedimento
-  readonly contentYaml: string; // YAML original serializado (audit trail)
-  readonly hash: string; // sha256(contentYaml), hex 64 chars
-  readonly createdAt: number; // epoch ms, definido no primeiro insert
+  id: string;
+  type: SkillKind;
+  title?: string;
+  text: string;
+  category?: SkillCategory;
+  critical?: boolean;
+  isDefault?: boolean;
 }
 
 export interface StoredSkill extends SkillRecord {
-  readonly id: number;
-  readonly updatedAt: number;
+  slug: string;
+  content_yaml: string;
+  embedding: Buffer;
+  hash: string;
+  created_at: number;
+  updated_at: number;
 }
 
-// Boundary type para YAML cru (antes da validacao)
-export interface RawSkillYaml {
-  slug?: unknown;
-  kind?: unknown;
-  content?: unknown;
-  [key: string]: unknown;
-}
-
-export const VALID_KINDS: readonly SkillKind[] = ['skill', 'rule', 'persona'] as const;
-
-// kebab-case slug pattern (CLAUDE.md § Naming)
-export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/u;
+export interface RawSkillYaml extends SkillRecord {}

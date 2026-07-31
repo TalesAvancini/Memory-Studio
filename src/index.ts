@@ -14,4 +14,4 @@ export function placeholder(): string {
 }
 
 // Catalog domain (Phase 2): schema, loader, embedder, writer.
-export * from './catalog/index.ts';
+export * from './catalog/schema/index.ts';

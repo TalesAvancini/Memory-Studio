@@ -1,161 +1,41 @@
-/**
- * Schema tests — cover ACs crud-01, crud-02, crud-03.
- *
- * Strategy: open a fresh `:memory:` SQLite db, run createSchema, then assert
- * via `PRAGMA table_info(name)` that every required column exists with the
- * expected name / type / constraints. Idempotency is checked by calling
- * createSchema twice in a row.
- */
-
-import { test } from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
-import Database from 'better-sqlite3';
-import { createSchema } from '../../src/catalog/schema.ts';
+import { SkillSchema, RuleSchema, PersonaSchema, validateCatalogItem, CatalogSchema } from '../../src/catalog/schema/index.ts';
 
-function openMemoryDb() {
-  return new Database(':memory:');
-}
-
-function getColumns(db, tableName) {
-  // PRAGMA cannot be parameterized; the tableName is a constant literal in
-  // each call site, so safe to interpolate.
-  return /** @type {Array<{name: string, type: string, notnull: 0 | 1, pk: 0 | 1, dflt_value: unknown}>} */ (
-    db.prepare(`PRAGMA table_info(${tableName})`).all()
-  );
-}
-
-test('T-SCHEMA-01: createSchema creates `skills` table with the expected columns (crud-01)', () => {
-  const db = openMemoryDb();
-  try {
-    createSchema(db);
-    const cols = getColumns(db, 'skills');
-    const byName = Object.fromEntries(cols.map((c) => [c.name, c]));
-
-    // Required columns per spec.md crud-01
-    const required = [
-      { name: 'id', type: 'INTEGER' },
-      { name: 'slug', type: 'TEXT' },
-      { name: 'kind', type: 'TEXT' },
-      { name: 'content_yaml', type: 'TEXT' },
-      { name: 'embedding', type: 'BLOB' },
-      { name: 'hash', type: 'TEXT' },
-      { name: 'created_at', type: 'INTEGER' },
-      { name: 'updated_at', type: 'INTEGER' },
-    ];
-    for (const { name, type } of required) {
-      assert.ok(byName[name], `column ${name} should exist in skills`);
-      assert.equal(
-        byName[name].type,
-        type,
-        `column ${name} should be ${type}, got ${byName[name].type}`,
-      );
-    }
-
-    // id is PRIMARY KEY AUTOINCREMENT
-    assert.equal(byName.id.pk, 1, 'id should be PRIMARY KEY');
-
-    // slug and hash are UNIQUE (notnull enforced by SQLite UNIQUE)
-    assert.equal(byName.slug.notnull, 1, 'slug NOT NULL');
-    assert.equal(byName.hash.notnull, 1, 'hash NOT NULL');
-
-    // Timestamp columns not nullable
-    assert.equal(byName.created_at.notnull, 1);
-    assert.equal(byName.updated_at.notnull, 1);
-
-    // The CHECK on kind is expressed via DDL; verify it triggers below.
-  } finally {
-    db.close();
-  }
+test('valid Skill parses with category enum', () => {
+  const result = SkillSchema.parse({ id: 'auth-jwt-01', type: 'skill', title: 'JWT', category: 'procedural', text: 'Validate tokens.' });
+  assert.equal(result.category, 'procedural');
 });
 
-test('T-SCHEMA-01b: skills table rejects invalid `kind` via CHECK constraint', () => {
-  const db = openMemoryDb();
-  try {
-    createSchema(db);
-    const stmt = db.prepare(
-      `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    );
-
-    assert.throws(
-      () =>
-        stmt.run(
-          'demo-skill',
-          'bogus-kind',
-          'content',
-          Buffer.alloc(1536),
-          'h1',
-          Date.now(),
-          Date.now(),
-        ),
-      /CHECK constraint failed/i,
-      'invalid kind must violate CHECK',
-    );
-  } finally {
-    db.close();
-  }
+test('Skill rejects missing title with field path', () => {
+  const result = validateCatalogItem({ id: 'skill-1', type: 'skill', category: 'pattern', text: 'body' });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, 'title_required');
 });
 
-test('T-SCHEMA-02: createSchema creates `audit_events` table with expected columns (crud-02)', () => {
-  const db = openMemoryDb();
-  try {
-    createSchema(db);
-    const cols = getColumns(db, 'audit_events');
-    const byName = Object.fromEntries(cols.map((c) => [c.name, c]));
-
-    const required = [
-      { name: 'id', type: 'INTEGER' },
-      { name: 'ts', type: 'INTEGER' },
-      { name: 'tenant_hash', type: 'TEXT' },
-      { name: 'event_type', type: 'TEXT' },
-      { name: 'payload', type: 'TEXT' },
-    ];
-    for (const { name, type } of required) {
-      assert.ok(byName[name], `column ${name} should exist in audit_events`);
-      assert.equal(
-        byName[name].type,
-        type,
-        `column ${name} should be ${type}, got ${byName[name].type}`,
-      );
-    }
-
-    assert.equal(byName.id.pk, 1, 'id PRIMARY KEY');
-    assert.equal(byName.ts.notnull, 1);
-    assert.equal(byName.tenant_hash.notnull, 1);
-    assert.equal(byName.event_type.notnull, 1);
-    assert.equal(byName.payload.notnull, 1);
-  } finally {
-    db.close();
-  }
+test('Skill rejects category outside enum deterministically', () => {
+  const result = validateCatalogItem({ id: 'skill-1', type: 'skill', title: 'x', category: 'other', text: 'body' });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.code, 'invalid_category');
 });
 
-test('T-SCHEMA-03: createSchema called twice is idempotent (crud-03)', () => {
-  const db = openMemoryDb();
-  try {
-    createSchema(db);
-    // Second call must not throw.
-    createSchema(db);
+test('Rule and Persona parse defaults', () => {
+  assert.equal(RuleSchema.parse({ id: 'rule-1', type: 'rule', text: 'Do this.' }).critical, false);
+  assert.equal(PersonaSchema.parse({ id: 'persona-1', type: 'persona', text: 'Be concise.' }).isDefault, false);
+});
 
-    // Data inserted before the second call must still be there.
-    db.prepare(
-      `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      'survives',
-      'skill',
-      'c',
-      Buffer.alloc(1536),
-      'hh',
-      Date.now(),
-      Date.now(),
-    );
+test('Rule critical and Persona isDefault reject non-boolean values', () => {
+  assert.throws(() => RuleSchema.parse({ id: 'rule-1', type: 'rule', text: 'x', critical: 'yes' }));
+  assert.throws(() => PersonaSchema.parse({ id: 'persona-1', type: 'persona', text: 'x', isDefault: 1 }));
+});
 
-    createSchema(db); // third call still fine
-    const row = db
-      .prepare('SELECT slug FROM skills WHERE slug = ?')
-      .get('survives');
-    assert.equal(row?.slug, 'survives');
-  } finally {
-    db.close();
-  }
+test('all schemas reject missing id and empty text', () => {
+  assert.throws(() => SkillSchema.parse({ type: 'skill', title: 'x', category: 'pattern', text: 'x' }));
+  assert.throws(() => RuleSchema.parse({ id: 'rule-1', type: 'rule', text: '' }));
+  assert.throws(() => PersonaSchema.parse({ id: 'persona-1', type: 'persona', text: '' }));
+});
+
+test('text is NFC normalized', () => {
+  const result = RuleSchema.parse({ id: 'rule-1', type: 'rule', text: 'Café' });
+  assert.equal(result.text, 'Café');
 });
