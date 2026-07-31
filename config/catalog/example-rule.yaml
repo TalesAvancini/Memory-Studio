@@ -1,0 +1,8 @@
+id: example-rule-no-secrets-in-prompts
+type: rule
+critical: true
+text: |
+  Never include raw API keys, passwords, OAuth tokens, or personally
+  identifiable information in prompts or logs. When a snippet needs
+  a secret, reference it by an environment variable name
+  (e.g. `${JWT_SIGNING_KEY}`) and resolve at execution time only.

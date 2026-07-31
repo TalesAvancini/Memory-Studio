@@ -1,0 +1,16 @@
+id: example-skill-01
+type: skill
+title: Example Skill — JWT Validation
+category: procedural
+text: |
+  Validates JWT tokens issued by a trusted authority using the `jose`
+  library. Verifies the signature with the JWKS endpoint, checks
+  standard claims (`exp`, `iat`, `aud`, `iss`), and rejects tokens
+  whose `kid` is not in the current key set.
+
+  Steps:
+    1. Fetch JWKS from the configured issuer (cached, 10 min TTL).
+    2. Resolve the signing key for the token's `kid` header.
+    3. Verify signature; if invalid, surface `invalid_signature`.
+    4. Verify `exp > now` and `iss === expected_issuer`.
+    5. Decode claims and return the typed payload.
