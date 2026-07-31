@@ -357,6 +357,72 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
+> **Phase 4 split (2026-07-31) — 4 subchapters per SUBCHAPTER_BREAKDOWN trigger (8-12h phase, 13 tasks total).**
+> Each subchapter is a fresh phase with own Planner→Implementer→Verifier cycle.
+> Source: `.specs/features/phase-4-ui-panel/{spec.md, design.md, tasks.md}` (commit `ae4b6f6`).
+> Key decisions: option (a) for /state/toggle (Phase 4 owns real endpoint, Phase 5b subsumes); UI server = Node 22 `http` in `scripts/ui-server.mjs` (NOT Fastify); HTMX+Alpine vendored locally (zero build step); cold+warm first-byte <1000ms.
+
+#### Phase 4.1 — UI workspace + state schema [ ]
+
+**Done when:** `packages/ui` workspace scaffolded; HTMX+Alpine vendored locally; `.memory-studio/state.json` schema is a TS type with read+write; minimal index page renders.
+
+**Depends on:** Phase 3, Phase 4
+
+**Scope (4 tasks):**
+- `packages/ui/package.json` + `tsconfig.json` + vendored HTMX 1.9.x + Alpine 3.x
+- `.memory-studio/state.json` TS type (extend existing schema with `active_catalog`, `ui` config)
+- `readProjectState(path): ProjectState` + `writeProjectState(path, state): boolean` helpers
+- Minimal `index.html` with hash router shell
+
+**Output:** workspace + state schema + helpers + index shell.
+
+---
+
+#### Phase 4.2 — Skills + Rules + Personas tabs [ ]
+
+**Done when:** Skills, Rules, Personas tabs render the catalog items with search, side-panel, Critical Rules confirmation, persona cap 3.
+
+**Depends on:** Phase 4.1
+
+**Scope (4 tasks):**
+- Skills tab: colunar list, search by name/keyword, side-panel reader
+- Rules tab: list + Critical Rules visual warning + toggle-off confirmation modal
+- Personas tab: list + cap-3 selection enforcement (UI blocks 4th with inline error)
+- HTMX partials for tab content (server returns HTML, Alpine enhances)
+
+**Output:** 3 tabs with full interactive features.
+
+---
+
+#### Phase 4.3 — Audit + Settings tabs [ ]
+
+**Done when:** Audit tab shows last N augmentations; Settings tab exposes thresholds + tenant + integration mode + embedding model.
+
+**Depends on:** Phase 4.1
+
+**Scope (2 tasks):**
+- Audit tab: list of last N augmentations (timestamp, redact-prompt-hash, matched IDs, pruning reasons, latency); empty-state
+- Settings tab: form bound to `state.json` thresholds + tenant + integration mode + embedding model
+
+**Output:** 2 tabs reading project state.
+
+---
+
+#### Phase 4.4 — Toggle enforcement + perf + responsive closeout [ ]
+
+**Done when:** `POST /state/toggle` returns 400 on critical without confirmation; UI loads cold+warm <1000ms; layout works at 1024px viewport.
+
+**Depends on:** Phase 4.1, Phase 4.2, Phase 4.3
+
+**Scope (3 tasks):**
+- `/state/toggle` endpoint in `scripts/ui-server.mjs` with Critical Rules + persona cap server-side enforcement
+- Cold + warm first-byte measurement (Date.now() assertions, <1000ms both)
+- Responsive layout sanity check (1024px viewport functions for all 5 tabs)
+
+**Output:** `/state/toggle` working + perf measured + responsive verified. Phase 5b later subsumes the endpoint contract.
+
+---
+
 #### Phase 5a — API + Retrieval + Byte-string [ ]
 
 **Done when:** `/augment` smoke test com Claude Code; byte-string determinístico (SHA256); cache do provedor hit verificado em log; p50<50ms.
