@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { renderCatalogPartial, escapeScriptJson } from '@memory-studio/ui';
+import {
+  CRITICAL_RULE_EXAMPLE_COPY,
+  PERSONA_CAP_MESSAGE,
+  escapeScriptJson,
+  renderCatalogPartial,
+} from '@memory-studio/ui';
 
 const SAMPLE_SKILL = {
   id: 'skill-jwt-validation',
@@ -15,6 +20,13 @@ const SAMPLE_RULE = {
   type: 'rule',
   critical: true,
   text: 'Never commit secrets.\n',
+};
+
+const SAMPLE_RULE_NON_CRITICAL = {
+  id: 'rule-doc',
+  type: 'rule',
+  critical: false,
+  text: 'Prefer small snippets.\n',
 };
 
 const SAMPLE_PERSONA = {
@@ -161,4 +173,72 @@ test('escapeScriptJson neutralizes HTML terminator characters', () => {
   assert.deepEqual(JSON.parse(escaped), value);
   // And the literal </script must not survive into the output.
   assert.doesNotMatch(escaped, /<\/script>/i);
+});
+
+test('Rules partial renders the exact mandated Critical Rule example copy', () => {
+  const html = renderCatalogPartial('rule', {
+    items: [SAMPLE_RULE],
+    activeIds: new Set([SAMPLE_RULE.id]),
+  });
+
+  assert.match(html, /data-state="critical-example"/);
+  // The copy must appear, escaped or unescaped. In the rendered HTML the
+  // single-quote becomes &#39; because every catalog-bound field passes
+  // through HTML escaping — the browser parses &#39; back to ' on display.
+  const escapedCopy = CRITICAL_RULE_EXAMPLE_COPY
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+  assert.match(html, new RegExp(escapedCopy.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
+test('Rules partial embeds the Critical Rule modal markup with CONFIRMAR input', () => {
+  const html = renderCatalogPartial('rule', {
+    items: [SAMPLE_RULE],
+    activeIds: new Set([SAMPLE_RULE.id]),
+  });
+
+  assert.match(html, /data-catalog-critical-modal/);
+  assert.match(html, /data-catalog-critical-input/);
+  assert.match(html, /data-catalog-modal-cancel/);
+  assert.match(html, /data-catalog-modal-confirm/);
+  // Confirm button is enabled only when input matches exactly.
+  assert.match(html, /:disabled="!criticalConfirmMatches\(\)"/);
+});
+
+test('Personas partial renders the inline persona-cap error message', () => {
+  const html = renderCatalogPartial('persona', {
+    items: [SAMPLE_PERSONA],
+    activeIds: new Set(),
+  });
+
+  assert.match(html, /data-state="persona-cap"/);
+  assert.match(html, new RegExp(PERSONA_CAP_MESSAGE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  // Toggle button binds to the browser-side persona cap gate.
+  assert.match(html, /:disabled="shouldBlockForPersonaCap\(item\)"/);
+});
+
+test('Skills partial does not render Critical Rule example copy (rule-only)', () => {
+  const html = renderCatalogPartial('skill', {
+    items: [SAMPLE_SKILL],
+    activeIds: new Set(),
+  });
+
+  assert.doesNotMatch(html, /data-state="critical-example"/);
+  assert.doesNotMatch(html, /data-catalog-critical-modal/);
+});
+
+test('Critical Rule row exposes critical marker on the toggle button', () => {
+  const html = renderCatalogPartial('rule', {
+    items: [SAMPLE_RULE, SAMPLE_RULE_NON_CRITICAL],
+    activeIds: new Set([SAMPLE_RULE.id]),
+  });
+
+  // The x-for template iterates over both rows and emits one toggle button
+  // bound to item.critical — Alpine clones the template per item at runtime.
+  assert.match(html, /:data-critical="item\.type === 'rule' &amp;&amp; item\.critical"/);
+  // One template instance contains the data-catalog-toggle marker.
+  assert.match(html, /data-catalog-toggle/);
 });

@@ -347,3 +347,61 @@ test('toggleCatalogItem with matching state returns success without writing the 
   const reread = await store.read();
   assert.deepEqual(reread.activeCatalog, ['skill-a']);
 });
+
+test('toggleCatalogItem blocks the fourth persona and leaves state unmutated', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'memory-studio-toggle-persona-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = createProjectStateStore(root);
+  const catalog = reader([PERSONA_A, PERSONA_B, PERSONA_C, PERSONA_D]);
+  await store.update((current) => ({
+    ...current,
+    activeCatalog: [PERSONA_A.id, PERSONA_B.id, PERSONA_C.id],
+  }));
+  const beforeBytes = JSON.stringify(await store.read());
+
+  await assert.rejects(
+    () => toggleCatalogItem(
+      { itemId: 'persona-d', action: 'on' },
+      catalog,
+      store,
+    ),
+    (error) => {
+      assert.ok(error instanceof TransitionRequestError);
+      assert.equal(error.code, 'PERSONA_LIMIT_EXCEEDED');
+      return true;
+    },
+  );
+
+  // State bytes on disk must remain identical to the pre-attempt snapshot.
+  const after = await store.read();
+  assert.equal(JSON.stringify(after), beforeBytes);
+  assert.deepEqual(after.activeCatalog, [PERSONA_A.id, PERSONA_B.id, PERSONA_C.id]);
+});
+
+test('disabling one persona via toggleCatalogItem releases a slot for the next activation', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'memory-studio-toggle-persona-slot-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const store = createProjectStateStore(root);
+  const catalog = reader([PERSONA_A, PERSONA_B, PERSONA_C, PERSONA_D]);
+  await store.update((current) => ({
+    ...current,
+    activeCatalog: [PERSONA_A.id, PERSONA_B.id, PERSONA_C.id],
+  }));
+
+  const deactivated = await toggleCatalogItem(
+    { itemId: PERSONA_A.id, action: 'off' },
+    catalog,
+    store,
+  );
+  assert.equal(deactivated.active, false);
+  assert.equal(deactivated.state.activeCatalog.length, 2);
+
+  const activated = await toggleCatalogItem(
+    { itemId: PERSONA_D.id, action: 'on' },
+    catalog,
+    store,
+  );
+  assert.equal(activated.active, true);
+  assert.equal(activated.state.activeCatalog.length, MAX_ACTIVE_PERSONAS);
+  assert.equal(activated.state.activeCatalog.includes(PERSONA_D.id), true);
+});

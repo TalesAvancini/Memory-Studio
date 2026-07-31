@@ -62,6 +62,12 @@ export interface CatalogViewModel {
   activeIds: ReadonlySet<string>;
 }
 
+export const CRITICAL_RULE_EXAMPLE_COPY =
+  "Rule critical:true — exemplo: toggle off + digitar 'CONFIRMAR' no painel → aceito; sem confirmação → bloqueado";
+
+export const PERSONA_CAP_MESSAGE =
+  'Persona cap reached (3 active). Disable one persona to activate another.';
+
 function filterByType(
   items: readonly UiCatalogItem[],
   type: 'skill' | 'rule' | 'persona',
@@ -106,8 +112,31 @@ export function renderCatalogPartial(
     : '';
   const noMatchState = `<p class="catalog-empty" data-state="no-match" x-show="query &amp;&amp; filtered().length === 0">No ${escapeHtml(lowerLabel)} match "<span x-text="query"></span>".</p>`;
 
+  const criticalExample = type === 'rule'
+    ? `<p class="catalog-critical-example" data-state="critical-example">${escapeHtml(CRITICAL_RULE_EXAMPLE_COPY)}</p>`
+    : '';
+  const criticalModal = type === 'rule'
+    ? `<div class="catalog-modal" x-show="pendingCriticalId" role="dialog" aria-modal="true" aria-labelledby="catalog-critical-modal-title" data-catalog-critical-modal>
+  <article class="catalog-modal-content">
+    <h3 id="catalog-critical-modal-title">Confirm Critical Rule toggle</h3>
+    <p class="catalog-critical-warning">${escapeHtml(CRITICAL_RULE_EXAMPLE_COPY)}</p>
+    <p>Type <code>CONFIRMAR</code> below to deactivate the rule:</p>
+    <label class="catalog-modal-input-label">
+      <span>Confirmation token</span>
+      <input type="text" x-model="criticalConfirmInput" autocomplete="off" data-catalog-critical-input>
+    </label>
+    <p class="catalog-modal-error" x-show="criticalConfirmInput &amp;&amp; !criticalConfirmMatches()" role="alert">Type exactly <code>CONFIRMAR</code> to confirm.</p>
+    <div class="catalog-modal-actions">
+      <button type="button" @click="cancelCriticalToggle()" data-catalog-modal-cancel>Cancel</button>
+      <button type="button" :disabled="!criticalConfirmMatches()" @click="confirmCriticalToggle()" data-catalog-modal-confirm>Confirm</button>
+    </div>
+  </article>
+</div>`
+    : '';
+
   return `<section data-tab="${escapeAttr(type === 'skill' ? 'skills' : type === 'rule' ? 'rules' : 'personas')}" aria-labelledby="${escapeAttr(type)}-heading" x-data="catalogTab">
 <h2 id="${escapeAttr(type)}-heading">${escapeHtml(tabLabel)}</h2>
+${criticalExample}
 <script type="application/json" data-catalog-config>${configJson}</script>
 <div class="catalog-layout">
   <div class="catalog-list-region">
@@ -125,6 +154,10 @@ export function renderCatalogPartial(
             <span class="catalog-row-meta" x-text="displayMeta(item)"></span>
             <span class="catalog-row-status" x-text="isActive(item.id) ? 'Active' : 'Inactive'"></span>
           </button>
+          <button type="button" class="catalog-row-toggle" :class="isActive(item.id) ? 'is-on' : 'is-off'" :data-critical="item.type === 'rule' &amp;&amp; item.critical" :disabled="shouldBlockForPersonaCap(item)" @click="toggleItem(item)" data-catalog-toggle>
+            <span x-text="isActive(item.id) ? 'On' : 'Off'"></span>
+          </button>
+          <p class="catalog-persona-cap-error" x-show="shouldBlockForPersonaCap(item)" role="alert" data-state="persona-cap">${escapeHtml(PERSONA_CAP_MESSAGE)}</p>
         </li>
       </template>
     </ul>
@@ -142,6 +175,7 @@ export function renderCatalogPartial(
     </template>
   </aside>
 </div>
+${criticalModal}
 </section>`;
 }
 

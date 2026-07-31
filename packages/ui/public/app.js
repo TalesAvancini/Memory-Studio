@@ -1,5 +1,7 @@
 document.addEventListener('alpine:init', () => {
   const tabs = ['skills', 'rules', 'personas', 'audit', 'settings'];
+  const CRITICAL_CONFIRMATION_TOKEN = 'CONFIRMAR';
+  const MAX_ACTIVE_PERSONAS = 3;
 
   function describeCatalogMeta(item) {
     if (!item) return '';
@@ -36,6 +38,8 @@ document.addEventListener('alpine:init', () => {
     activeIds: [],
     query: '',
     selectedId: null,
+    pendingCriticalId: null,
+    criticalConfirmInput: '',
     init() {
       const root = this.$el;
       const dataEl = root?.querySelector?.('script[data-catalog-config]');
@@ -79,6 +83,56 @@ document.addEventListener('alpine:init', () => {
     },
     select(id) {
       this.selectedId = id;
+    },
+    isCriticalRule(item) {
+      return item && item.type === 'rule' && item.critical === true;
+    },
+    isPersona(item) {
+      return item && item.type === 'persona';
+    },
+    personaIds() {
+      return new Set(this.items.filter((item) => this.isPersona(item)).map((item) => item.id));
+    },
+    activePersonaCount() {
+      const personaIds = this.personaIds();
+      return this.activeIds.filter((id) => personaIds.has(id)).length;
+    },
+    isAtPersonaCap() {
+      return this.activePersonaCount() >= MAX_ACTIVE_PERSONAS;
+    },
+    shouldBlockForPersonaCap(item) {
+      if (!item || !this.isPersona(item)) return false;
+      if (this.isActive(item.id)) return false; // deactivating always allowed
+      return this.isAtPersonaCap();
+    },
+    toggleItem(item) {
+      if (!item) return null;
+      if (this.shouldBlockForPersonaCap(item)) return null;
+      const currentlyActive = this.isActive(item.id);
+      // Deactivating a critical Rule always requires the CONFIRMAR modal.
+      if (currentlyActive && this.isCriticalRule(item)) {
+        this.startCriticalToggle(item.id);
+        return null;
+      }
+      return { itemId: item.id, action: currentlyActive ? 'off' : 'on', critical_confirm: undefined };
+    },
+    startCriticalToggle(itemId) {
+      this.pendingCriticalId = itemId;
+      this.criticalConfirmInput = '';
+    },
+    cancelCriticalToggle() {
+      this.pendingCriticalId = null;
+      this.criticalConfirmInput = '';
+    },
+    criticalConfirmMatches() {
+      return this.criticalConfirmInput === CRITICAL_CONFIRMATION_TOKEN;
+    },
+    confirmCriticalToggle() {
+      if (!this.pendingCriticalId || !this.criticalConfirmMatches()) return null;
+      const itemId = this.pendingCriticalId;
+      this.pendingCriticalId = null;
+      this.criticalConfirmInput = '';
+      return { itemId, action: 'off', critical_confirm: CRITICAL_CONFIRMATION_TOKEN };
     },
     displayTitle(item) {
       return catalogDisplayTitle(item);

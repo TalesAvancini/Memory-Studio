@@ -70,6 +70,13 @@ const RULE_NO_SECRETS = {
   text: 'Never commit secrets.',
 };
 
+const RULE_DOC = {
+  id: 'rule-doc',
+  type: 'rule',
+  critical: false,
+  text: 'Prefer small documented snippets.',
+};
+
 function ids(items) {
   // Snapshot items into a fresh outer-scope array so deepStrictEqual
   // does not trip over vm-context prototype identity.
@@ -221,4 +228,194 @@ test('catalogTab init() with no config script keeps defaults', () => {
   assert.equal(state.type, '');
   assert.equal(state.items.length, 0);
   assert.equal(state.activeIds.length, 0);
+});
+
+test('catalogTab toggleItem on non-critical skill returns on action without confirmation', () => {
+  const state = loadCatalogTab({
+    type: 'skill',
+    items: [SKILL_JWT],
+    activeIds: [],
+  });
+
+  const action = state.toggleItem(SKILL_JWT);
+  assert.equal(JSON.stringify(action), JSON.stringify({ itemId: 'skill-jwt-validation', action: 'on', critical_confirm: undefined }));
+});
+
+test('catalogTab toggleItem off on active non-critical rule returns off action without confirmation', () => {
+  const state = loadCatalogTab({
+    type: 'rule',
+    items: [RULE_DOC],
+    activeIds: ['rule-doc'],
+  });
+
+  const action = state.toggleItem(RULE_DOC);
+  assert.equal(JSON.stringify(action), JSON.stringify({ itemId: 'rule-doc', action: 'off', critical_confirm: undefined }));
+});
+
+test('catalogTab toggleItem on critical rule is permitted without confirmation', () => {
+  const state = loadCatalogTab({
+    type: 'rule',
+    items: [RULE_NO_SECRETS],
+    activeIds: [],
+  });
+
+  const action = state.toggleItem(RULE_NO_SECRETS);
+  assert.equal(action?.itemId, 'rule-no-secrets');
+  assert.equal(action?.action, 'on');
+  assert.equal(action?.critical_confirm, undefined);
+  assert.equal(state.pendingCriticalId, null, 'activating a critical rule must not open the modal');
+});
+
+test('catalogTab toggleItem off on critical rule opens the modal and clears input', () => {
+  const state = loadCatalogTab({
+    type: 'rule',
+    items: [RULE_NO_SECRETS],
+    activeIds: ['rule-no-secrets'],
+  });
+
+  const result = state.toggleItem(RULE_NO_SECRETS);
+
+  assert.equal(result, null, 'deactivation must defer to modal confirm step');
+  assert.equal(state.pendingCriticalId, 'rule-no-secrets');
+  assert.equal(state.criticalConfirmInput, '');
+});
+
+test('catalogTab cancelCriticalToggle clears modal state', () => {
+  const state = loadCatalogTab({
+    type: 'rule',
+    items: [RULE_NO_SECRETS],
+    activeIds: ['rule-no-secrets'],
+  });
+  state.toggleItem(RULE_NO_SECRETS);
+  state.criticalConfirmInput = 'CONFIRMAR';
+
+  state.cancelCriticalToggle();
+
+  assert.equal(state.pendingCriticalId, null);
+  assert.equal(state.criticalConfirmInput, '');
+});
+
+test('catalogTab criticalConfirmMatches requires the exact CONFIRMAR token', () => {
+  const state = loadCatalogTab({
+    type: 'rule',
+    items: [RULE_NO_SECRETS],
+    activeIds: ['rule-no-secrets'],
+  });
+
+  const cases = [
+    ['CONFIRMAR', true],
+    ['confirmar', false],
+    [' CONFIRMAR', false],
+    ['CONFIRMAR ', false],
+    ['\tCONFIRMAR', false],
+    ['', false],
+    ['CON FIRMAR', false],
+  ];
+  for (const [input, expected] of cases) {
+    state.criticalConfirmInput = input;
+    assert.equal(state.criticalConfirmMatches(), expected, `input=${JSON.stringify(input)}`);
+  }
+});
+
+test('catalogTab confirmCriticalToggle returns action only with exact CONFIRMAR', () => {
+  const state = loadCatalogTab({
+    type: 'rule',
+    items: [RULE_NO_SECRETS],
+    activeIds: ['rule-no-secrets'],
+  });
+  state.toggleItem(RULE_NO_SECRETS);
+  state.criticalConfirmInput = 'confirmar';
+  assert.equal(state.confirmCriticalToggle(), null, 'wrong-case confirm must be rejected');
+
+  state.criticalConfirmInput = ' CONFIRMAR';
+  assert.equal(state.confirmCriticalToggle(), null, 'padded confirm must be rejected');
+
+  state.criticalConfirmInput = 'CONFIRMAR';
+  const action = state.confirmCriticalToggle();
+  assert.equal(JSON.stringify(action), JSON.stringify({
+    itemId: 'rule-no-secrets',
+    action: 'off',
+    critical_confirm: 'CONFIRMAR',
+  }));
+  // Modal state cleared after a successful confirm.
+  assert.equal(state.pendingCriticalId, null);
+  assert.equal(state.criticalConfirmInput, '');
+});
+
+test('catalogTab activePersonaCount and isAtPersonaCap reflect the persona set', () => {
+  const items = [
+    { id: 'persona-a', type: 'persona', isDefault: true, text: 'A' },
+    { id: 'persona-b', type: 'persona', isDefault: false, text: 'B' },
+    { id: 'persona-c', type: 'persona', isDefault: false, text: 'C' },
+    { id: 'persona-d', type: 'persona', isDefault: false, text: 'D' },
+  ];
+  const state = loadCatalogTab({ type: 'persona', items, activeIds: [] });
+
+  assert.equal(state.activePersonaCount(), 0);
+  assert.equal(state.isAtPersonaCap(), false);
+
+  state.activeIds = ['persona-a', 'persona-b', 'persona-c'];
+  assert.equal(state.activePersonaCount(), 3);
+  assert.equal(state.isAtPersonaCap(), true);
+});
+
+test('catalogTab shouldBlockForPersonaCap blocks 4th activation only', () => {
+  const items = [
+    { id: 'persona-a', type: 'persona', isDefault: true, text: 'A' },
+    { id: 'persona-b', type: 'persona', isDefault: false, text: 'B' },
+    { id: 'persona-c', type: 'persona', isDefault: false, text: 'C' },
+    { id: 'persona-d', type: 'persona', isDefault: false, text: 'D' },
+  ];
+  const state = loadCatalogTab({
+    type: 'persona',
+    items,
+    activeIds: ['persona-a', 'persona-b', 'persona-c'],
+  });
+
+  // 4th persona activation blocked
+  assert.equal(state.shouldBlockForPersonaCap(items[3]), true);
+  // Deactivating an active persona always permitted
+  assert.equal(state.shouldBlockForPersonaCap(items[0]), false);
+  // Non-persona items never blocked by persona cap
+  assert.equal(state.shouldBlockForPersonaCap(SKILL_JWT), false);
+});
+
+test('catalogTab toggleItem on 4th persona returns null and does not mutate state', () => {
+  const items = [
+    { id: 'persona-a', type: 'persona', isDefault: true, text: 'A' },
+    { id: 'persona-b', type: 'persona', isDefault: false, text: 'B' },
+    { id: 'persona-c', type: 'persona', isDefault: false, text: 'C' },
+    { id: 'persona-d', type: 'persona', isDefault: false, text: 'D' },
+  ];
+  const state = loadCatalogTab({
+    type: 'persona',
+    items,
+    activeIds: ['persona-a', 'persona-b', 'persona-c'],
+  });
+
+  const action = state.toggleItem(items[3]);
+
+  assert.equal(action, null, '4th persona activation must short-circuit');
+  assert.equal(JSON.stringify(state.activeIds), JSON.stringify(['persona-a', 'persona-b', 'persona-c']));
+});
+
+test('catalogTab disabling a persona releases a slot for the next activation', () => {
+  const items = [
+    { id: 'persona-a', type: 'persona', isDefault: true, text: 'A' },
+    { id: 'persona-b', type: 'persona', isDefault: false, text: 'B' },
+    { id: 'persona-c', type: 'persona', isDefault: false, text: 'C' },
+    { id: 'persona-d', type: 'persona', isDefault: false, text: 'D' },
+  ];
+  const state = loadCatalogTab({
+    type: 'persona',
+    items,
+    activeIds: ['persona-a', 'persona-b', 'persona-c'],
+  });
+  // Deactivate persona-a — opens no modal (not critical).
+  const deactivated = state.toggleItem(items[0]);
+  state.activeIds = ['persona-b', 'persona-c'];
+
+  assert.equal(state.shouldBlockForPersonaCap(items[3]), false);
+  const next = state.toggleItem(items[3]);
+  assert.equal(JSON.stringify(next), JSON.stringify({ itemId: 'persona-d', action: 'on', critical_confirm: undefined }));
 });
