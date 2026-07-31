@@ -378,7 +378,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 4.2 — Skills + Rules + Personas tabs [ ]
+#### Phase 4.2 — Skills + Rules + Personas tabs [x]
 
 **Done when:** Skills, Rules, Personas tabs render the catalog items with search, side-panel, Critical Rules confirmation, persona cap 3.
 
