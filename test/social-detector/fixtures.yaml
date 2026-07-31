@@ -1,0 +1,62 @@
+---
+# Phase 2 — Detector fixture for FP rate assertion (AC-4 + AC-5).
+#
+# Two top-level keys:
+#   social_prompts: 20 strings — each MUST return `true` from isSocial.
+#     Mix of PT-BR (oi, valeu, obrigado, tchau, até logo, bom dia) and EN
+#     (thanks, ok, bye, hello, etc.) — covers the regex catalog head
+#     end-to-end including the new `ok`/`okay` patterns added in T-01.
+#
+#   real_prompts: 20 strings — each MUST return `false` from isSocial.
+#     Each entry contains a social word in non-bypass context (e.g.,
+#     "thanks, agora refatora o parser", "write a function that returns
+#     \"thanks\"") so the test exercises the FALSE_POSITIVE catalog and
+#     proves the detector does NOT misclassify real dev prompts.
+#
+# FP rate assertion (test/social-detector.test.mjs):
+#   - All 20 social prompts return true.
+#   - All 20 real prompts return false (FP rate 0%; max tolerated ≤ 1).
+
+social_prompts:
+  - oi
+  - olá
+  - valeu
+  - obrigado
+  - thanks
+  - ok
+  - okay
+  - bye
+  - hi
+  - hello
+  - hey
+  - good morning
+  - thank you
+  - thx
+  - tchau
+  - "até logo"
+  - bom dia
+  - good evening
+  - goodbye
+  - how are you?
+
+real_prompts:
+  - "thanks to memoization, this function is fast"
+  - "oi, corrija o bug no parser"
+  - "bom dia, implemente um endpoint"
+  - "write a function that returns \"thanks\""
+  - "why does the bye command close the socket?"
+  - "thanks, agora refatora o parser"
+  - "good morning jobs fail in CI"
+  - "Implement JWT authentication in TypeScript"
+  - "Explain why this SQL query is slow"
+  - "create a regex that matches hello"
+  - "refatora o parser para suportar Unicode"
+  - "how are you handling database retries?"
+  - "como vai funcionar o cache?"
+  - "fix the auth bug in the session middleware"
+  - "the method thanks the user after saving"
+  - "write tests for the new feature"
+  - "optimize the database query"
+  - "obrigado is Portuguese for thank you"
+  - "add CORS headers to the API"
+  - "deploy the new build to staging"
