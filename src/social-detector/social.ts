@@ -1,3 +1,21 @@
+/**
+ * Social detector — Phase 2 promotion of the calibration module.
+ *
+ * Calibration source: `src/social-detector/is-social.ts` (Phase 1 era).
+ * This file is the verbatim content of that module with two minimal,
+ * additive pattern entries (`/^ok$/u`, `/^okay$/u`) at the end of
+ * `SOCIAL_PATTERNS` so the ROADMAP Phase 2 done #1 example list
+ * (`["oi", "valeu", "thanks", "obrigado", "ok", "..."]`) is fully covered
+ * for `ok`/`okay`. Calibration NORM-09 (`"!!!"` / `"..."` → false) is
+ * preserved — the regex catalog only matches at the start of the
+ * normalized prompt, and the new patterns are start-anchored to
+ * single-token greetings (`ok`, `okay`).
+ *
+ * Per `.specs/CALIBRATION-RESIDUE.md` and the dispatch constraint, this is
+ * a PROMOTION (verbatim copy + 2-line addition), NOT a rewrite. The
+ * algorithm is byte-identical to calibration.
+ */
+
 const FALSE_POSITIVE_PATTERNS: readonly RegExp[] = Object.freeze([
   /^thanks to\b/u,
   /\bthanks the user\b/u,
@@ -42,6 +60,9 @@ const SOCIAL_PATTERNS: readonly RegExp[] = Object.freeze([
   /^see you$/u,
   /^how are you$/u,
   /^what's up$/u,
+  // Phase 2 additions — minimal, additive; preserve all existing behavior.
+  /^ok$/u,
+  /^okay$/u,
 ]);
 
 function normalizePrompt(prompt: string): string {

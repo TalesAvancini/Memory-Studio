@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isSocial } from '../src/social-detector/is-social.ts';
+import { isSocial } from '../src/social-detector/index.ts';
 
 const positiveFixtures = [
   ['POS-01', 'oi'],
