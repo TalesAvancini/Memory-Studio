@@ -10,6 +10,7 @@ import {
   type PortRange,
 } from './port.ts';
 import { createEmptyAuditReader, type AuditReader } from './audit.ts';
+import type { CatalogReader } from './catalog.ts';
 import {
   createDefaultPartialRenderers,
   renderSafeErrorPartial,
@@ -47,6 +48,7 @@ export interface UiServerOptions {
   projectRoot?: string;
   stateStore?: Pick<ProjectStateStore, 'read'>;
   auditReader?: AuditReader;
+  catalogReader?: Pick<CatalogReader, 'list'>;
   partialRenderers?: Partial<UiPartialRenderers>;
 }
 
@@ -102,7 +104,11 @@ export function createUiServer(
   const publicDirectory = options.publicDirectory ?? DEFAULT_PUBLIC_DIRECTORY;
   const stateStore = options.stateStore ?? createProjectStateStore(options.projectRoot ?? process.cwd());
   const partialRenderers: UiPartialRenderers = {
-    ...createDefaultPartialRenderers(stateStore, options.auditReader ?? createEmptyAuditReader()),
+    ...createDefaultPartialRenderers(
+      stateStore,
+      options.auditReader ?? createEmptyAuditReader(),
+      { catalogReader: options.catalogReader },
+    ),
     ...options.partialRenderers,
   };
   let activeServer: Server | undefined;
