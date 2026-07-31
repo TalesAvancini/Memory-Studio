@@ -199,7 +199,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 1.3 — CatalogLoader + Embedder [ ]
+#### Phase 1.3 — CatalogLoader + Embedder [x]
 
 **Done when:** CatalogLoader parses YAML → validates via Zod → embeds via multilingual-e5-small → upserts into SQLite; embedder produces 384d Float32Array deterministically; YAML re-run is no-op for unchanged items.
 
