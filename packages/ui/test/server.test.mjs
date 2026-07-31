@@ -3,7 +3,16 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
-import { createUiServer, findFirstFreePort, UI_HOST } from '@memory-studio/ui';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import vm from 'node:vm';
+import {
+  createDefaultProjectState,
+  createUiServer,
+  findFirstFreePort,
+  UI_HOST,
+} from '@memory-studio/ui';
 
 const launcherPath = fileURLToPath(new URL('../../../scripts/ui-server.mjs', import.meta.url));
 
@@ -190,4 +199,126 @@ test('launcher prints the selected full URL', async (t) => {
   assert.equal(url, `http://${UI_HOST}:${port}/`);
   child.kill();
   await waitForExit(child);
+});
+
+async function projectFixture(t) {
+  const root = await mkdtemp(join(tmpdir(), 'memory-studio-ui-server-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  return root;
+}
+
+test('server exposes five HTML partials and validated project state JSON', async (t) => {
+  const projectRoot = await projectFixture(t);
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+  const tabs = ['skills', 'rules', 'personas', 'audit', 'settings'];
+
+  for (const tab of tabs) {
+    const response = await fetch(new URL(`ui/${tab}`, url));
+    assert.equal(response.status, 200, tab);
+    assert.equal(response.headers.get('content-type'), 'text/html; charset=utf-8', tab);
+    assert.match(await response.text(), new RegExp(`data-tab="${tab}"`), tab);
+  }
+
+  const stateResponse = await fetch(new URL('state', url));
+  assert.equal(stateResponse.status, 200);
+  assert.equal(stateResponse.headers.get('content-type'), 'application/json; charset=utf-8');
+  assert.deepEqual(await stateResponse.json(), createDefaultProjectState());
+});
+
+test('provider failure renders a safe HTML partial without filesystem details', async (t) => {
+  const projectRoot = await projectFixture(t);
+  const port = await freePort();
+  const server = createUiServer({
+    portRange: [port, port],
+    projectRoot,
+    auditReader: {
+      async latest() {
+        throw new Error(`catalog failed at ${join(projectRoot, 'private', 'audit.json')}`);
+      },
+    },
+  });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const response = await fetch(new URL('ui/audit', url));
+  const body = await response.text();
+
+  assert.equal(response.status, 500);
+  assert.equal(response.headers.get('content-type'), 'text/html; charset=utf-8');
+  assert.match(body, /Audit could not be loaded/);
+  assert.doesNotMatch(body, /audit\.json|private|memory-studio-ui-server/i);
+});
+
+test('malformed project state returns a safe typed JSON conflict', async (t) => {
+  const projectRoot = await projectFixture(t);
+  const stateDirectory = join(projectRoot, '.memory-studio');
+  await mkdir(stateDirectory, { recursive: true });
+  const malformed = '{"schemaVersion":3,"secretPath":"C:\\\\private\\\\state.json",';
+  await writeFile(join(stateDirectory, 'state.json'), malformed, 'utf8');
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port], projectRoot });
+  t.after(() => server.close());
+  const { url } = await server.start();
+
+  const response = await fetch(new URL('state', url));
+  const body = await response.json();
+
+  assert.equal(response.status, 409);
+  assert.deepEqual(body, {
+    error: { code: 'MALFORMED_STATE', message: 'Project state is invalid' },
+  });
+  assert.doesNotMatch(JSON.stringify(body), /secretPath|private|state\.json/);
+});
+
+test('hash router normalizes empty and unknown hashes and loads known tabs', async (t) => {
+  const port = await freePort();
+  const server = createUiServer({ portRange: [port, port] });
+  t.after(() => server.close());
+  const { url } = await server.start();
+  const source = await (await fetch(new URL('assets/app.js', url))).text();
+  const listeners = new Map();
+  const registrations = new Map();
+  const requests = [];
+  const window = {
+    location: { hash: '' },
+    htmx: {
+      ajax(method, path, options) {
+        requests.push({ method, path, options });
+      },
+    },
+  };
+  const history = {
+    replaceState(_state, _title, hash) {
+      window.location.hash = hash;
+    },
+  };
+  vm.runInNewContext(source, {
+    document: { addEventListener: (name, listener) => listeners.set(name, listener) },
+    Alpine: { data: (name, factory) => registrations.set(name, factory) },
+    history,
+    window,
+  });
+  listeners.get('alpine:init')();
+  const panel = registrations.get('uiPanel')();
+
+  panel.route();
+  assert.equal(panel.tab, 'skills');
+  assert.equal(window.location.hash, '#skills');
+  assert.equal(requests.at(-1).method, 'GET');
+  assert.equal(requests.at(-1).path, '/ui/skills');
+  assert.equal(requests.at(-1).options.target, '#panel-content');
+  assert.equal(requests.at(-1).options.swap, 'innerHTML');
+
+  window.location.hash = '#unknown';
+  panel.route();
+  assert.equal(panel.tab, 'skills');
+  assert.equal(window.location.hash, '#skills');
+
+  window.location.hash = '#rules';
+  panel.route();
+  assert.equal(panel.tab, 'rules');
+  assert.equal(requests.at(-1).path, '/ui/rules');
 });

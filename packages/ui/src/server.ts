@@ -9,6 +9,19 @@ import {
   findFirstFreePort,
   type PortRange,
 } from './port.ts';
+import { createEmptyAuditReader, type AuditReader } from './audit.ts';
+import {
+  createDefaultPartialRenderers,
+  renderSafeErrorPartial,
+  type UiPartialRenderers,
+} from './render.ts';
+import {
+  ProjectStateConflictError,
+  createProjectStateStore,
+  validateProjectState,
+  type ProjectStateStore,
+} from './state.ts';
+import type { UiTab } from './index.ts';
 
 const DEFAULT_PUBLIC_DIRECTORY = fileURLToPath(new URL('../public/', import.meta.url));
 
@@ -20,9 +33,21 @@ const STATIC_FILES = new Map<string, readonly [fileName: string, contentType: st
   ['/assets/app.js', ['app.js', 'text/javascript; charset=utf-8']],
 ]);
 
+const PARTIAL_ROUTES = new Map<string, UiTab>([
+  ['/ui/skills', 'skills'],
+  ['/ui/rules', 'rules'],
+  ['/ui/personas', 'personas'],
+  ['/ui/audit', 'audit'],
+  ['/ui/settings', 'settings'],
+]);
+
 export interface UiServerOptions {
   portRange?: PortRange;
   publicDirectory?: string;
+  projectRoot?: string;
+  stateStore?: Pick<ProjectStateStore, 'read'>;
+  auditReader?: AuditReader;
+  partialRenderers?: Partial<UiPartialRenderers>;
 }
 
 export interface UiServerDependencies {
@@ -37,6 +62,16 @@ export interface UiServer {
 function sendText(response: ServerResponse, status: number, body: string): void {
   response.writeHead(status, { 'content-type': 'text/plain; charset=utf-8' });
   response.end(body);
+}
+
+function sendHtml(response: ServerResponse, status: number, body: string): void {
+  response.writeHead(status, { 'content-type': 'text/html; charset=utf-8' });
+  response.end(body);
+}
+
+function sendJson(response: ServerResponse, status: number, body: unknown): void {
+  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  response.end(JSON.stringify(body));
 }
 
 function isAddressInUse(error: unknown): boolean {
@@ -65,6 +100,11 @@ export function createUiServer(
 ): UiServer {
   const range = options.portRange ?? DEFAULT_PORT_RANGE;
   const publicDirectory = options.publicDirectory ?? DEFAULT_PUBLIC_DIRECTORY;
+  const stateStore = options.stateStore ?? createProjectStateStore(options.projectRoot ?? process.cwd());
+  const partialRenderers: UiPartialRenderers = {
+    ...createDefaultPartialRenderers(stateStore, options.auditReader ?? createEmptyAuditReader()),
+    ...options.partialRenderers,
+  };
   let activeServer: Server | undefined;
   let activeAddress: { url: string; port: number } | undefined;
   let starting: Promise<{ url: string; port: number }> | undefined;
@@ -80,6 +120,34 @@ export function createUiServer(
     }
 
     const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
+
+    if (pathname === '/state') {
+      try {
+        const state = await stateStore.read();
+        validateProjectState(state);
+        sendJson(response, 200, state);
+      } catch (error) {
+        const conflict = error instanceof ProjectStateConflictError;
+        sendJson(response, conflict ? 409 : 500, {
+          error: {
+            code: conflict ? error.code : 'STATE_READ_FAILED',
+            message: conflict ? 'Project state is invalid' : 'Project state could not be loaded',
+          },
+        });
+      }
+      return;
+    }
+
+    const tab = PARTIAL_ROUTES.get(pathname);
+    if (tab) {
+      try {
+        sendHtml(response, 200, await partialRenderers[tab]());
+      } catch {
+        sendHtml(response, 500, renderSafeErrorPartial(tab));
+      }
+      return;
+    }
+
     const asset = STATIC_FILES.get(pathname);
     if (!asset) {
       sendText(response, 404, 'Not Found');
