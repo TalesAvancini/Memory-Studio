@@ -394,7 +394,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 4.3 — Audit + Settings tabs [ ]
+#### Phase 4.3 — Audit + Settings tabs [x]
 
 **Done when:** Audit tab shows last N augmentations; Settings tab exposes thresholds + tenant + integration mode + embedding model.
 
