@@ -119,6 +119,8 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 **Done when:** catálogo constrói localmente; retrieval index populado; YAML schema versionado; `npm run build-index` <60s pra 100 skills.
 
+> **Phase 1 status 2026-07-31:** Completed via subchapters 1.1, 1.2, 1.3, 1.4 (all `[x]`). DO NOT mark this `[x]` directly — subchapter entries are the verification record. Phase 1 stays as the parent phase scope description; substantive proof is in the four subchapter validation.md reports.
+
 **Depends on:** Phase 0
 
 **Goal:** catálogo constrói localmente; retrieval index populado; YAML schema versionado.
@@ -215,7 +217,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 1.4 — build-index + Perf + API Schema Version [ ]
+#### Phase 1.4 — build-index + Perf + API Schema Version [x]
 
 **Done when:** `npm run build-index` runs in <60s for 100-skill fixture (measured); `schemaVersion: 3` exposed via `getSchemaVersion()` helper consumed by Phase 5a API; thresholds initial in `.memory-studio/state.json` match PRD §10.4.
 

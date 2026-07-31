@@ -18,11 +18,65 @@
       ],
       "created": "2026-07-31T02:33:03Z",
       "last_seen": "2026-07-31T02:33:03Z"
+    },
+    {
+      "id": "L-002",
+      "key": "surviving_mutant::windows ebusy eperm eacces retry with backoff pattern 50ms 1000ms 25 attempts is required when renaming model files that concurrent test files e g embedder test mjs may hold open reusable for any windows ci that touches onnx model sentinel files",
+      "text": "Windows EBUSY/EPERM/EACCES retry-with-backoff pattern (50ms→1000ms, 25 attempts) is required when renaming model files that concurrent test files (e.g. embedder.test.mjs) may hold open. Reusable for any Windows CI that touches ONNX/model/sentinel files.",
+      "signal": "surviving_mutant",
+      "scope": "test/**/*.test.mjs",
+      "status": "candidate",
+      "features": [
+        "phase-1.4"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "test/catalog/build-index.test.mjs:167-187 (test/**/*.test.mjs)"
+      ],
+      "created": "2026-07-31T03:58:20Z",
+      "last_seen": "2026-07-31T03:58:20Z"
+    },
+    {
+      "id": "L-003",
+      "key": "spec_deviation::when deleting cli modules e g src catalog cli ts the package json scripts block must be updated in the same task otherwise npm run old cli name stays broken across phases phase 1 1 t 01 deleted cli ts without redirect phase 1 4 t 14 had to redirect catalog load to build index ts to repair",
+      "text": "When deleting CLI modules (e.g. src/catalog/cli.ts) the package.json scripts block must be updated in the same task — otherwise npm run <old-cli-name> stays broken across phases. Phase 1.1 T-01 deleted cli.ts without redirect; Phase 1.4 T-14 had to redirect catalog:load to build-index.ts to repair.",
+      "signal": "spec_deviation",
+      "scope": "package.json + calibration residue deletion",
+      "status": "candidate",
+      "features": [
+        "phase-1.4"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "package.json:scripts.catalog:load (package.json + calibration residue deletion)"
+      ],
+      "created": "2026-07-31T03:58:20Z",
+      "last_seen": "2026-07-31T03:58:20Z"
+    },
+    {
+      "id": "L-004",
+      "key": "spec_deviation::d 001 cross check needs 2 axis classification stale section refs 18 5 pointing to deleted 18 are fail meta documentation of the d 001 rule itself e g zero 18 x refs is keep grep hits must be classified before marking as drift",
+      "text": "D-001 cross-check needs 2-axis classification: stale section refs (§18.5 pointing to deleted §18) are FAIL; META documentation of the D-001 rule itself (e.g. 'ZERO §18.x refs') is keep. Grep hits must be classified before marking as drift.",
+      "signal": "spec_deviation",
+      "scope": ".specs/ROADMAP.md + PRD/PLAN/SPEC",
+      "status": "candidate",
+      "features": [
+        "phase-1.4"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "ROADMAP.md:60,150 spec.md:705 (.specs/ROADMAP.md + PRD/PLAN/SPEC)"
+      ],
+      "created": "2026-07-31T03:58:21Z",
+      "last_seen": "2026-07-31T03:58:21Z"
     }
   ],
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
   "schema": 1,
-  "next_id": 2
+  "next_id": 5
 }

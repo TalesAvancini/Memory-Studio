@@ -74,10 +74,9 @@ related:
 
 ## Handoff
 
-- **phase:** "Phase 1.4 — build-index + Perf + API Schema Version"
-- **phase-previous:** "Phase 1.3 — CatalogLoader + Embedder" (DONE 2026-07-31, 1 iteration, Verifier PASS commit `635778e`)
-- **phase-1.2:** "Phase 1.2 — Migrations + FTS5 + sqlite-vec" (DONE 2026-07-30)
-- **phase-1.1:** "Phase 1.1 — YAML Schema + Zod Validation" (DONE 2026-07-30, 2 iterations)
+- **phase:** "Phase 2 — Detector + Fingerprint"
+- **phase-previous:** "Phase 1.4 — build-index + Perf + API Schema Version" (DONE 2026-07-31, 1 iteration, Verifier PASS commit `4de0632`)
+- **phase-1-status:** "Phase 1 (Catalog + Schema + Index) entire phase DONE via subchapters 1.1, 1.2, 1.3, 1.4 — all `[x]`"
 - **phase-zero:** "Phase 0 — Environment Validation" (DONE 2026-07-30, 6/6 checks PASS)
 - **era:** `2026-08-prd-v3-ready`
 - **era-anterior:** `2026-07-foundation-complete` (skill calibrada, archived em `archive_handoff/`)
@@ -85,12 +84,13 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Implementer para Phase 1.4 — build-index + perf + API schemaVersion
-- **working-tree:** working (`loop/phase-0` em `635778e`)
-- **lessons-store:** L-001 added (status=candidate, recurrence=1) — vec0 ≠ FTS5 trigger syntax
+- **próximo-step-concreto:** dispatch Planner para Phase 2 — Detector + Fingerprint (promotes `src/social-detector/is-social.ts` from calibration, adds 4-component fingerprint + sha256[0:16] hashing, audit_events schema DDL only)
+- **working-tree:** working (`loop/phase-0` em `4de0632`)
+- **lessons-store:** L-001..L-004 added (4 candidates, recurrence=1 each): vec0≠FTS5 trigger, Windows EBUSY retry, catalog:load regression, D-001 META classification
+- **phase-1.4-feature-dir:** `.specs/features/phase-1-catalog-schema-index/validation-phase-1.4.md` (commit `4de0632`)
 - **phase-1.3-feature-dir:** `.specs/features/phase-1-catalog-schema-index/validation-phase-1.3.md` (commit `635778e`)
 - **phase-1.2-feature-dir:** `.specs/features/phase-1-catalog-schema-index/validation-phase-1.2.md` (commit `b49ae4f`)
 - **phase-1.1-feature-dir:** `.specs/features/phase-1-catalog-schema-index/{spec.md, design.md, tasks.md, validation.md, fix-tasks.md}` (commit `ea4bc54`)
 - **phase-0-feature-dir:** `.specs/features/phase-0-environment-validation/{spec.md, tasks.md, validation.md}` (Verifier PASS commit `218dad1`)
 - **não-congela:** STATE.md `## Decisions` append-only; `## Handoff` overwrite por sessão
-- **calibration residue:** `src/catalog/**` schema+DB+loader+embedder reescrito em Phase 1.1+1.2+1.3. `src/social-detector/` untouched (Phase 2 promotes).
+- **calibration residue:** `src/catalog/**` completamente reescrito (Phase 1). `src/social-detector/` byte-identical a pre-Phase-1 — Phase 2 promove.
