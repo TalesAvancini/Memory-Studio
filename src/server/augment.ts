@@ -1,80 +1,56 @@
 /**
  * POST /augment route handler.
  *
- * Phase 5a.1 (T-03) — request validation + structured response shape.
+ * Phase 5a.2 (T-08) — wires the route to the real augmentation
+ * pipeline. The Phase 5a.1 placeholder (which returned empty matched
+ * arrays and `emptyReason: null` for any valid input) is replaced by
+ * `runAugment(req, context)`, which composes the social gate, the
+ * active-catalog filesystem validation, FTS5 + sqlite-vec + RRF
+ * retrieval, the double threshold, the top-K + tiebreak, and the
+ * 2-block `cache_control: ephemeral` system message builder.
  *
- * Pipeline (Phase 5a.1, placeholder):
- *   1. Zod validate the body (AugmentRequestSchema).
- *      Failure → 400 with `{ error: { code: 'MISSING_REQUIRED_FIELD',
- *      field, message } }` naming the first offending path.
- *   2. Generate `decisionTraceId = crypto.randomUUID()`.
- *   3. Emit a structured log line via `requestLogger()` carrying the
- *      `usage.cache_read_input_tokens` field stub (`null` in Phase 5a.1;
- *      Phase 5b surfaces provider cache metrics once the /v1/messages
- *      proxy is wired).
- *   4. Return 200 with a placeholder AugmentResponse that matches the
- *      full PRD §7.1 response shape. The retrieval pipeline lands in
- *      Phase 5a.2 (T-05..T-08).
+ * Pipeline context (db, embedder, catalog dir) is supplied via the
+ * `setAugmentPipelineProvider` hook so tests in `test/augment/*` can
+ * inject in-memory fixtures. The default provider used in production
+ * wiring is created lazily on first request so module import stays
+ * cheap (no ONNX load at import time).
  *
- * Recording the success timestamp is delegated to `recordAugmentSuccess`
- * which the boot factory wires into the route via `onSuccess`. This
- * keeps `/health`'s `last_request_ts` fresh without coupling /augment
- * to `/health` directly.
+ * On any retrieval failure (FTS error, vec error, embedder failure,
+ * missing catalog dir) the pipeline returns 200 with
+ * `emptyReason: 'timeout'` and a persona-only system message — the
+ * server NEVER returns 500 for retrieval errors (PRD §2 fail-open).
  */
 
 import { createHash, randomUUID } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
+import Database from 'better-sqlite3';
 import {
   AugmentRequestSchema,
-  type AugmentRequest,
   type AugmentResponse,
 } from './schema.ts';
 import { requestLogger } from './logger.ts';
 import { recordLastRequestTimestampMs } from './boot.ts';
+import { runAugment, type PipelineContext } from './augment/pipeline.ts';
+import { initializeSearchStorage } from '../search/schema.ts';
+import type { Embedder } from '../catalog/embedder/types.ts';
+import { EMBEDDING_DIMENSIONS } from '../catalog/embedder/index.ts';
 
 export interface AugmentRouteOptions {
   onSuccess?: (timeMs?: number) => void;
+  /**
+   * Optional explicit pipeline provider. When supplied, the route
+   * handler uses this for every request. When omitted, the module-level
+   * provider (set via `setAugmentPipelineProvider`) is used; the
+   * module-level provider defaults to a lazy in-memory pipeline.
+   */
+  pipelineProvider?: () => PipelineContext;
 }
 
 const PERFORMANCE_BUDGET_RERANK_MS = 0;
-const PERFORMANCE_BUDGET_TOTAL_MS_PLACEHOLDER = 0;
 
 function hashTenantId(tenantId: string | undefined): string | null {
   if (!tenantId) return null;
   return createHash('sha256').update(tenantId, 'utf8').digest('hex').slice(0, 16);
-}
-
-function buildPlaceholderResponse(
-  request: AugmentRequest,
-  decisionTraceId: string,
-  startMs: number,
-): AugmentResponse {
-  const totalMs = Date.now() - startMs;
-  return {
-    systemMessage: '',
-    matchedSkills: [],
-    matchedRules: [],
-    matchedPersonas: [],
-    pruningDecisions: {
-      rejectedByFloor: [],
-      rejectedByBudget: [],
-      rejectedByAttentionTier: [],
-      rejectedByNegativeFeedback: [],
-      rejectedByCriticalDropped: [],
-    },
-    latencyMs: {
-      embedding: 0,
-      retrieval: 0,
-      rerank: PERFORMANCE_BUDGET_RERANK_MS,
-      total: totalMs || PERFORMANCE_BUDGET_TOTAL_MS_PLACEHOLDER,
-    },
-    decisionTraceId,
-    warnings: request.activeCatalog.length === 0
-      ? ['activeCatalog is empty — proceeding with persona only']
-      : [],
-    emptyReason: request.activeCatalog.length === 0 ? 'no_active_items' : null,
-    schemaVersion: 3,
-  };
 }
 
 function firstInvalidPath(issues: ReadonlyArray<{ path: ReadonlyArray<unknown> }>): string {
@@ -84,10 +60,107 @@ function firstInvalidPath(issues: ReadonlyArray<{ path: ReadonlyArray<unknown> }
   return first.path.map((segment) => String(segment)).join('.');
 }
 
+// --- Pipeline provider plumbing --------------------------------------------
+//
+// The default provider creates an in-memory sqlite + stub embedder so
+// the route works out of the box for the smoke test. Production wiring
+// (real catalog dir + ONNX embedder) lands in Phase 5a.4 alongside the
+// `server:start` script that opens the on-disk catalog DB.
+
+let pipelineProviderOverride: (() => PipelineContext) | null = null;
+
+/**
+ * Override the module-level pipeline provider. Used by tests in
+ * `test/augment/*` to inject fixtures. Pass `null` to clear the
+ * override and fall back to the lazy in-memory default.
+ */
+export function setAugmentPipelineProvider(
+  provider: (() => PipelineContext) | null,
+): void {
+  pipelineProviderOverride = provider;
+}
+
+/** Test-only: read the current provider override. */
+export function getAugmentPipelineProviderOverride(): (() => PipelineContext) | null {
+  return pipelineProviderOverride;
+}
+
+let cachedDefaultContext: PipelineContext | null = null;
+
+function defaultPipelineContext(): PipelineContext {
+  if (cachedDefaultContext !== null) return cachedDefaultContext;
+  cachedDefaultContext = createInMemoryPipelineContext();
+  return cachedDefaultContext;
+}
+
+/**
+ * Build an in-memory DB with the legacy `skills` table shape + a stub
+ * embedder that always returns a zero vector. Used by the default
+ * pipeline provider so the route works without any external state.
+ * Real wiring (on-disk catalog + ONNX embedder) is a future phase.
+ *
+ * The `skills` table shape matches the calibration residue (test
+ * fixture parity). Production wiring opens the on-disk catalog DB.
+ *
+ * The search storage (FTS5 + sqlite-vec virtual tables + sync
+ * triggers) is also initialized so the FTS channel query doesn't
+ * fail on "no such table: content_fts" when the route receives a
+ * request against an empty corpus.
+ */
+function createInMemoryPipelineContext(): PipelineContext {
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS skills (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      slug TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      content_yaml TEXT NOT NULL,
+      embedding BLOB NOT NULL,
+      hash TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+  `);
+
+  // Initialize search storage (FTS5 + vec0) so retrieval doesn't
+  // throw "no such table" on an empty in-memory DB. Real production
+  // wiring opens the on-disk catalog DB; this initialization is a
+  // best-effort — if the sqlite-vec extension can't be loaded, we
+  // skip it and let retrieval return empty (the pipeline is fail-open
+  // and returns `emptyReason: 'timeout'`).
+  try {
+    initializeSearchStorage(db);
+  } catch {
+    // Best-effort initialization; the pipeline is fail-open.
+  }
+
+  const embedder: Embedder = {
+    dimensions: EMBEDDING_DIMENSIONS,
+    async encode(_text: string): Promise<Float32Array> {
+      return new Float32Array(EMBEDDING_DIMENSIONS);
+    },
+    // Legacy alias of encode — kept for Phase 5 backward compat with
+    // `src/search/*` which still calls `embedder.embed(text)`.
+    async embed(text: string): Promise<Float32Array> {
+      return this.encode(text);
+    },
+  };
+
+  return { db, embedder };
+}
+
+function resolveProvider(opts: AugmentRouteOptions): () => PipelineContext {
+  if (opts.pipelineProvider !== undefined) return opts.pipelineProvider;
+  if (pipelineProviderOverride !== null) return pipelineProviderOverride;
+  return defaultPipelineContext;
+}
+
 export async function registerAugmentRoute(
   app: FastifyInstance,
   options: AugmentRouteOptions = {},
 ): Promise<void> {
+  const provider = resolveProvider(options);
+
   app.post('/augment', async (request, reply) => {
     const startMs = Date.now();
     const decisionTraceId = randomUUID();
@@ -124,7 +197,49 @@ export async function registerAugmentRoute(
       };
     }
 
-    const response = buildPlaceholderResponse(parsed.data, decisionTraceId, startMs);
+    // Real pipeline path (Phase 5a.2). The provider is per-request
+    // because the test suite may swap it between calls; the default
+    // returns a memoized context (cheap to share).
+    let response: AugmentResponse;
+    try {
+      response = await runAugment(parsed.data, provider());
+    } catch (err) {
+      // Defensive: the pipeline is fail-open by contract; a throw
+      // here is a programmer error, not a retrieval error. Log and
+      // surface a structured 500 (the only place the server returns
+      // non-200 for a validated body).
+      const message = err instanceof Error ? err.message : String(err);
+      const log = requestLogger({
+        requestId: decisionTraceId,
+        tenantIdHashed: hashTenantId(parsed.data.tenantId),
+      });
+      log.error(
+        {
+          route: '/augment',
+          decisionTraceId,
+          error: message,
+        },
+        '/augment pipeline error',
+      );
+      reply.code(500);
+      return {
+        error: {
+          code: 'PIPELINE_ERROR',
+          message,
+        },
+      };
+    }
+
+    // Ensure the response carries the route-scoped `decisionTraceId`
+    // so the log line and the response body are joinable.
+    const finalResponse: AugmentResponse = {
+      ...response,
+      decisionTraceId,
+      latencyMs: {
+        ...response.latencyMs,
+        rerank: PERFORMANCE_BUDGET_RERANK_MS,
+      },
+    };
 
     const log = requestLogger({
       requestId: decisionTraceId,
@@ -134,9 +249,13 @@ export async function registerAugmentRoute(
       {
         route: '/augment',
         decisionTraceId,
-        latencyMs: response.latencyMs,
-        matchedIds: [],
-        systemMessageSha256: response.systemMessage,
+        latencyMs: finalResponse.latencyMs,
+        matchedIds: [
+          ...finalResponse.matchedSkills.map((m) => m.id),
+          ...finalResponse.matchedRules.map((m) => m.id),
+          ...finalResponse.matchedPersonas.map((m) => m.id),
+        ],
+        systemMessageSha256: finalResponse.systemMessage,
         usage: {
           cache_read_input_tokens: null,
           cache_creation_input_tokens: null,
@@ -147,7 +266,7 @@ export async function registerAugmentRoute(
 
     options.onSuccess?.(Date.now());
     reply.code(200);
-    return response;
+    return finalResponse;
   });
 }
 

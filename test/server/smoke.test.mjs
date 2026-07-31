@@ -139,7 +139,7 @@ async function injectValid(handle, body) {
   });
 }
 
-test('augment: POST /augment with valid body returns 200 + structural placeholder', async () => {
+test('augment: POST /augment with valid body returns 200 + real-pipeline response', async () => {
   resetServerMetadataForTests();
   const handle = await createServer();
   try {
@@ -159,8 +159,15 @@ test('augment: POST /augment with valid body returns 200 + structural placeholde
     });
     assert.equal(typeof body.decisionTraceId, 'string');
     assert.equal(body.decisionTraceId.length, 36);
-    assert.deepEqual(body.warnings, []);
-    assert.equal(body.emptyReason, null);
+    // Phase 5a.2: the default in-memory pipeline runs the real retrieval
+    // (FTS + vec + RRF) but the empty corpus yields no matches, so
+    // top-K emits a "below threshold" warning and emptyReason is
+    // `low_confidence` (not `null` like the Phase 5a.1 placeholder).
+    assert.equal(body.emptyReason, 'low_confidence');
+    assert.ok(
+      Array.isArray(body.warnings) && body.warnings.length > 0,
+      'expected at least one top-K warning on an empty in-memory corpus',
+    );
   } finally {
     await handle.close();
   }
@@ -257,8 +264,12 @@ test('augment: context:null is accepted (prompt-only mode)', async () => {
     const response = await injectValid(handle, buildValidRequest({ context: null }));
     assert.equal(response.statusCode, 200);
     const body = JSON.parse(response.body);
-    assert.equal(body.emptyReason, null);
-    assert.deepEqual(body.warnings, []);
+    // Phase 5a.2: with an empty in-memory corpus, retrieval yields no
+    // matches, so emptyReason is `low_confidence` (not `null` like
+    // the Phase 5a.1 placeholder). The persona-only path is still
+    // 200 — the request shape is accepted; the corpus is the
+    // differentiator.
+    assert.equal(body.emptyReason, 'low_confidence');
   } finally {
     await handle.close();
   }
