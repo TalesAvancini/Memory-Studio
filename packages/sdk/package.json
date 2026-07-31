@@ -5,7 +5,7 @@
   "type": "module",
   "engines": { "node": ">=22" },
   "files": ["dist"],
-  "exports": { ".": { "types": "./dist/index.d.mts", "import": "./dist/index.mjs", "require": "./dist/index.cjs" } },
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.mjs", "require": "./dist/index.cjs" } },
   "scripts": { "build": "tsup", "test": "node --test test/**/*.test.mjs", "typecheck": "tsc --noEmit" },
   "dependencies": {},
   "devDependencies": { "@types/node": "^22.0.0", "tsup": "^8.5.0", "typescript": "^5.6.0" }
