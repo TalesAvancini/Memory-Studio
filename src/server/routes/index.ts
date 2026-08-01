@@ -12,3 +12,4 @@ export {
   registerAuditSummaryRoute,
 } from './audit.ts';
 export { registerStateToggleRoute } from './state-toggle.ts';
+export { registerMessagesProxyRoute, readUpstreamUrl } from './messages-proxy.ts';
