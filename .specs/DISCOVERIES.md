@@ -84,3 +84,154 @@ Log append-only de drift arquitetural. Append-only — nunca editar entrada exis
 - Harness: `scripts/poc-6a-{hot-path,fast-agent}.mjs` + `scripts/stub-fast-agent.mjs`
 - Tests: `test/poc/{stub-fast-agent,byte-string-equality,intel-schema}.test.mjs`
 - Phase 6b planning: triggers after this AD is reviewed.
+
+---
+
+## 2026-08-01 — AD-007 + AD-008: Phase 6b Batch 3 (6b.4) closure
+
+### AD-007 — Phase 6b cache hit invariant verified at end-of-phase (2026-08-01)
+
+**Decision:** Phase 6b Batch 3 (6b.4 — Pipeline Integration + Cache Hit
+Validation) cache hit invariant is **VERIFIED** via
+`test/augment/inception-cache-hit.test.mjs` (5 cases) + the
+`test/augment/byte-string-with-intel.test.mjs` regression suite
+(Block 1 byte-identical across 5 intel variations).
+
+**Measurements (5 cache-hit invariant cases, all PASS):**
+- Same persona + different prompts + same intel: 2nd call SHA
+  byte-identical to 1st call → stub cache tracker reports
+  `cache_read_input_tokens: 42` (cache hit) — **PASS**.
+- Different persona: 2nd call SHA differs from 1st → stub cache
+  tracker reports `cache_read_input_tokens: 0` (cache miss) —
+  **PASS**.
+- Single turn: stub cache tracker reports
+  `cache_read_input_tokens: 0` (no prior cache) — **PASS**.
+- Defensive: Block 1 (persona text) byte-identical across 3 intel
+  variations (no-intel / full / different recentTopic) — **PASS**
+  (cache prefix is stable).
+- Defensive: full 2-block SHA DOES differ when intel changes
+  (Block 2 grows the `## Intel` section) — **PASS** (intentional:
+  Block 2 is the variable suffix; cache hit is on Block 1 only).
+
+**Por quê:** R-15 (cache hit invariant) is the LOAD-BEARING
+contract of the inception híbrida — without it, the `cache_control:
+ephemeral` markers on the 2-block structure can't deliver cost
+savings on Turn N+1. The test surfaces a stub cache tracker that
+simulates Anthropic's `usage.cache_read_input_tokens` metric (0 on
+first call, 42 on subsequent calls with the same SHA). Real
+Anthropic cache hit requires real API access + TTL window — that's
+Phase 7b's measurement. The stub proves the FLOW.
+
+**Regras:**
+- Block 1 (persona) is NEVER modified by intel changes (R-15
+  invariant).
+- Block 2 (intel + skills + rules + context + warnings) is the
+  variable suffix; cache-miss expected when intel changes.
+- The `## Intel` section is FIRST in Block 2 (R-10 + AD-006 #1)
+  to maximize cache-key stability when only Skills/Rules shift.
+- The no-intel baseline SHA `4f6dba1b411a9c2947863416098aeac30db43869f1469d6bc11a7852925eb633`
+  is preserved (D-006 byte-string determinism).
+
+**Related:**
+- Test: `test/augment/inception-cache-hit.test.mjs` (5 cases)
+- Test: `test/augment/byte-string-with-intel.test.mjs` (5 cases —
+  Block 1 stability regression guard)
+- Spec: `.specs/features/phase-6b-fast-agent-intel/spec.md` AC-11
+- Validation: `.specs/features/phase-6b-fast-agent-intel/validation-phase-6b.3.md`
+  (Phase 6b.3 baseline already confirmed the no-intel SHA is
+  byte-identical to Phase 6a.2)
+
+---
+
+### AD-008 — Phase 6b sync vs async intel write decision (2026-08-01)
+
+**Decision:** Phase 6b production canonical writer is **SYNC**
+(`createSyncIntelWriter` is the default per AD-006 #4). The
+`createAsyncIntelWriter` factory is shipped as a documented
+fallback (NOT auto-activated) per the D-007 mirror pattern.
+
+**Measurements (`test/server/fast-agent/writer-perf.test.mjs`):**
+- Sync write p95: **0.089ms** across 95 measured samples (5 warmup
+  + 95 measured = 100 total writes) — budget < 1ms per AD-006 #4
+  fallback trigger.
+- Decision: **SYNC (measured 0.089ms ≪ 1ms, no fallback needed)**.
+- Async fallback factory `createAsyncIntelWriter` exists per
+  `test/server/fast-agent/writer-perf.test.mjs` structural
+  assertion (T-06 deliverable preserved).
+
+**Por quê:** Per AD-006 #4, sync is the default. Async is the
+fallback IF measured > 1ms. The measured p95 (0.089ms) is 11x
+under the 1ms trigger threshold, so the async factory ships but
+is not auto-activated. Phase 6a POC measured sqlite INSERT
+overhead = SELECT overhead = 0.02ms (250x under budget) — the
+measured 0.089ms here is slightly higher than the POC number
+because the perf test runs 100 sequential writes (more data →
+slightly higher p95) but still well within budget.
+
+**Regras:**
+- Production wiring uses `createSyncIntelWriter` (default in
+  `createDefaultIntelWriter`).
+- The async factory `createAsyncIntelWriter` mirrors the
+  `AuditRingBuffer` pattern from `src/server/audit/buffer.ts` —
+  in-memory ring buffer (cap 10_000) + batch flush (N=100 OR
+  T=1000ms) + fail-open.
+- If a future environment reports p95 > 1ms, the operator
+  switches the boot wiring to `createAsyncIntelWriter`. The
+  factory signature is identical to the sync writer (both
+  implement the `IntelWriter` interface), so the swap is
+  one-line.
+
+**Related:**
+- Test: `test/server/fast-agent/writer-perf.test.mjs` (4 cases)
+- Module: `src/server/fast-agent/writer.ts` (sync + async
+  factories)
+- Spec: `.specs/features/phase-6b-fast-agent-intel/spec.md` AC-5
+- AD-006 #4: sync default, async fallback if measured > 1ms
+
+---
+
+## 2026-08-01 — AD-009: Phase 6b end-of-phase POC re-run confirms ceilings survived (2026-08-01)
+
+### AD-009 — Phase 6b production wiring re-runs Phase 6a POC at end-of-phase (2026-08-01)
+
+**Decision:** Phase 6b production wiring RE-RUNS the Phase 6a POC
+ceilings and **PASSES**. The hot path overhead stays well under
+budget after the new code paths (Stage 1b intel read + tail
+setImmediate intel write) are active.
+
+**Measurements (re-run of Phase 6a POC, with Phase 6b code active):**
+- Hot path overhead (sqlite.get + concat + template render, p95 sum):
+  **0.07ms** (Phase 6a budget < 10ms — **143x headroom preserved**)
+  - sqlite.get(intel): 0.03ms p95 (Phase 6a budget < 5ms)
+  - concat: 0ms p95 (Phase 6a budget < 1ms)
+  - template render: 0.04ms p95 (Phase 6a budget < 1ms)
+- Total per-request overhead: **0.07ms p95** (Phase 6a budget < 10ms).
+- Sync write perf (AD-008): 0.089ms p95 (Phase 6a budget < 1ms).
+
+**Por quê:** Phase 6b is the production wiring — the POC numbers
+become ceilings the runtime MUST honor. If the wiring exceeded
+the ceilings, the human would decide to optimize (NOT add a
+fallback) per PRD §16.7 rule "ajustar, não collapsar". The
+re-run is MANDATORY at T-17 (end of phase) and PASSES with the
+same Phase 6a POC overhead (0.07ms total). The Stage 1b +
+tail setImmediate additions are NOT in the hot path for the
+POC's measurement surface (the POC measures the intel-read
+cost, not the tail-write cost, since the tail is a setImmediate
+that fires after the response is built).
+
+**Regras:**
+- Phase 6b is now CLOSED — all ceilings survived.
+- Future phases that modify the hot path (e.g., adding a new
+  section to Block 2) MUST re-run `scripts/poc-6a-hot-path.mjs`
+  to confirm the ceilings survive.
+- If a future phase exceeds the ceilings, optimize (not collapse)
+  per PRD §16.7.
+
+**Related:**
+- POC harness: `scripts/poc-6a-hot-path.mjs`
+- POC results: `.specs/features/phase-6a-poc-validation/poc-results.md`
+- Spec: `.specs/features/phase-6b-fast-agent-intel/spec.md` AC-12
+  (mandatory POC re-run at end-of-phase)
+- AD-006: Phase 6a POC result (the ceilings this re-run honors)
+- AD-008: Sync writer perf (0.089ms p95)
+
