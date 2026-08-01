@@ -29,6 +29,7 @@ import { registerHealthRoute, setHealthDb } from './health.ts';
 import { initAuditBuffer, startAuditBuffer, stopAuditBuffer } from './audit/lifecycle.ts';
 import {
   registerCatalogListRoute,
+  registerCatalogRebuildRoute,
   registerAuditListRoute,
   registerAuditSummaryRoute,
 } from './routes/index.ts';
@@ -159,6 +160,7 @@ export async function createServer(
   // in-memory path remains untouched.
   if (options.db !== undefined) {
     await registerCatalogListRoute(app, { db: options.db });
+    await registerCatalogRebuildRoute(app, { db: options.db });
     await registerAuditListRoute(app, { db: options.db });
     await registerAuditSummaryRoute(app, { db: options.db });
   }

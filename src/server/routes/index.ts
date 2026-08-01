@@ -6,6 +6,7 @@
  */
 
 export { registerCatalogListRoute } from './catalog.ts';
+export { registerCatalogRebuildRoute } from './catalog-rebuild.ts';
 export {
   registerAuditListRoute,
   registerAuditSummaryRoute,
