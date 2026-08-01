@@ -39,6 +39,12 @@ import {
 import type { PipelineContext } from './augment/pipeline.ts';
 import type { Embedder } from '../catalog/embedder/types.ts';
 import { EMBEDDING_DIMENSIONS } from '../catalog/embedder/index.ts';
+import {
+  getMode as getFastAgentMode,
+  getModel as getFastAgentModel,
+  getEndpoint as getFastAgentEndpoint,
+} from './fast-agent/client.ts';
+import { setIntelWriterDb } from './fast-agent/writer.ts';
 
 export interface AugmentServerOptions {
   portRange?: [number, number];
@@ -164,6 +170,22 @@ export async function createServer(
     initAuditBuffer(options.db);
     await startAuditBuffer();
     setHealthDb(options.db);
+  }
+
+  // Phase 6b (T-07) — fast-agent client + Intel writer wiring. The
+  // MODE was resolved at module-load by client.ts; here we (a) echo
+  // it once more with the resolved endpoint + model so operator
+  // logs are self-describing, (b) bind the catalog DB to the writer
+  // so the proxy + pipeline can call writeIntelSync() without
+  // (re)binding. The env vars MINIMAX_API_KEY (R-02) and
+  // MEMORY_STUDIO_FAST_AGENT_MODEL (R-17) are read once at module
+  // load (see src/server/fast-agent/client.ts) so the server-side
+  // resolution is stable for the lifetime of this process.
+  console.log(
+    `[boot] fast-agent MODE=${getFastAgentMode()} endpoint=${getFastAgentEndpoint()} model=${getFastAgentModel()}`,
+  );
+  if (options.db !== undefined) {
+    setIntelWriterDb(options.db);
   }
 
   await registerHealthRoute(app);

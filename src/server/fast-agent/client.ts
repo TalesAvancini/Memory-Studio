@@ -131,17 +131,13 @@ export async function fetchIntel(prompt: string): Promise<Intel> {
 async function callReal(prompt: string): Promise<Intel> {
   // Dynamic import — resolves at call time. The package MAY not be
   // installed yet (Phase 6b T-07 wires the install), so the static
-  // `import` form would crash at module load.
-  //
-  // The TS compiler cannot resolve these modules until `@anthropic-ai/sdk`
-  // is in `node_modules`. Until T-07 runs `npm install @anthropic-ai/sdk`,
-  // the imports look like `Cannot find module ...` to tsc. We use
-  // a string-form specifier + a runtime cast to `unknown` to opt
-  // out of TS resolution; the runtime check (`resolveMode`) ensures
-  // the real path is only exercised when the SDK is present.
-  const mod: { default: new (opts: { apiKey: string; baseURL: string }) => unknown } =
-    // @ts-expect-error -- dynamic import resolves at runtime; T-07 installs the SDK
-    await import('@anthropic-ai/sdk');
+  // `import` form would crash at module load. We use a structural
+  // type annotation so the code stays compileable regardless of SDK
+  // presence — the runtime check (`resolveMode`) ensures the real
+  // path is only exercised when the SDK is present.
+  const mod = await import('@anthropic-ai/sdk') as {
+    default: new (opts: { apiKey: string; baseURL: string }) => unknown;
+  };
   const Anthropic = mod.default;
   type AnthropicInstance = InstanceType<typeof Anthropic>;
   type CreateArgs = {
@@ -169,9 +165,9 @@ async function callReal(prompt: string): Promise<Intel> {
   // versions).
   let tools: ReadonlyArray<unknown> = [];
   try {
-    const helpers: { zodResponseFormat?: (schema: unknown, name: string) => unknown } =
-      // @ts-expect-error -- see note above; T-07 installs the SDK
-      await import('@anthropic-ai/sdk/helpers/zod');
+    const helpers = await import('@anthropic-ai/sdk/helpers/zod') as {
+      zodResponseFormat?: (schema: unknown, name: string) => unknown;
+    };
     const zodResponseFormat = helpers.zodResponseFormat;
     if (typeof zodResponseFormat === 'function' && IntelSchema) {
       tools = [zodResponseFormat(IntelSchema, 'intel')];
