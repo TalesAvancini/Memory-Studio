@@ -44,6 +44,7 @@ import type { AuditEvent } from '../audit/types.ts';
 import { AugmentRequestSchema, type AugmentRequest } from '../schema.ts';
 import { runAugment, type PipelineContext } from '../augment/pipeline.ts';
 import { buildSystemMessage } from '../augment/augmenter.ts';
+import { recordProxySample } from '../metrics/collector.ts';
 
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
 
@@ -175,6 +176,12 @@ export async function registerMessagesProxyRoute(
 
   app.post('/v1/messages', async (request, reply: FastifyReply) => {
     const decisionTraceId = createHash('sha256').update(String(now())).digest('hex').slice(0, 16);
+    // --- Phase 7a T-06: metrics entry time --------------------------------
+    // Capture entry time at the top of the route handler so the
+    // `recordProxySample` latency measurement covers the FULL proxy
+    // path (validation + augment + upstream fetch + audit). Excludes
+    // nothing — `performance.now()` is monotonic per Node 22.
+    const tProxyStart = performance.now();
 
     // --- 1. Proxy enabled check --------------------------------------------
     if (opts.upstreamUrl === null) {
@@ -370,7 +377,20 @@ export async function registerMessagesProxyRoute(
       eventType: 'messages_proxy',
     });
 
-    // --- 10. Return response ----------------------------------------------
+    // --- 10. Phase 7a T-06: metrics sample (proxy path) -------------------
+    // Only record on 200 responses (NOT 503 proxy_disabled, NOT 502
+    // augment_failed/upstream_fetch_failed/proxy_host_notallowed — those
+    // failures don't count as proxy_requests per R-2 denominator).
+    // The collector translates `cacheReadInputTokens === null` to a
+    // no-op (defensive guard against partial upstream responses).
+    if (upstreamRes.status === 200) {
+      recordProxySample({
+        cacheReadTokens: cacheReadInputTokens,
+        latencyMs: performance.now() - tProxyStart,
+      });
+    }
+
+    // --- 11. Return response ----------------------------------------------
     reply.code(upstreamRes.status);
     return upstreamBody;
   });

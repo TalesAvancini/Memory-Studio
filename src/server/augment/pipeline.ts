@@ -44,6 +44,7 @@ import { buildSystemMessage } from './augmenter.ts';
 import { buildResponse, type LatencyTimings } from './response.ts';
 import type { AugmentRequest, AugmentResponse, EmptyReason } from './types.ts';
 import type { Intel } from '../fast-agent/intel-schema.ts';
+import { recordAugmentSample } from '../metrics/collector.ts';
 
 import type { Database } from 'better-sqlite3';
 
@@ -240,7 +241,7 @@ export async function runAugment(
   // unaffected.
   scheduleIntelTailWrite(context, intel);
 
-  return buildResponse({
+  const response = buildResponse({
     request,
     systemMessage: sha256,
     matched,
@@ -248,6 +249,22 @@ export async function runAugment(
     warnings: topKWarnings,
     latency,
   });
+
+  // --- Stage 9.6: Metrics sample (Phase 7a T-06) -----------------------
+  // Record matched.count + latencyMs.total for the metrics dashboard.
+  // NO-OP when the metrics buffer is not initialized (the in-memory
+  // smoke path) OR when the buffer throws (fail-open per D-007
+  // mirror). Never blocks the request — fire-and-forget.
+  // Phase 7a T-06: this is the matched/no-match path (Stages 6-9
+  // reached retrieval); `emptyReason` is the response's
+  // `low_confidence` (if thresholds rejected all) or null/undefined.
+  recordAugmentSample({
+    matched: matched.length > 0,
+    emptyReason: response.emptyReason ?? null,
+    latencyMs: totalMs,
+  });
+
+  return response;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +333,7 @@ function personaOnlyResponse(
     matched: [],
     personaTextOverride: '',
   });
-  return buildResponse({
+  const response = buildResponse({
     request,
     systemMessage: sha256,
     matched: [],
@@ -333,6 +350,16 @@ function personaOnlyResponse(
     },
     emptyReason: reason,
   });
+  // --- Phase 7a T-06: metrics sample (fail-open path) ------------------
+  // Persona-only paths are EXCLUDED from the R-1 denominator per
+  // spec.md R-1 table. Latency IS captured (R-3/R-4 include ALL paths).
+  // Fire-and-forget — collector swallows errors (D-007 mirror).
+  recordAugmentSample({
+    matched: false,
+    emptyReason: reason,
+    latencyMs: totalMs,
+  });
+  return response;
 }
 
 /**
@@ -352,7 +379,7 @@ function failOpenResponse(
     matched: [],
     personaTextOverride: '',
   });
-  return buildResponse({
+  const response = buildResponse({
     request,
     systemMessage: sha256,
     matched: [],
@@ -366,4 +393,13 @@ function failOpenResponse(
     },
     emptyReason: 'timeout',
   });
+  // --- Phase 7a T-06: metrics sample (fail-open path) ------------------
+  // 'timeout' is EXCLUDED from the R-1 denominator per spec.md R-1
+  // table. Latency IS captured (R-3/R-4 include ALL paths).
+  recordAugmentSample({
+    matched: false,
+    emptyReason: 'timeout',
+    latencyMs: totalMs,
+  });
+  return response;
 }
