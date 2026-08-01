@@ -28,12 +28,18 @@ import { registerAugmentRoute, getAugmentPipelineProviderOverride } from './augm
 import { registerHealthRoute, setHealthDb } from './health.ts';
 import { initAuditBuffer, startAuditBuffer, stopAuditBuffer } from './audit/lifecycle.ts';
 import {
+  initMetricsBuffer,
+  startMetricsBuffer,
+  stopMetricsBuffer,
+} from './metrics/lifecycle.ts';
+import {
   registerCatalogListRoute,
   registerCatalogRebuildRoute,
   registerAuditListRoute,
   registerAuditSummaryRoute,
   registerStateToggleRoute,
   registerMessagesProxyRoute,
+  registerMetricsRoute,
   readUpstreamUrl,
 } from './routes/index.ts';
 import type { PipelineContext } from './augment/pipeline.ts';
@@ -188,6 +194,18 @@ export async function createServer(
     setIntelWriterDb(options.db);
   }
 
+  // Phase 7a (T-05) — metrics module wiring. The buffer is
+  // initialized AFTER the audit buffer + Intel writer so the
+  // metrics module sees the audit + intel lifecycles first
+  // (audit owns the DB; intel owns the writer). `startMetricsBuffer`
+  // begins the 60s time trigger; `registerMetricsRoute` adds
+  // `GET /metrics` to the Fastify instance. The buffer is module-
+  // scoped via lifecycle.ts so the route + collectors share the
+  // same instance.
+  const metricsBuffer = initMetricsBuffer();
+  await startMetricsBuffer();
+  await registerMetricsRoute(app, { buffer: metricsBuffer });
+
   await registerHealthRoute(app);
   await registerAugmentRoute(app, {
     onSuccess: recordLastRequestTimestampMs,
@@ -224,8 +242,12 @@ export async function createServer(
     url: `http://${host}:${port}`,
     port,
     async close() {
-      // Drain the audit buffer BEFORE closing Fastify so events
-      // emitted in the shutdown window still flush.
+      // Stop the metrics time interval BEFORE closing Fastify so the
+      // interval does not fire during shutdown. Then drain the audit
+      // buffer (existing Phase 5b behavior). Then close Fastify.
+      // Order matters: metrics has no DB dependency so it stops
+      // first; audit owns the DB so it stops before app.close().
+      await stopMetricsBuffer();
       await stopAuditBuffer();
       await app.close();
     },
