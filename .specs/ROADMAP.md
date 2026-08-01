@@ -849,6 +849,76 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
+> **Phase 6b split (2026-08-01) — 4 subchapters per Planner recommendation (17 atomic tasks, 3 Implementer batches of 8+4+5).**
+> Each subchapter is a fresh phase with own Planner→Implementer→Verifier cycle.
+> Source: `.specs/features/phase-6b-fast-agent-intel/{spec.md, design.md, tasks.md}` (commit `3838214`).
+> Key decisions (from AD-006 in `.specs/DISCOVERIES.md`): Intel store = SAME catalog SQLite DB (not separate intel.sqlite); `BuildOptions.intel` at line ~52 of `augmenter.ts`, nullable; match script = POST-retrieval injection (not query expansion — preserves D-006 byte-string + `src/search/*` REUSE-ONLY); suffix injection = `## Intel` FIRST in Block 2 (persona anchor in Block 1 unchanged for cache hit stability); async vs sync write = SYNC default, async fallback IF measured > 1ms. POC budgets are CEILINGS for Phase 6b per-request latency: sqlite.get(intel) ≤ 5ms, concat ≤ 1ms, template render ≤ 1ms, TOTAL hot path overhead ≤ 10ms (PRIMARY), fast agent ≤ 3s. T-17 explicitly mandates POC re-run at end-of-phase; Phase 6b does NOT close if any ceiling exceeded (PRD §16.7 rule).
+
+#### Phase 6b.1 — Intel Store Foundation [ ]
+
+**Done when:** migration `004_intel.sql` creates `intel(session_id TEXT PK, agent_state TEXT, next_needs TEXT, recent_topic TEXT, ts INTEGER)` table with WAL pragma + covering index `idx_intel_session_id`; `getIntel(session_id)` reads from `src/catalog/index.ts`; `Intel` type + Zod schema in `src/server/fast-agent/intel-schema.ts`; unit tests for store round-trip + WAL + index query plan.
+
+**Depends on:** Phase 6b
+
+**Scope (T-01..T-04):**
+- `src/catalog/migrations/004_intel.sql` — additive table + WAL pragma + covering index (existing `001_init.sql`, `002_*.sql`, `003_*.sql` UNTOUCHED)
+- `src/catalog/index.ts` — `getIntel(session_id: string): Promise<Intel | null>` + `writeIntel(session_id, intel, ts?)` helpers; uses existing WAL connection
+- `src/server/fast-agent/intel-schema.ts` — `Intel` type literal `{ agentState: string, nextNeeds: string[], recentTopic: string }` per SPEC §IMod-5 D-005; Zod schema with graceful degradation on empty fields
+- `test/catalog/intel-store.test.mjs` — round-trip + WAL preservation (reopen connection) + query plan uses index
+
+**Output:** Intel store accessible from catalog DB; type contract + Zod validation; unit tests PASS.
+
+---
+
+#### Phase 6b.2 — Fast Agent Module [ ]
+
+**Done when:** `src/server/fast-agent/client.ts` (real `@anthropic-ai/sdk` at `https://api.minimax.io/anthropic` + stub fallback marked `[STUB]`) + `writer.ts` (sync write + async factory fallback IF perf > 1ms) wired into `boot.ts` env reading `MINIMAX_API_KEY` + `MEMORY_STUDIO_FAST_AGENT_MODEL`; mandatory perf test on `writeIntel` recorded in AD-008; SDK install verified (or re-installed) in `package.json`.
+
+**Depends on:** Phase 6b.1
+
+**Scope (T-05..T-08):**
+- `src/server/fast-agent/client.ts` — `fetchIntel(prompt: string): Promise<Intel>` calls `https://api.minimax.io/anthropic` via `@anthropic-ai/sdk` with `baseURL`; stub fallback returns deterministic Intel literal; tries `MINIMAX_API_KEY` env var, falls back to stub if unset OR SDK missing
+- `src/server/fast-agent/writer.ts` — `writeIntelSync(session_id, intel)` uses `writeIntel` from 6b.1; `createAsyncIntelWriter()` factory stubbed (NOT auto-activated) per AD-006 #4
+- `src/server/boot.ts` — read `MINIMAX_API_KEY` + `MEMORY_STUDIO_FAST_AGENT_MODEL` env vars; default `MiniMax-M2.7-highspeed`; log `[fast-agent] MODE=real|stub` at boot
+- `test/server/fast-agent/{client,writer,writer-perf}.test.mjs` — stub fallback + real-mode contract + mandatory perf test (result in AD-008)
+
+**Output:** fast agent module wired + AD-008 perf result (sync if < 1ms, async fallback IF > 1ms).
+
+---
+
+#### Phase 6b.3 — BuildOptions.intel + Suffix Injection [ ]
+
+**Done when:** `BuildOptions.intel?: Intel | null` added at `src/server/augment/augmenter.ts:51-70`; `buildVariableSuffix()` emits `## Intel` section FIRST in Block 2 (persona anchor in Block 1 unchanged); byte-string determinism verified (same inputs → same SHA-256, intel incorporated); D-005 graceful degradation tests.
+
+**Depends on:** Phase 6b.2
+
+**Scope (T-09..T-12):**
+- `src/server/augment/augmenter.ts:51-70` — add `readonly intel?: Intel | null` to `BuildOptions`; update `buildVariableSuffix()` to emit `## Intel` section FIRST in Block 2 (persona anchor in Block 1 untouched for cache hit stability)
+- `test/augment/byte-string-with-intel.test.mjs` — same inputs → same SHA-256; intel incorporated in hash; D-005 graceful degradation (empty fields OK); same intel different prompt → different SHA
+- `test/augment/writer-reader-roundtrip.test.mjs` — write Intel via writer → read via getIntel → match pipeline uses it
+- `src/server/fast-agent/index.ts` (barrel) — re-exports `Intel` type + `fetchIntel` + `writeIntelSync`
+
+**Output:** 2-block template extends with intel suffix + byte-string stability + D-005 contract preserved.
+
+---
+
+#### Phase 6b.4 — Pipeline Integration + Cache Hit Validation [ ]
+
+**Done when:** `runAugment` extended with Stage 1b (fast agent in-process call) + tail `setImmediate` (intel write after response); integration tests confirm: latency trick (fast agent ≤ 3s, request returns in < 50ms unaffected), cache hit when persona stable (2 turns with same persona → `usage.cache_read_input_tokens > 0` on 2nd), AD-007/008 entries; POC re-run at end-of-phase confirms all Phase 6a budgets still met.
+
+**Depends on:** Phase 6b.3
+
+**Scope (T-13..T-17):**
+- `src/server/augment/pipeline.ts` — extend `runAugment` with Stage 1b (fast agent `fetchIntel()` call, await with timeout) + tail `setImmediate(() => writeIntelSync(...))` AFTER response returned
+- `test/augment/inception-cache-hit.test.mjs` — 2 consecutive `/v1/messages` requests, same persona + different prompts, assert 2nd response has `cache_read_input_tokens > 0` via stub provider (3 cases: same persona cache hit, different persona cache miss, single turn miss)
+- `scripts/smoke-latency-trick.mjs` — boots augment server, sends 1 `/v1/messages`, measures `(t_intel_written - t_response_end)` < 3000ms (AD-006 budget), parallel 5000ms simulated human read
+- AD-007 entry (cache hit invariant) + AD-008 entry (sync vs async intel write decision)
+- `scripts/poc-6a-hot-path.mjs` RE-RUN at end-of-phase — confirm hot path overhead still < 10ms after wiring
+
+**Output:** end-to-end inception híbrida + cache hit verified + AD-007/008 decisions recorded + POC ceilings preserved.
+
+---
+
 #### Phase 7a — Metrics Instrumentation [ ]
 
 **Done when:** dashboard emite `request_hit_rate` + `token_cache_coverage` + `p50_latency_ms` + `p99_latency_ms` + `working_set_mb`; atualizado a cada N=10 requests ou T=60s.
