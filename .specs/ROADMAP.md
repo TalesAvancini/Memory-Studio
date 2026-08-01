@@ -933,6 +933,8 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 **Done when:** dashboard emite `request_hit_rate` + `token_cache_coverage` + `p50_latency_ms` + `p99_latency_ms` + `working_set_mb`; atualizado a cada N=10 requests ou T=60s.
 
+**Phase 7a status 2026-08-01:** Planner artifacts at `.specs/features/phase-7a-metrics/{spec.md, design.md, tasks.md}` (commit `49183cc`). 7 atomic tasks single batch (no subchapters — smallest phase yet, 2-3h estimate). New `GET /metrics` endpoint (8th endpoint, schema_version=1) — NOT extension of `/health` (different concerns). PRD divergences documented: R-1 naming (Phase 7a = match-pipeline hit, PRD = provider cache hit); R-2 formula (request-weighted simplification, token-weighted is v3.1+). Verifier MUST document these in `validation-phase-7a.md`. Sub-agents NOT triggered (≤8 tasks = inline execution).
+
 **Depends on:** Phase 5b
 
 **Goal:** dashboard emite métricas cache hit + latency + working set.
