@@ -106,12 +106,111 @@ audience: "orchestrator agent (post-compaction) + the human user"
 
 ### Next actions (when resuming)
 
-1. **Inspect working tree first:** `git status --short` — see if `src/server/metrics/collector.ts` was edited between Implementer commit and now.
-2. **Commit any pending edits** (the collector.ts was M in last status check — small adjustment that landed mid-write).
+1. **Inspect working tree first:** `git status --short` — see if `src/server/metrics/collector.ts` was edited between Implementer commit and now. (committed at `87c9c96` — should be clean.)
+2. **Commit any pending edits** if any.
 3. **Dispatch Verifier Phase 7a** — audit metrics ring buffer, dashboard, endpoint, refresh trigger.
 4. **If Verifier PASS:** Flip Phase 7a [ ]→[x] in ROADMAP, update STATE.md, commit validation report.
 5. **If Verifier FAIL:** handle per phase cap (iter 2 of 3 cap available; iterate).
 6. **Dispatch Planner Phase 7b** after Phase 7a closes. Phase 7b is the LAST phase.
+
+### Quick decision tree (when resuming)
+
+```
+Is there a Verifier pending for Phase 7a?
+├── YES → dispatch Verifier (use prompt template below)
+└── NO → read STATE.md ## Handoff for current phase pointer
+
+Did Phase 7a Implementer return PASS but no Verifier dispatched yet?
+├── YES → dispatch Verifier 7a (pattern from .specs/features/phase-6b-fast-agent-intel/validation-phase-6b.4.md as template)
+└── NO → check if Phase 7b Planner dispatched → if not, dispatch Planner 7b
+
+Is HEAD < 87c9c96?
+├── YES → run `git log -10 --oneline` to see current state, then catch up
+└── NO → proceed with current state pointer
+
+Do you have unanswered user messages?
+├── YES → ANSWER THEM FIRST before dispatching (user got frustrated when I ran long dispatches in foreground)
+└── NO → dispatch freely
+```
+
+### Concrete resume commands (copy-paste ready)
+
+```bash
+# 1. Get current state
+cd "C:/Users/User/Desktop/AI-Project/Memory-Studio"
+git checkout loop/phase-0
+git log -10 --oneline
+git status --short
+
+# 2. Read state pointer
+cat .specs/STATE.md | head -100
+
+# 3. Read this handoff for context
+cat handoff-orchestrator.md
+
+# 4. Check what Verifier dispatch template exists
+ls .specs/features/phase-6b-fast-agent-intel/validation-phase-6b.*.md
+
+# 5. Dispatch Verifier Phase 7a (after reading tasks.md and validation-phase-7a.md template)
+# Use Agent tool with subagent_type: "general-purpose"
+# Reference: .specs/features/phase-7a-metrics/{spec,design,tasks}.md
+# Write validation report to: .specs/features/phase-7a-metrics/validation-phase-7a.md
+```
+
+### Critical user-experience lesson (MUST follow)
+
+**DO NOT run long Implementer/Planner/Verifier dispatches in foreground without acknowledging the user first.** When the user asks "como estamos?" mid-dispatch, they WAIT — sometimes 30+ minutes. Solutions:
+- Run long dispatches in `run_in_background: true` so you can respond to status queries.
+- If you must run foreground, send a 1-line "Implementer started, will report back in ~30 min" message BEFORE calling the Agent tool.
+- After every long dispatch returns, respond IMMEDIATELY to any queued user messages.
+
+**User explicitly flagged this frustration on 2026-08-01:** "Eu te perguntei 3 vezes vc ficou meia hora sem me responder, fdp." Do not repeat this pattern.
+
+### Known issues to track (do NOT skip)
+
+1. **test#366 flake** — `test/server/smoke.test.mjs:366` (was line 111, line 237, line 285 across phases — line number shifts as tests are added). Port exhaustion in `[42900, 43000]`. Pre-existing across Phases 5a, 5b, 6a, 6b, 7a. **Recommendation:** widen port range in Phase 7b cleanup, or add SIGTERM + 500ms delay in smoke wrapper.
+2. **Proxy T-14 deviation** — `src/server/routes/messages-proxy.ts:230` uses `activeCatalog: []` which short-circuits BEFORE Stage 1b. Documented in AD-009. Pickup candidate for Phase 7b.
+3. **POST /catalog/rebuild no-op fallback** — `src/server/routes/catalog-rebuild.ts:55-65` uses FALLBACK_REBUILD that returns count without doing actual rebuild. Documented in file header lines 17-23. Pickup candidate for Phase 7b.
+4. **Token-weighted `token_cache_coverage`** — Phase 7a uses request-weighted (simpler). PRD §14.6 specifies token-weighted. v3.1+ if needed.
+
+### Phase 7a Verifier dispatch template (use when resuming)
+
+The Verifier for Phase 7a should:
+- Read `.specs/features/phase-7a-metrics/{spec,design,tasks}.md`
+- Audit `src/server/metrics/ring-buffer.ts` (366 lines) — counters, latency ring, refresh trigger
+- Audit `src/server/metrics/collector.ts` (98 lines) — write seam
+- Audit `src/server/routes/metrics.ts` (43 lines) — GET /metrics endpoint
+- Audit hook sites in `src/server/augment/pipeline.ts` and `src/server/routes/messages-proxy.ts`
+- Run `npm test -- test/server/metrics/` — 19 tests must PASS
+- Run `node scripts/smoke-metrics.mjs` — must exit 0
+- Run `node scripts/poc-6a-hot-path.mjs` — must show total overhead < 10ms (Phase 6b invariant)
+- Document PRD divergences in validation-phase-7a.md per spec.md §5
+- Write report to `.specs/features/phase-7a-metrics/validation-phase-7a.md`
+
+### Phase 7b scope preview (per ROADMAP)
+
+Phase 7b — Real API Measurement + Tuning. 2-3h estimate. Depends on Phase 5 + Phase 6b.
+
+Done criteria (per ROADMAP):
+- Real `MiniMax-M2.7-highspeed` API latency p95 measurement (vs POC stub 223ms)
+- Cache hit validation with real Anthropic API (vs POC stub `cache_read_input_tokens=42`)
+- Working set measurement at 1h mark vs PRD §10.2.3 budget (<1.5GB)
+- Tuned thresholds based on real data
+
+**Likely cleanup candidates picked up here:**
+- test#366 flake fix
+- Proxy T-14 deviation (AD-009)
+- POST /catalog/rebuild production wiring (Phase 5b.3 deferred gap)
+
+### Authoritative files for resume (READ IN ORDER)
+
+1. `handoff-orchestrator.md` (this file) — TL;DR + decision tree + recovery commands
+2. `.specs/STATE.md` — current phase pointer + decisions + handoff
+3. `.specs/ROADMAP.md` — phase ordering + done criteria
+4. `.specs/DISCOVERIES.md` — AD-001..AD-009 architectural decisions
+5. `.specs/features/phase-7a-metrics/{spec,design,tasks}.md` — Phase 7a contracts (T-01..T-07)
+6. `.specs/features/phase-7a-metrics/validation-phase-7a.md` — Verifier report (when written)
+7. `.claude/agents/` or `~/.claude/agents/` — if you need to dispatch sub-agents, use the same agent types as before (general-purpose for Implementer/Verifier/Planner)
 
 ## Cumulative Phase Results Summary
 
