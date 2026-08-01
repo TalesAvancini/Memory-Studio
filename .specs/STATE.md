@@ -91,7 +91,9 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Implementer Batch 1 Phase 6b (6b.1 Intel Store Foundation + 6b.2 Fast Agent Module, T-01..T-08 = 8 atomic tasks: migration 004_intel.sql + getIntel helper + Intel type + Zod schema + fast-agent client + writer + boot env wiring + tests)
+- **próximo-step-concreto:** dispatch Implementer Batch 2 Phase 6b (6b.3 BuildOptions.intel + Suffix Injection, T-09..T-12 = 4 atomic tasks: BuildOptions.intel field at augmenter.ts:51-70 + ## Intel section first in Block 2 + byte-string stability + D-005 hardening + writer-reader roundtrip + barrel index)
+- **phase-6b.1-status:** "Phase 6b.1 — Intel Store Foundation" (DONE 2026-08-01, 1 iteration, Verifier PASS at `fbc6c47`. 004_intel.sql + WAL + index + getIntel + writeIntelRow + Intel type + Zod schema + 11 catalog tests. Commits `584fe60`, `b4a5d2f`, `37f9b70`)
+- **phase-6b.2-status:** "Phase 6b.2 — Fast Agent Module" (DONE 2026-08-01, 1 iteration, Verifier PASS at `fbc6c47`. client.ts + writer.ts + boot.ts env wiring + SDK install verified. AD-008 SYNC decision (writer-perf p95 = 0.108ms). 17 fast-agent tests. Commits `cdacf70`, `d96d6e6`, `51ef228`, `21d5887`, `fbc6c47`)
 - **phase-6a-plan:** Planner artifacts at `.specs/features/phase-6a-poc-validation/{spec.md, design.md, tasks.md, poc-results.md}` (commits `ddc7c0c` + `84d70a1`). 11 atomic POC tasks closed. Verifier PASS at `84d70a1` with re-measurement within 1.6% of Implementer's numbers. AD-006 in `.specs/DISCOVERIES.md` records 4 architectural decisions for Phase 6b.
 - **phase-6b-plan:** Planner artifacts at `.specs/features/phase-6b-fast-agent-intel/{spec.md, design.md, tasks.md}` (commit `3838214`). 17 atomic tasks across 4 sub-chapters (6b.1 intel store, 6b.2 fast agent, 6b.3 BuildOptions.intel, 6b.4 pipeline + cache hit). 3 Implementer batches of 8+4+5. POC ceilings are Phase 6b per-request latency budgets (T-17 re-runs POC at end-of-phase).
 - **working-tree:** working (`loop/phase-0` em `c7e7a8d`)

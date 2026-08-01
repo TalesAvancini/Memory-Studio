@@ -854,9 +854,11 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 > Source: `.specs/features/phase-6b-fast-agent-intel/{spec.md, design.md, tasks.md}` (commit `3838214`).
 > Key decisions (from AD-006 in `.specs/DISCOVERIES.md`): Intel store = SAME catalog SQLite DB (not separate intel.sqlite); `BuildOptions.intel` at line ~52 of `augmenter.ts`, nullable; match script = POST-retrieval injection (not query expansion — preserves D-006 byte-string + `src/search/*` REUSE-ONLY); suffix injection = `## Intel` FIRST in Block 2 (persona anchor in Block 1 unchanged for cache hit stability); async vs sync write = SYNC default, async fallback IF measured > 1ms. POC budgets are CEILINGS for Phase 6b per-request latency: sqlite.get(intel) ≤ 5ms, concat ≤ 1ms, template render ≤ 1ms, TOTAL hot path overhead ≤ 10ms (PRIMARY), fast agent ≤ 3s. T-17 explicitly mandates POC re-run at end-of-phase; Phase 6b does NOT close if any ceiling exceeded (PRD §16.7 rule).
 
-#### Phase 6b.1 — Intel Store Foundation [ ]
+#### Phase 6b.1 — Intel Store Foundation [x]
 
 **Done when:** migration `004_intel.sql` creates `intel(session_id TEXT PK, agent_state TEXT, next_needs TEXT, recent_topic TEXT, ts INTEGER)` table with WAL pragma + covering index `idx_intel_session_id`; `getIntel(session_id)` reads from `src/catalog/index.ts`; `Intel` type + Zod schema in `src/server/fast-agent/intel-schema.ts`; unit tests for store round-trip + WAL + index query plan.
+
+**Phase 6b.1 status 2026-08-01:** Closed via 1 iteration. Migration `004_intel.sql` with WAL pragma + covering index `idx_intel_session_id`. `getIntel` + `writeIntelRow` helpers at `src/catalog/index.ts` + `src/catalog/intel-store.ts`. `Intel` type + Zod schema + `serializeIntel`/`deserializeIntel` at `src/server/fast-agent/intel-schema.ts` (138 lines, D-005 graceful degradation on empty fields). 11 catalog tests (migrations-004 + intel-store + intel-restart) — round-trip + WAL preservation across close/reopen + NFC UTF-8 + empty fields + corrupted JSON graceful. WAL design soundness verified: `openCatalogDb` sets `journal_mode=WAL` BEFORE migrations run; in-file pragma is reviewer-visible intent marker (runner wraps in transaction). Verifier PASS at `fbc6c47`. 438 tests. Commits `584fe60`, `b4a5d2f`, `37f9b70`.
 
 **Depends on:** Phase 6b
 
@@ -870,9 +872,11 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
-#### Phase 6b.2 — Fast Agent Module [ ]
+#### Phase 6b.2 — Fast Agent Module [x]
 
 **Done when:** `src/server/fast-agent/client.ts` (real `@anthropic-ai/sdk` at `https://api.minimax.io/anthropic` + stub fallback marked `[STUB]`) + `writer.ts` (sync write + async factory fallback IF perf > 1ms) wired into `boot.ts` env reading `MINIMAX_API_KEY` + `MEMORY_STUDIO_FAST_AGENT_MODEL`; mandatory perf test on `writeIntel` recorded in AD-008; SDK install verified (or re-installed) in `package.json`.
+
+**Phase 6b.2 status 2026-08-01:** Closed via 1 iteration. `src/server/fast-agent/client.ts` (219 lines) with real `@anthropic-ai/sdk` at `https://api.minimax.io/anthropic` + stub fallback (deterministic `EMPTY_INTEL`, every log line `[STUB]`-prefixed, `[fast-agent] MODE=real|stub` logged at module load). `src/server/fast-agent/writer.ts` (231 lines) with `writeIntelSync` + `createAsyncIntelWriter` factory stub (NOT auto-activated). `src/server/boot.ts` reads `MINIMAX_API_KEY` + `MEMORY_STUDIO_FAST_AGENT_MODEL` (default `MiniMax-M2.7-highspeed`). `@anthropic-ai/sdk@0.115.0` installed (was missing pre-Batch 1). AD-008 SYNC decision: writer-perf p95 = 0.108ms (Implementer) / 0.144ms (Verifier median of 3 runs) — both 7-9× under 1ms trigger; sync is canonical, async fallback shipped as documented fallback. 17 fast-agent tests (9 client + 4 writer + 4 writer-perf). Verifier PASS at `fbc6c47`. Commits `cdacf70`, `d96d6e6`, `51ef228`, `21d5887`, `fbc6c47`.
 
 **Depends on:** Phase 6b.1
 
