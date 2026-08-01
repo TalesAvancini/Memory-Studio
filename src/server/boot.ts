@@ -24,7 +24,7 @@
 import { createServer as createHttpServer } from 'node:http';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import { registerAugmentRoute } from './augment.ts';
+import { registerAugmentRoute, getAugmentPipelineProviderOverride } from './augment.ts';
 import { registerHealthRoute, setHealthDb } from './health.ts';
 import { initAuditBuffer, startAuditBuffer, stopAuditBuffer } from './audit/lifecycle.ts';
 import {
@@ -33,7 +33,12 @@ import {
   registerAuditListRoute,
   registerAuditSummaryRoute,
   registerStateToggleRoute,
+  registerMessagesProxyRoute,
+  readUpstreamUrl,
 } from './routes/index.ts';
+import type { PipelineContext } from './augment/pipeline.ts';
+import type { Embedder } from '../catalog/embedder/types.ts';
+import { EMBEDDING_DIMENSIONS } from '../catalog/embedder/index.ts';
 
 export interface AugmentServerOptions {
   portRange?: [number, number];
@@ -48,6 +53,16 @@ export interface AugmentServerOptions {
    * request).
    */
   db?: DatabaseType;
+  /**
+   * Phase 5b T-13 — transparent /v1/messages proxy options.
+   * When omitted, the proxy reads `MEMORY_STUDIO_ANTHROPIC_BASE_URL`
+   * from `process.env` (entry-point path). Programmatic callers can
+   * pass an explicit `upstreamUrl` (e.g. `null` to force 503).
+   */
+  proxy?: {
+    upstreamUrl?: string | null;
+    allowedHostsCsv?: string;
+  };
 }
 
 export interface AugmentServerHandle {
@@ -166,6 +181,20 @@ export async function createServer(
     await registerAuditSummaryRoute(app, { db: options.db });
   }
 
+  // Phase 5b — transparent /v1/messages proxy. Registered whenever an
+  // upstream URL is configured (env var MEMORY_STUDIO_ANTHROPIC_BASE_URL
+  // for the entry-point path; the explicit `proxy` option for
+  // programmatic callers). When the URL is null, the route returns
+  // 503 proxy_disabled on every call (the default behavior).
+  const proxyUpstreamUrl = options.proxy?.upstreamUrl ?? readUpstreamUrl();
+  const proxyAllowedHosts = options.proxy?.allowedHostsCsv
+    ?? process.env['MEMORY_STUDIO_PROXY_ALLOWED_HOSTS'];
+  await registerMessagesProxyRoute(app, {
+    upstreamUrl: proxyUpstreamUrl,
+    allowedHostsCsv: proxyAllowedHosts,
+    pipelineProvider: () => defaultProxyPipelineContext(options.db),
+  });
+
   await app.listen({ port, host });
 
   return {
@@ -177,6 +206,41 @@ export async function createServer(
       // emitted in the shutdown window still flush.
       await stopAuditBuffer();
       await app.close();
+    },
+  };
+}
+
+/**
+ * Resolve a `PipelineContext` for the transparent `/v1/messages` proxy.
+ * When a DB is wired AND a pipeline provider override is set, reuse
+ * it (proxy requests hit the same catalog as `/augment`); otherwise
+ * synthesize a minimal context with a zero-vector stub embedder. The
+ * proxy never mutates the catalog, so the db handle is read-only
+ * from the proxy's perspective.
+ */
+function defaultProxyPipelineContext(db: DatabaseType | undefined): PipelineContext {
+  if (db !== undefined) {
+    const override = getAugmentPipelineProviderOverride();
+    if (override !== null) return override();
+    return { db, embedder: createStubEmbedder() };
+  }
+  // No DB: synthesize an in-memory context with a zero-vector embedder.
+  // This path keeps the proxy route functional in environments where
+  // no catalog DB is wired (smoke, unit tests).
+  return {
+    db: db as unknown as PipelineContext['db'],
+    embedder: createStubEmbedder(),
+  };
+}
+
+function createStubEmbedder(): Embedder {
+  return {
+    dimensions: EMBEDDING_DIMENSIONS,
+    async encode(_text: string): Promise<Float32Array> {
+      return new Float32Array(EMBEDDING_DIMENSIONS);
+    },
+    async embed(text: string): Promise<Float32Array> {
+      return this.encode(text);
     },
   };
 }
@@ -233,30 +297,57 @@ if (isMainModule()) {
   }
   const portRange: [number, number] =
     envRange ?? [DEFAULT_AUGMENT_PORT_RANGE[0], DEFAULT_AUGMENT_PORT_RANGE[1]];
-  createServer({ portRange }).then(
-    (handle) => {
-      console.log(`Memory Studio augment server: ${handle.url}`);
-      let closing = false;
-      const shutdown = async (): Promise<void> => {
-        if (closing) return;
-        closing = true;
-        try {
-          await handle.close();
-        } finally {
-          process.exit(0);
-        }
-      };
-      process.once('SIGINT', () => {
-        void shutdown();
-      });
-      process.once('SIGTERM', () => {
-        void shutdown();
-      });
-    },
-    (error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(message);
-      process.exit(1);
-    },
-  );
+
+  // Optional catalog DB path. When MEMORY_STUDIO_CATALOG_DB_PATH is
+  // set, open the on-disk SQLite DB so audit rows persist to disk
+  // (otherwise the augment server runs in-memory and audit rows are
+  // dropped — see D-007 fail-open semantics). Phase 5b T-14's smoke
+  // uses this to verify the proxy writes `messages_proxy` audit rows.
+  const dbPath = process.env['MEMORY_STUDIO_CATALOG_DB_PATH'];
+  const bootOptions: AugmentServerOptions = { portRange };
+  if (dbPath !== undefined && dbPath.trim().length > 0) {
+    void import('./catalog/open-on-demand.ts').then(async (mod) => {
+      try {
+        const db = await mod.openCatalogDbForBoot(dbPath);
+        bootOptions.db = db;
+      } catch (err) {
+        console.error(
+          `[boot] failed to open MEMORY_STUDIO_CATALOG_DB_PATH=${dbPath}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        process.exit(1);
+      }
+      startServer(bootOptions);
+    });
+  } else {
+    startServer(bootOptions);
+  }
+
+  function startServer(opts: AugmentServerOptions): void {
+    createServer(opts).then(
+      (handle) => {
+        console.log(`Memory Studio augment server: ${handle.url}`);
+        let closing = false;
+        const shutdown = async (): Promise<void> => {
+          if (closing) return;
+          closing = true;
+          try {
+            await handle.close();
+          } finally {
+            process.exit(0);
+          }
+        };
+        process.once('SIGINT', () => {
+          void shutdown();
+        });
+        process.once('SIGTERM', () => {
+          void shutdown();
+        });
+      },
+      (error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(message);
+        process.exit(1);
+      },
+    );
+  }
 }
