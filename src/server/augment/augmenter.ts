@@ -24,7 +24,7 @@
 import type { AugmentRequest, Context, MatchedSkill, MatchedRule, MatchedPersona, PruningDecisions } from './types.ts';
 import type { RankedItem } from './retrieval.ts';
 import { canonicalSha256 } from './byte-string.ts';
-import { serializeIntel, type Intel } from '../fast-agent/intel-schema.ts';
+import { serializeIntel, type Intel } from '../fast-agent/index.ts';
 
 /** A single Anthropic system block. */
 export interface SystemBlock {
