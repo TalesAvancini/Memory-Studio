@@ -43,6 +43,7 @@ import { topKAndTiebreak, DEFAULT_MIN_K, DEFAULT_MAX_K } from './top-k.ts';
 import { buildSystemMessage } from './augmenter.ts';
 import { buildResponse, type LatencyTimings } from './response.ts';
 import type { AugmentRequest, AugmentResponse, EmptyReason } from './types.ts';
+import type { Intel } from '../fast-agent/intel-schema.ts';
 
 import type { Database } from 'better-sqlite3';
 
@@ -62,6 +63,44 @@ export interface PipelineContext {
    * `embedder.encode(prompt)`. Tests inject a deterministic stub.
    */
   readonly encodeQuery?: (prompt: string) => Promise<Float32Array>;
+  /**
+   * Phase 6b (T-13) — Session ID for the in-process call chain.
+   * When set, Stage 1b reads prior intel via `getIntel(sessionId)`
+   * and the tail setImmediate writes back the intel used in this
+   * turn. When `undefined`, the pipeline runs without intel (the
+   * 2-block structure stays at the no-intel baseline SHA, preserving
+   * the cache hit invariant R-15 for legacy callers).
+   */
+  readonly sessionId?: string;
+  /**
+   * Phase 6b (T-13) — Read prior turn's intel from the store. Called
+   * by Stage 1b when `sessionId` is provided. Returns `null` when no
+   * intel row exists (cold start). Must NOT throw — fail-open to
+   * `null` so the pipeline never crashes on a corrupted row.
+   */
+  readonly getIntel?: (sessionId: string) => Intel | null;
+  /**
+   * Phase 6b (T-13) — Persist intel to the store. Invoked by the
+   * tail setImmediate AFTER the response is built, so the `/augment`
+   * caller is NEVER blocked by the write latency. Synchronous writes
+   * complete in < 1ms (Phase 6a POC measured 0.02ms p95 — well under
+   * the AD-006 #4 budget). The tail is fire-and-forget; errors are
+   * logged to stderr and never bubble up.
+   */
+  readonly writeIntel?: (sessionId: string, intel: Intel) => Promise<void>;
+  /**
+   * Phase 6b (T-13) — Optional fast-agent call for cold-start
+   * intel extraction. When `sessionId` is set AND `getIntel` returns
+   * `null` AND this hook is provided, Stage 1b calls it synchronously
+   * to extract fresh intel from the current prompt. Production wires
+   * this to `fetchIntel` (`src/server/fast-agent/client.ts`); tests
+   * inject a stub that returns a deterministic literal.
+   *
+   * R-20 fire-and-forget semantics: errors here degrade to
+   * `intel = null` (intel section omitted) and NEVER block the
+   * request response.
+   */
+  readonly callFastAgent?: (req: { readonly prompt: string; readonly model: string }) => Promise<{ readonly intel: Intel }>;
 }
 
 /** Internal pipeline result. */
@@ -105,6 +144,45 @@ export async function runAugment(
     }
   }
 
+  // --- Stage 1b: Intel (Phase 6b T-13) -------------------------------------
+  // Read prior turn's intel from the store (warm hit) OR extract fresh
+  // intel from the current prompt via the fast-agent (cold start). The
+  // result flows into Block 2's `## Intel` section via
+  // `BuildOptions.intel`. Fail-open: any error here leaves `intel` as
+  // `null` (intel section omitted) so the cache hit invariant R-15 is
+  // preserved when the row is corrupted or the fast-agent is down.
+  //
+  // Hot-path read budget: Phase 6a POC measured `sqlite.get(intel) =
+  // 0.02ms p95` (250x headroom under the 5ms AD-006 ceiling). Cold-start
+  // extraction adds a single fast-agent call (`< 3s p95` per the stub
+  // POC) but is gated to first-turn-of-session only (the next turn's
+  // warm read is < 0.02ms).
+  let intel: Intel | null = null;
+  if (context.sessionId !== undefined) {
+    const sessionId = context.sessionId;
+    if (context.getIntel !== undefined) {
+      try {
+        intel = context.getIntel(sessionId);
+      } catch {
+        // Fail-open: never let a bad read crash the pipeline.
+        intel = null;
+      }
+    }
+    if (intel === null && context.callFastAgent !== undefined) {
+      // Cold start: extract fresh intel from this turn's prompt.
+      try {
+        const result = await context.callFastAgent({
+          prompt: request.prompt,
+          model: 'MiniMax-M2.7-highspeed',
+        });
+        intel = result.intel;
+      } catch {
+        // Fail-open: degraded cold start → no intel this turn.
+        intel = null;
+      }
+    }
+  }
+
   // --- Stage 4: Embed query ----------------------------------------------
   let queryVec: Float32Array;
   let embeddingMs = 0;
@@ -142,6 +220,7 @@ export async function runAugment(
     matched,
     context: request.context,
     warnings: topKWarnings,
+    intel, // NEW Phase 6b T-13 — flows into Block 2's `## Intel` section.
   });
 
   // --- Stage 9: Response builder ----------------------------------------
@@ -153,6 +232,14 @@ export async function runAugment(
     totalMs,
   };
 
+  // --- Stage 9.5: Tail setImmediate (Phase 6b T-13) ---------------------
+  // Persist the intel we just used AFTER the response is returned. The
+  // helper is a no-op when (a) no sessionId, (b) no writeIntel hook,
+  // or (c) intel is null — so the existing test surface (Phase 5a/5b
+  // tests that call runAugment with bare PipelineContext) is
+  // unaffected.
+  scheduleIntelTailWrite(context, intel);
+
   return buildResponse({
     request,
     systemMessage: sha256,
@@ -160,6 +247,52 @@ export async function runAugment(
     rejectedByFloor,
     warnings: topKWarnings,
     latency,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Tail setImmediate helper (Phase 6b T-13)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fire-and-forget write of the intel literal used in the current turn
+ * (Phase 6b T-13). The setImmediate runs AFTER the response is built
+ * and returned, so the `/v1/messages` response time is unaffected by
+ * the write latency.
+ *
+ * Why a setImmediate (NOT await):
+ *   - Phase 6a POC measured the sync write at 0.02ms p95 — but a
+ *     `setImmediate` ensures the write NEVER blocks the hot path
+ *     even on a slow disk.
+ *   - The setImmediate runs in the next event-loop tick; the
+ *     `/augment` response has already been returned to the caller.
+ *
+ * Why the response path is unchanged:
+ *   - The current turn's intel was already read (or extracted) in
+ *     Stage 1b; the response carries the 2-block SHA from Block 1
+ *     (persona) + Block 2 (intel + ...). Writing the intel we just
+ *     used back to the store is idempotent (warm hit) OR the cold-
+ *     start persistence (no prior row). The actual R_N-based intel
+ *     extraction happens in the messages-proxy.ts path (T-14) which
+ *     has access to the upstream response text.
+ */
+function scheduleIntelTailWrite(
+  context: PipelineContext,
+  intel: Intel | null,
+): void {
+  if (context.sessionId === undefined) return;
+  if (context.writeIntel === undefined) return;
+  if (intel === null) return;
+  const sessionId = context.sessionId;
+  const writeIntel = context.writeIntel;
+  // Capture by value so the setImmediate closure stays stable.
+  const intelToWrite = intel;
+  setImmediate(() => {
+    void writeIntel(sessionId, intelToWrite).catch((err) => {
+      const reason = err instanceof Error ? err.message : String(err);
+      // Fail-open: log to stderr, never block, never bubble.
+      console.error(`[pipeline] tail setImmediate writeIntel failed: ${reason}`);
+    });
   });
 }
 
