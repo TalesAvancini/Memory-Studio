@@ -890,9 +890,11 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
-#### Phase 6b.3 — BuildOptions.intel + Suffix Injection [ ]
+#### Phase 6b.3 — BuildOptions.intel + Suffix Injection [x]
 
 **Done when:** `BuildOptions.intel?: Intel | null` added at `src/server/augment/augmenter.ts:51-70`; `buildVariableSuffix()` emits `## Intel` section FIRST in Block 2 (persona anchor in Block 1 unchanged); byte-string determinism verified (same inputs → same SHA-256, intel incorporated); D-005 graceful degradation tests.
+
+**Phase 6b.3 status 2026-08-01:** Closed via 1 iteration. `BuildOptions.intel?: Intel | null` added at `src/server/augment/augmenter.ts` (+38/-10 lines). `buildVariableSuffix` emits `## Intel` FIRST in Block 2 (persona anchor in Block 1 UNCHANGED). Empty/null/undefined intel → section omitted (backward-compat with Phase 6a.2 baseline). No-intel baseline SHA `4f6dba1b411a9c2947863416098aeac30db43869f1469d6bc11a7852925eb633` byte-identical preserved (D-006 invariant intact). Block 1 cache hit invariant confirmed: byte-identical across 6 intel variations + across prompts. 5 byte-string-with-intel cases PASS + 5 writer-reader roundtrip cases PASS + barrel `src/server/fast-agent/index.ts` (74 lines) re-exports Intel schema + writer + catalog store. Verifier PASS at `2a6f942`. 448 root + 152 UI + 16 SDK = 616 tests. Commits `402da38`, `a38e815`, `f71e1fe`, `2a6f942`.
 
 **Depends on:** Phase 6b.2
 
