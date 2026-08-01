@@ -10,11 +10,12 @@
  *     tolerates missing `tenantId` and emits `tenantId_hashed: null`).
  *   - `context: null` and `context` absent are treated identically
  *     (prompt-only mode).
- *   - `agentId` is currently unrestricted at the schema layer so the
- *     MVP can log non-canonical clients during early rollout; tightening
- *     to the canonical `["claude-code"]` list happens once Phase 5b has
- *     the proxy-layer visibility. PRD §14.4 names `claude-code` as the
- *     MVP canonical agent.
+ *   - `agentId` is restricted to the canonical literal `"claude-code"`
+ *     (R-06 / PRD §14.4). Phase 5a.4 deferred this enforcement to Phase
+ *     5b (the proxy layer gives visibility into non-canonical clients);
+ *     T-11 picks up the tightening. The errorMap returns a deterministic
+ *     message so the integration test (R-06 AC-26) can assert on the
+ *     exact text `"agentId must be one of: claude-code"`.
  *
  * The same shapes are re-exported as inferred TypeScript types so the
  * SDK package can mirror them without a build step.
@@ -55,7 +56,9 @@ export type Context = z.infer<typeof ContextSchema>;
 
 export const FingerprintSchema = z.object({
   projectPath: z.string(),
-  agentId: z.string(),
+  agentId: z.literal('claude-code', {
+    errorMap: () => ({ message: 'agentId must be one of: claude-code' }),
+  }),
   sessionId: z.string(),
   gitBranch: z.string(),
 });

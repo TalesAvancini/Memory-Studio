@@ -260,18 +260,33 @@ test('route-e2e: validation 400 when schemaVersion is not 3', async () => {
   assert.equal(body.error.field, 'schemaVersion');
 });
 
-test('route-e2e: validation 400 when fingerprint is missing', async () => {
-  // `agentId` is currently unrestricted at the schema layer (Phase 5a.4
-  // follow-up — see `src/server/schema.ts` comment). We exercise the
-  // OTHER 400 path: missing fingerprint, which the schema DOES
-  // require. R-06 (agentId = "claude-code") is a documented drift;
-  // see ROADMAP for the schema-tightening phase.
-  const req = baseRequest();
-  delete req.fingerprint;
+test('route-e2e: validation 400 when fingerprint.agentId is non-canonical (cursor)', async () => {
+  // R-06 (Phase 5b T-11): the schema now restricts agentId to the literal
+  // "claude-code" via z.literal. Any other value returns 400 with the
+  // custom errorMap message. This test REPLACES the Phase 5a.4 substitute
+  // (which asserted on a missing fingerprint) with the spec-correct case.
+  const req = baseRequest({ fingerprint: {
+    projectPath: '.',
+    agentId: 'cursor',
+    sessionId: 'r06-cursor',
+    gitBranch: 'main',
+  }});
   const { status, body } = await postAugment(req);
   assert.equal(status, 400, `expected 400, got ${status}`);
   assert.equal(body.error.code, 'MISSING_REQUIRED_FIELD');
-  assert.equal(body.error.field, 'fingerprint');
+  assert.equal(body.error.field, 'fingerprint.agentId');
+  assert.match(body.error.message, /agentId must be one of: claude-code/);
+});
+
+test('route-e2e: validation 400 when fingerprint.agentId is missing', async () => {
+  const req = baseRequest();
+  const { agentId: _ignored, ...fpWithoutAgentId } = req.fingerprint;
+  req.fingerprint = fpWithoutAgentId;
+  const { status, body } = await postAugment(req);
+  assert.equal(status, 400, `expected 400, got ${status}`);
+  assert.equal(body.error.code, 'MISSING_REQUIRED_FIELD');
+  assert.equal(body.error.field, 'fingerprint.agentId');
+  assert.match(body.error.message, /agentId must be one of: claude-code/);
 });
 
 test('route-e2e: validation 400 when activeCatalog is missing', async () => {
