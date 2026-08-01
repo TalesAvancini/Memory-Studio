@@ -32,6 +32,7 @@ import {
   registerCatalogRebuildRoute,
   registerAuditListRoute,
   registerAuditSummaryRoute,
+  registerStateToggleRoute,
 } from './routes/index.ts';
 
 export interface AugmentServerOptions {

@@ -11,3 +11,4 @@ export {
   registerAuditListRoute,
   registerAuditSummaryRoute,
 } from './audit.ts';
+export { registerStateToggleRoute } from './state-toggle.ts';
