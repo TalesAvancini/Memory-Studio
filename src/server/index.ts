@@ -31,7 +31,7 @@ export {
 } from './schema.ts';
 
 export { registerAugmentRoute, recordAugmentSuccess } from './augment.ts';
-export { registerHealthRoute } from './health.ts';
+export { registerHealthRoute, setHealthDb, setLastRebuildTs, getLastRebuildTs } from './health.ts';
 
 // Phase 5b — audit async/fail-open runtime (D-007 CRITICAL). Additive
 // re-exports; Phase 5a consumers continue to work unchanged.
@@ -51,3 +51,24 @@ export type {
   AuditBufferSnapshot,
   FlushReason,
 } from './audit/index.ts';
+
+// Phase 5b — auxiliary read endpoints (5b.2). Additive re-exports.
+export {
+  registerCatalogListRoute,
+  registerAuditListRoute,
+  registerAuditSummaryRoute,
+} from './routes/index.ts';
+
+// Phase 5b — security layer (5b.1 + 5b.3). Additive re-export.
+export { hashTenantId } from './security/index.ts';
+
+// Phase 5b — audit lifecycle helpers.
+export {
+  initAuditBuffer,
+  getAuditBuffer,
+  startAuditBuffer,
+  stopAuditBuffer,
+  getAuditBufferSnapshot,
+  setAuditBufferForTests,
+  resetAuditBufferForTests,
+} from './audit/lifecycle.ts';

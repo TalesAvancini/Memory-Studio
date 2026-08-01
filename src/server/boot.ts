@@ -25,8 +25,13 @@ import { createServer as createHttpServer } from 'node:http';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { registerAugmentRoute } from './augment.ts';
-import { registerHealthRoute } from './health.ts';
+import { registerHealthRoute, setHealthDb } from './health.ts';
 import { initAuditBuffer, startAuditBuffer, stopAuditBuffer } from './audit/lifecycle.ts';
+import {
+  registerCatalogListRoute,
+  registerAuditListRoute,
+  registerAuditSummaryRoute,
+} from './routes/index.ts';
 
 export interface AugmentServerOptions {
   portRange?: [number, number];
@@ -141,12 +146,22 @@ export async function createServer(
   if (options.db !== undefined) {
     initAuditBuffer(options.db);
     await startAuditBuffer();
+    setHealthDb(options.db);
   }
 
   await registerHealthRoute(app);
   await registerAugmentRoute(app, {
     onSuccess: recordLastRequestTimestampMs,
   });
+
+  // Phase 5b — auxiliary read endpoints. Only register when a DB is
+  // provided (these endpoints query SQLite directly). The smoke /
+  // in-memory path remains untouched.
+  if (options.db !== undefined) {
+    await registerCatalogListRoute(app, { db: options.db });
+    await registerAuditListRoute(app, { db: options.db });
+    await registerAuditSummaryRoute(app, { db: options.db });
+  }
 
   await app.listen({ port, host });
 
