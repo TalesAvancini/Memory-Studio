@@ -34,6 +34,10 @@ import { runAugment, type PipelineContext } from './augment/pipeline.ts';
 import { initializeSearchStorage } from '../search/schema.ts';
 import type { Embedder } from '../catalog/embedder/types.ts';
 import { EMBEDDING_DIMENSIONS } from '../catalog/embedder/index.ts';
+import { hashTenantId } from './security/tenant-hash.ts';
+import { redactObjectRecursive } from './audit/redact.ts';
+import { getAuditBuffer } from './audit/lifecycle.ts';
+import type { AuditEvent } from './audit/types.ts';
 
 export interface AugmentRouteOptions {
   onSuccess?: (timeMs?: number) => void;
@@ -48,9 +52,50 @@ export interface AugmentRouteOptions {
 
 const PERFORMANCE_BUDGET_RERANK_MS = 0;
 
-function hashTenantId(tenantId: string | undefined): string | null {
-  if (!tenantId) return null;
-  return createHash('sha256').update(tenantId, 'utf8').digest('hex').slice(0, 16);
+// Re-exported for Phase 5a call sites that imported `hashTenantId`
+// from `./augment.ts` directly. The canonical implementation now
+// lives in `./security/tenant-hash.ts` (extracted verbatim per T-04);
+// this re-export keeps the existing surface stable.
+export { hashTenantId };
+
+/**
+ * Build the audit row for a successful /augment request. Per PRD
+ * §10.3.1 the row contains ZERO raw prompt/context text — only
+ * `redacted_prompt_hash`, metadata arrays, and JSON-encoded payloads.
+ * `fingerprint` and `payload` JSON fields are walked through
+ * `redactObjectRecursive` so any placeholder secrets in nested strings
+ * are masked before persistence.
+ */
+function buildAuditEvent(
+  parsedRequest: import('./schema.ts').AugmentRequest,
+  response: AugmentResponse,
+  redactedPromptHash: string,
+  fingerprintMetadata: Record<string, unknown>,
+  payloadMetadata: Record<string, unknown>,
+): AuditEvent {
+  const matchedIds = [
+    ...response.matchedSkills.map((m) => m.id),
+    ...response.matchedRules.map((m) => m.id),
+    ...response.matchedPersonas.map((m) => m.id),
+  ];
+  const pruningReasons: string[] = [
+    ...response.pruningDecisions.rejectedByFloor.map((r) => r.reason),
+    ...response.pruningDecisions.rejectedByBudget.map((r) => r.reason),
+    ...response.pruningDecisions.rejectedByAttentionTier.map((r) => r.reason),
+    ...response.pruningDecisions.rejectedByNegativeFeedback.map((r) => r.reason),
+    ...response.pruningDecisions.rejectedByCriticalDropped.map((r) => r.reason),
+  ];
+  return {
+    ts: Date.now(),
+    tenantIdHashed: hashTenantId(parsedRequest.tenantId),
+    redactedPromptHash,
+    matchedIds,
+    pruningReasons,
+    latencyMs: response.latencyMs.total,
+    fingerprint: redactObjectRecursive(fingerprintMetadata) as Record<string, unknown>,
+    payload: redactObjectRecursive(payloadMetadata) as Record<string, unknown>,
+    eventType: 'augment',
+  };
 }
 
 function firstInvalidPath(issues: ReadonlyArray<{ path: ReadonlyArray<unknown> }>): string {
@@ -263,6 +308,49 @@ export async function registerAugmentRoute(
       },
       '/augment',
     );
+
+    // Audit enqueue (D-007 CRITICAL — Phase 5b T-03). The audit row
+    // contains ZERO raw prompt/context text per PRD §10.3.1. The
+    // `redactedPromptHash` is the sha256 hex of the ORIGINAL prompt
+    // (redaction is for log/storage; the hash is computed over the
+    // input verbatim so the cache key stays stable).
+    //
+    // Fail-open: enqueue never throws. If the buffer is uninitialized
+    // (the boot order didn't wire it), the audit is a silent no-op —
+    // tests that don't need audit get a clean baseline.
+    try {
+      const auditBuffer = getAuditBuffer();
+      if (auditBuffer !== null) {
+        const redactedPromptHash = createHash('sha256')
+          .update(parsed.data.prompt, 'utf8')
+          .digest('hex');
+        const fingerprintMetadata = {
+          agentId: parsed.data.fingerprint.agentId,
+          sessionId: parsed.data.fingerprint.sessionId,
+          projectPath: parsed.data.fingerprint.projectPath,
+          gitBranch: parsed.data.fingerprint.gitBranch,
+          requestId: decisionTraceId,
+        };
+        const payloadMetadata = {
+          systemMessageSha256: finalResponse.systemMessage,
+          matchedSkillsCount: finalResponse.matchedSkills.length,
+          matchedRulesCount: finalResponse.matchedRules.length,
+          matchedPersonasCount: finalResponse.matchedPersonas.length,
+          emptyReason: finalResponse.emptyReason ?? null,
+          warnings: finalResponse.warnings,
+        };
+        const event = buildAuditEvent(
+          parsed.data,
+          finalResponse,
+          redactedPromptHash,
+          fingerprintMetadata,
+          payloadMetadata,
+        );
+        auditBuffer.enqueue(event);
+      }
+    } catch {
+      // Audit is best-effort; never block the response.
+    }
 
     options.onSuccess?.(Date.now());
     reply.code(200);

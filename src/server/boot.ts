@@ -23,13 +23,24 @@
 
 import { createServer as createHttpServer } from 'node:http';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
+import type { Database as DatabaseType } from 'better-sqlite3';
 import { registerAugmentRoute } from './augment.ts';
 import { registerHealthRoute } from './health.ts';
+import { initAuditBuffer, startAuditBuffer, stopAuditBuffer } from './audit/lifecycle.ts';
 
 export interface AugmentServerOptions {
   portRange?: [number, number];
   host?: string;
   fastifyOptions?: FastifyServerOptions;
+  /**
+   * Optional better-sqlite3 handle for the audit async runtime
+   * (Phase 5b T-03). When provided, `initAuditBuffer(db)` wires the
+   * writer so every /augment enqueues an audit event. When omitted,
+   * the audit buffer is left uninitialized and the route handler
+   * silently skips enqueue (fail-open: audit never blocks the
+   * request).
+   */
+  db?: DatabaseType;
 }
 
 export interface AugmentServerHandle {
@@ -122,6 +133,16 @@ export async function createServer(
   serverStartTimeMs = Date.now();
   lastRequestTimestampMs = 0;
 
+  // Audit buffer lifecycle (Phase 5b T-03). The buffer is wired BEFORE
+  // the route handlers register so the first /augment request can
+  // enqueue immediately. If no DB is provided (the in-memory smoke
+  // path), the buffer is left uninitialized and the route handler
+  // skips enqueue (D-007 fail-open: audit never blocks the request).
+  if (options.db !== undefined) {
+    initAuditBuffer(options.db);
+    await startAuditBuffer();
+  }
+
   await registerHealthRoute(app);
   await registerAugmentRoute(app, {
     onSuccess: recordLastRequestTimestampMs,
@@ -134,6 +155,9 @@ export async function createServer(
     url: `http://${host}:${port}`,
     port,
     async close() {
+      // Drain the audit buffer BEFORE closing Fastify so events
+      // emitted in the shutdown window still flush.
+      await stopAuditBuffer();
       await app.close();
     },
   };

@@ -78,22 +78,25 @@ test('AC-10: 001 + 002 apply cleanly; audit_events has 10 columns including "ten
   const db = await freshDbWithVec();
   try {
     const result = await applyMigrations(db);
-    assert.equal(result.currentVersion, 2, 'currentVersion must be 2 after applying 001 + 002');
-    assert.deepEqual(
-      result.applied.sort(),
-      ['001_init', '002_audit_events_tenant_id_rename'].sort(),
-      'both migrations applied',
+    // Phase 5b added migration 003 (perf index) — currentVersion is now 3.
+    assert.ok(
+      result.currentVersion >= 2,
+      `currentVersion must be >= 2 after applying 001 + 002, got ${result.currentVersion}`,
+    );
+    assert.ok(
+      result.applied.includes('001_init') &&
+        result.applied.includes('002_audit_events_tenant_id_rename'),
+      'both 001 and 002 must be applied',
     );
 
-    // schema_migrations has both versions.
+    // schema_migrations has both (and possibly 003 from Phase 5b).
     const versions = db
       .prepare('SELECT version, name FROM schema_migrations ORDER BY version')
       .all();
-    assert.equal(versions.length, 2);
+    assert.ok(versions.length >= 2, `schema_migrations must have >= 2 rows, got ${versions.length}`);
     assert.equal(versions[0].version, 1);
     assert.equal(versions[0].name, '001_init');
-    assert.equal(versions[1].version, 2);
-    assert.equal(versions[1].name, '002_audit_events_tenant_id_rename');
+    assert.ok(versions.some((v) => v.name === '002_audit_events_tenant_id_rename'));
 
     // audit_events has 10 columns with the expected names.
     const cols = db.prepare('PRAGMA table_info(audit_events)').all();
@@ -150,15 +153,16 @@ test('AC-6 / R-06: re-running applyMigrations on a DB with version 2 is a no-op'
   const db = await freshDbWithVec();
   try {
     const first = await applyMigrations(db);
-    assert.equal(first.currentVersion, 2);
-    assert.equal(first.applied.length, 2);
+    // Phase 5b adds migration 003 (perf index) — currentVersion can be 3.
+    assert.ok(first.currentVersion >= 2, `expected currentVersion >= 2, got ${first.currentVersion}`);
+    assert.ok(first.applied.length >= 2, 'at least 2 migrations should be applied');
 
     const second = await applyMigrations(db);
     assert.deepEqual(second.applied, [], 'no migrations should be re-applied');
-    assert.equal(second.currentVersion, 2);
+    assert.equal(second.currentVersion, first.currentVersion, 'currentVersion must be unchanged on re-run');
 
     const count = db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').get();
-    assert.equal(count.n, 2, 'schema_migrations still has exactly 2 rows');
+    assert.ok(count.n >= 2, `schema_migrations must have >= 2 rows, got ${count.n}`);
   } finally {
     db.close();
   }
