@@ -11,6 +11,7 @@
   "scripts": {
     "test": "node --test test/**/*.test.mjs",
     "test:smoke": "node --test test/smoke.test.mjs",
+    "test:idempotent": "npm test && npm test",
     "test:catalog": "node --test test/catalog/*.test.mjs",
     "test:coverage": "node --experimental-test-coverage --test test/search/*.test.mjs",
     "typecheck": "tsc --noEmit",
