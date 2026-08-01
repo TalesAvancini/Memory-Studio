@@ -124,27 +124,61 @@ async function bootAndProbe() {
 
 async function killChild(child) {
   if (!child || child.exitCode !== null) return;
+  // 1) Polite SIGTERM first (cross-platform). Give it KILL_TIMEOUT_MS
+  //    to exit gracefully — Fastify hooks + Node's `exit` event typically
+  //    finish in <200ms when no in-flight work is pending.
   try {
     child.kill('SIGTERM');
   } catch {
     // ignore — best-effort cleanup
   }
-  // Give it a moment to exit cleanly, then SIGKILL.
-  const exitStart = Date.now();
-  while (child.exitCode === null && Date.now() - exitStart < KILL_TIMEOUT_MS) {
+  const sigtermStart = Date.now();
+  while (child.exitCode === null && Date.now() - sigtermStart < KILL_TIMEOUT_MS) {
     await sleep(50);
   }
-  if (child.exitCode === null) {
+  if (child.exitCode !== null) return;
+
+  // 2) Hard kill. On Windows, `child.kill('SIGKILL')` calls
+  //    `TerminateProcess` which only kills the parent PID — child
+  //    processes (e.g. anything the server forked or any node helper)
+  //    keep the bound listener alive, and the parent Node process can
+  //    also linger without releasing the socket. Use `taskkill /F /T`
+  //    (force + tree) which reliably tears down the whole tree and
+  //    releases the port. On POSIX, SIGKILL on the direct child is
+  //    sufficient because Node doesn't fork auxiliaries in this script.
+  if (process.platform === 'win32') {
+    try {
+      const { spawn: spawnSync } = await import('node:child_process');
+      spawnSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], {
+        stdio: 'ignore',
+        windowsHide: true,
+      });
+    } catch {
+      // best-effort: fall through to the bound wait below
+    }
+  } else {
     try {
       child.kill('SIGKILL');
     } catch {
       // ignore
     }
-    // Wait for actual exit to release the listener port.
-    while (child.exitCode === null) {
-      await sleep(20);
-    }
   }
+
+  // 3) Bounded post-kill wait (defensive belt). Even with taskkill /F /T
+  //    the Node `child` object's `exit` event may not fire synchronously
+  //    on Windows, so we cap the wait at 3s. If we time out we still
+  //    return — the smoke probe already passed, the listener port will
+  //    be released by the OS once the process is gone, and the smoke
+  //    assertions have already been satisfied.
+  const hardStart = Date.now();
+  const HARD_TIMEOUT_MS = 3000;
+  while (child.exitCode === null && Date.now() - hardStart < HARD_TIMEOUT_MS) {
+    await sleep(20);
+  }
+  // Note: we intentionally do NOT loop forever here. If the child still
+  // hasn't exited past HARD_TIMEOUT_MS, we return; the smoke is already
+  // complete and the OS will reap the zombie. The wrapper tests should
+  // never see a hang from this path.
 }
 
 function log(tag, message) {
