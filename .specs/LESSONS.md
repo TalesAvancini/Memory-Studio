@@ -52,6 +52,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: loop-orchestrator-dispatch (loop-orchestrator discipline)
 - last seen: 2026-07-31T15:12:58Z
 
+### L-007 — When Implementer/Verifier dies from API 429 token-limit mid-task, do NOT restart from scratch — inspect working tree (git status/diff), commit any partial fix-task work that landed, dispatch fresh sub-agent scoped to remaining items. Recurrence=2 confirms this pattern (Phase 4.4 + Phase 5a.2).
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `loop orchestration + API 429 recovery` · harmful: 0
+- features: phase-5a.2
+- evidence: orchestrator pattern (session handoff-orchestrator.md) (loop orchestration + API 429 recovery)
+- last seen: 2026-08-01T03:36:37Z
+
 ## Quarantined (failed when applied — ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

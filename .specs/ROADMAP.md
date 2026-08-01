@@ -502,7 +502,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 5a.2 — Retrieval Pipeline [ ]
+#### Phase 5a.2 — Retrieval Pipeline [x]
 
 **Done when:** retrieval composes RRF + double threshold + top-3-to-5 + tiebreak; pipeline orchestrator builds 2-block systemMessage with SHA-256 byte-string; empty/timeout cases fail-open.
 
@@ -518,6 +518,8 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 - Fail-open: retrieval errors → 200 with `emptyReason: "timeout"` + persona-only system message
 
 **Output:** deterministic, fail-open retrieval; SHA-256 byte-string stable across equivalent inputs.
+
+**Phase 5a.2 status 2026-08-01:** Closed via iter 1 (FAIL on G1 CRITICAL tiebreak D-006) → iter 2 (FT-01 tiebreak fix + FT-02 smoke + FT-03 idempotent script — Implementer died from API 429 mid-fix) → iter 3 (Windows taskkill /F /T cleanup + R-14 fail-open tests). Verifier iter 3 PASS: 275 root + 152 UI + 16 SDK = 443 tests, hash drift 0/1000 iters, smoke 3x stable, no port leak. Validation report: `.specs/features/phase-5a-api-retrieval/validation-phase-5a.2-iter3.md`. Commits `fe07efa`, `526ddf5`, `23f6242`, `17a0d32`, `3fe84ba`.
 
 ---
 

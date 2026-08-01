@@ -74,8 +74,9 @@ related:
 
 ## Handoff
 
-- **phase:** "Phase 5a.2 — Retrieval Pipeline"
-- **phase-previous:** "Phase 5a.1 — Server Foundation" (DONE 2026-07-31, 1 iteration, Verifier PASS commit `5cf6894`, ~395 tests: 227 root + 152 UI + 16 SDK)
+- **phase:** "Phase 5a.3 — Tests + Smoke"
+- **phase-previous:** "Phase 5a.2 — Retrieval Pipeline" (DONE 2026-08-01, 3 iterations — iter 1 FAIL on G1 CRITICAL tiebreak, iter 2 Implementer died API 429 with FT-01/02 committed, iter 3 Windows cleanup + R-14 fail-open. Verifier iter 3 PASS. ~443 tests: 275 root + 152 UI + 16 SDK. Commits `fe07efa`, `526ddf5`, `23f6242`, `17a0d32`, `3fe84ba`)
+- **phase-5a.1:** "Phase 5a.1 — Server Foundation" (DONE 2026-07-31, 1 iteration, Verifier PASS commit `5cf6894`, ~395 tests: 227 root + 152 UI + 16 SDK)
 - **phase-4-status:** "Phase 4 (UI Panel) entire phase DONE via subchapters 4.1, 4.2, 4.3, 4.4 — all `[x]`. 375 tests total."
 - **phase-3:** "Phase 3 — SDK Cliente" (DONE 2026-07-31, 1 iteration)
 - **phase-2:** "Phase 2 — Detector + Fingerprint" (DONE 2026-07-31, 1 iteration)
@@ -87,9 +88,10 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Implementer para Phase 5a.2 — Retrieval Pipeline (compose src/search/* + double threshold + top-3-to-5 + tiebreak + 2-block SHA-256 byte-string, fail-open) — 4 tasks T-05..T-08
-- **working-tree:** working (`loop/phase-0` em `5cf6894`)
-- **lessons-store:** L-001..L-004 (Phase 1) + L-005/L-006 (Phase 3)
+- **próximo-step-concreto:** dispatch Implementer Phase 5a.3 (T-09 byte-string equality + T-11 end-to-end smoke + Claude Code guide; T-10 already implemented as byte-string-determinism.test.mjs)
+- **working-tree:** working (`loop/phase-0` em `3fe84ba`)
+- **lessons-store:** L-001..L-004 (Phase 1) + L-005/L-006 (Phase 3) + L-007 (Phase 5a.2: API 429 mid-task recovery pattern)
+- **next-pending-action:** save L-007 lesson (recurrence=2), then dispatch Implementer Phase 5a.3 (T-09 byte-string equality + T-10 tiebreak stress [already done as byte-string-determinism.test.mjs] + T-11 end-to-end smoke + Claude Code integration guide)
 - **phase-3-feature-dir:** `.specs/features/phase-3-sdk-client/{spec.md, design.md, tasks.md, validation.md}` (commit `fe20a66`)
 - **phase-2-feature-dir:** `.specs/features/phase-2-detector-fingerprint/{spec.md, tasks.md, validation.md}` (commit `74b4cdc`)
 - **phase-1.4-feature-dir:** `.specs/features/phase-1-catalog-schema-index/validation-phase-1.4.md` (commit `4de0632`)

@@ -108,11 +108,29 @@
       ],
       "created": "2026-07-31T15:12:58Z",
       "last_seen": "2026-07-31T15:12:58Z"
+    },
+    {
+      "id": "L-007",
+      "key": "surviving_mutant::when implementer verifier dies from api 429 token limit mid task do not restart from scratch inspect working tree git status diff commit any partial fix task work that landed dispatch fresh sub agent scoped to remaining items recurrence 2 confirms this pattern phase 4 4 phase 5a 2",
+      "text": "When Implementer/Verifier dies from API 429 token-limit mid-task, do NOT restart from scratch — inspect working tree (git status/diff), commit any partial fix-task work that landed, dispatch fresh sub-agent scoped to remaining items. Recurrence=2 confirms this pattern (Phase 4.4 + Phase 5a.2).",
+      "signal": "surviving_mutant",
+      "scope": "loop orchestration + API 429 recovery",
+      "status": "candidate",
+      "features": [
+        "phase-5a.2"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "orchestrator pattern (session handoff-orchestrator.md) (loop orchestration + API 429 recovery)"
+      ],
+      "created": "2026-08-01T03:36:37Z",
+      "last_seen": "2026-08-01T03:36:37Z"
     }
   ],
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
   "schema": 1,
-  "next_id": 7
+  "next_id": 8
 }
