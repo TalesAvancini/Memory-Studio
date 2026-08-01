@@ -7,3 +7,9 @@
  */
 
 export { hashTenantId } from './tenant-hash.ts';
+export {
+  LOOPBACK_HOSTS,
+  assertLoopback,
+  checkProxyAllowlist,
+  ProxyHostNotAllowedError,
+} from './proxy-allowlist.ts';
