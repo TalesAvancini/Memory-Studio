@@ -91,3 +91,15 @@ export {
 // to use the new schema directly; until then, this re-export keeps the
 // suite green without re-implementing the helper here.
 export { createSchema } from './schema.ts';
+
+// Phase 6b — Intel store read/write primitives for the `intel` table
+// (migration 004_intel.sql). Pass a better-sqlite3 `Database` handle;
+// `getIntel` returns `null` for unknown sessions + corrupted rows.
+export { getIntel, writeIntelRow } from './intel-store.ts';
+
+// Phase 6b — Intel literal type re-exported from the canonical owner
+// (`src/server/fast-agent/intel-schema.ts`) for consumer convenience.
+// Cross-directory import is a known barrel anti-pattern that the
+// catalog barrel tolerates so the BuildOptions.intel / pipeline.ts
+// imports stay short.
+export type { Intel } from '../server/fast-agent/intel-schema.ts';
