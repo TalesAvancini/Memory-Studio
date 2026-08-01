@@ -7,7 +7,9 @@
   "engines": {
     "node": ">=22.0.0"
   },
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "test": "node --test test/**/*.test.mjs",
     "test:smoke": "node --test test/smoke.test.mjs",
@@ -22,6 +24,7 @@
     "smoke:augment-server": "node scripts/smoke-augment-server.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@huggingface/transformers": "^4.2.0",
     "better-sqlite3": "^11.5.0",
     "fastify": "^5.11.0",
