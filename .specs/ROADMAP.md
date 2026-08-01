@@ -523,7 +523,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 5a.3 — Tests + Smoke [ ]
+#### Phase 5a.3 — Tests + Smoke [x]
 
 **Done when:** SHA-256 equality test proves 2 equivalent inputs → same byte-string; tiebreak stress test runs 1000 randomized requests with same matched IDs → all 1000 same byte-string; smoke script + Claude Code guide draft complete.
 
@@ -536,6 +536,8 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 - `docs/guides/claude-code-baseurl.md` — Claude Code SDK-level custom baseURL integration
 
 **Output:** tests pass + smoke script + Claude Code guide.
+
+**Phase 5a.3 status 2026-08-01:** Closed via 1 iteration. T-09 byte-string equality (7/7) baseline `4f6dba1b…` byte-identical. T-10 tiebreak stress (already in `byte-string-determinism.test.mjs`) baseline `c038eb79…` unchanged. T-11 end-to-end smoke (5/5 checks, cache_read=23 on 2nd call, 4× standalone stability) + Claude Code guide (94 lines, 3 sections). Verifier PASS at `ad8be1c`. 282 root + 152 UI + 16 SDK = 450 tests. Validation report: `.specs/features/phase-5a-api-retrieval/validation-phase-5a.3.md`. Commits `0cc9ce3`, `ad8be1c`. LOW follow-ups flagged: (a) `MEMORY_STUDIO_AUGMENT_PORT_RANGE` env var set but not read by `boot.ts:111` (parse-from-stdout works around it); (b) no `smoke:augment-server` package.json script. Both optional.
 
 ---
 
