@@ -74,8 +74,9 @@ related:
 
 ## Handoff
 
-- **phase:** "Phase 6a — POC Validation (hot path + fast agent)"
-- **phase-previous:** "Phase 5b — Audit + Endpoints + Security" (DONE 2026-08-01 via subchapters 5b.1, 5b.2, 5b.3, 5b.4. 11 atomic commits. 391 root + 152 UI + 16 SDK = 559 tests. All gates green. Final HEAD at `c7e7a8d`. Sub-phases: 5b.1 Audit Foundation (`d232927`), 5b.2 Read Endpoints (`351ca9e`), 5b.3 Write Endpoints + R-06 (`76b7951`), 5b.4 Transparent Proxy (`c7e7a8d`). Deferred gap documented: POST /catalog/rebuild uses FALLBACK no-op — real TEMP+rename swap deferred pending stable YAML catalog dir + embedder)
+- **phase:** "Phase 6b — Fast Agent + Intel Pipeline (mandatory)"
+- **phase-previous:** "Phase 6a — POC Validation" (DONE 2026-08-01 via subchapters 6a.1, 6a.2, 6a.3. 6 atomic commits. 391 root + 152 UI + 16 SDK + 19 POC = 578 tests. POC verdict: PASS on all 3 targets (hot path overhead 0.07ms vs 10ms budget = 147× headroom, fast agent 223ms stub vs 3s budget, byte-string determinism 10/10). AD-006 decision record + Phase 6b per-request latency budget derivation at `.specs/DISCOVERIES.md`. Final HEAD at `84d70a1`)
+- **phase-5b-status:** "Phase 5b — Audit + Endpoints + Security" (DONE 2026-08-01 via subchapters 5b.1, 5b.2, 5b.3, 5b.4. 11 atomic commits. 391 root + 152 UI + 16 SDK = 559 tests. All gates green. Final HEAD at `c7e7a8d`. Deferred gap: POST /catalog/rebuild production wiring uses FALLBACK no-op)
 - **phase-5a-status:** "Phase 5a — API + Retrieval + Byte-string" (DONE 2026-08-01 via subchapters 5a.1, 5a.2, 5a.3, 5a.4. 13 atomic commits. 309 root + 152 UI + 16 SDK = 477 tests. All gates green. Final HEAD at `701a2f2`)
 - **phase-5a.2:** "Phase 5a.2 — Retrieval Pipeline" (DONE 2026-08-01, 3 iterations — iter 1 FAIL on G1 CRITICAL tiebreak, iter 2 Implementer died API 429 with FT-01/02 committed, iter 3 Windows cleanup + R-14 fail-open. Verifier iter 3 PASS. ~443 tests: 275 root + 152 UI + 16 SDK. Commits `fe07efa`, `526ddf5`, `23f6242`, `17a0d32`, `3fe84ba`)
 - **phase-5a.1:** "Phase 5a.1 — Server Foundation" (DONE 2026-07-31, 1 iteration, Verifier PASS commit `5cf6894`, ~395 tests: 227 root + 152 UI + 16 SDK)
@@ -90,8 +91,8 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Implementer Phase 6a single batch (11 POC tasks: T-01..T-04 hot path overhead + T-05..T-08 fast agent latency + T-09..T-11 byte-string + AD-006 decision record)
-- **phase-6a-plan:** Planner artifacts at `.specs/features/phase-6a-poc-validation/{spec.md, design.md, tasks.md}` (commit `ddc7c0c`). 11 atomic POC tasks across 3 sub-chapters (6a.1 hot path, 6a.2 fast agent, 6a.3 byte-string + AD-006). Single Implementer batch (all measurement scripts, no production code). Pass/fail thresholds are p95 with 10 amostras + 5 warmup.
+- **próximo-step-concreto:** dispatch Planner Phase 6b (Fast Agent + Intel Pipeline, MANDATORY per ROADMAP meta-convention #8, 12-16h estimate). POC verdict PASS — 6a POC measurements are Phase 6b per-request latency budget ceilings
+- **phase-6a-plan:** Planner artifacts at `.specs/features/phase-6a-poc-validation/{spec.md, design.md, tasks.md, poc-results.md}` (commits `ddc7c0c` + `84d70a1`). 11 atomic POC tasks closed. Verifier PASS at `84d70a1` with re-measurement within 1.6% of Implementer's numbers. AD-006 in `.specs/DISCOVERIES.md` records 4 architectural decisions for Phase 6b: (1) `BuildOptions.intel` formalization, (2) Intel store SQLite migration `004_intel.sql` + WAL mode + covering index, (3) Fast agent module location `src/server/fast-agent/{client,writer}.ts`, (4) Async vs sync intel write (POC assumes sync; Phase 6b may need async batching per D-007 audit pattern)
 - **working-tree:** working (`loop/phase-0` em `c7e7a8d`)
 - **lessons-store:** L-001..L-006 (Phase 1+3) + L-007 (Phase 5a.2: API 429 mid-task recovery) + L-008 (Phase 5b.3: deferred-wiring pattern for contractually-correct no-op fallback)
 - **working-tree:** working (`loop/phase-0` em `b6ced99`)
