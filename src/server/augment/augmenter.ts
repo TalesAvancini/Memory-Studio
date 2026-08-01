@@ -24,6 +24,7 @@
 import type { AugmentRequest, Context, MatchedSkill, MatchedRule, MatchedPersona, PruningDecisions } from './types.ts';
 import type { RankedItem } from './retrieval.ts';
 import { canonicalSha256 } from './byte-string.ts';
+import { serializeIntel, type Intel } from '../fast-agent/intel-schema.ts';
 
 /** A single Anthropic system block. */
 export interface SystemBlock {
@@ -67,6 +68,18 @@ export interface BuildOptions {
   readonly context?: Context | null;
   /** Optional augmentation trace (e.g. warnings from top-K). */
   readonly warnings?: ReadonlyArray<string>;
+  /**
+   * Phase 6b: Intel literal from the previous turn (set by the
+   * pipeline via `getIntel(sessionId)`). When non-null AND non-empty
+   * (D-005), the augmenter emits a `## Intel` section as the FIRST
+   * section of Block 2 (per AD-006 + design §5). Empty/null/undefined
+   * → section omitted entirely (preserves the no-intel baseline byte
+   * string → cache hit invariant R-15).
+   *
+   * Block 1 (persona) is NEVER modified by this field — the cache hit
+   * prefix stays stable across turns when persona is stable.
+   */
+  readonly intel?: Intel | null;
 }
 
 /** Re-export `PruningDecisions` so consumers can `import { PruningDecisions }` here. */
@@ -94,29 +107,43 @@ function buildPersonaText(
  * Build the variable suffix (block 2 body). Sections are joined by
  * `\n\n` and only emitted when non-empty:
  *
+ *   ## Intel            (Phase 6b — FIRST section when present)
  *   ## Skills
- *   <each skill text, joined by \n\n>
- *
  *   ## Rules
- *   <each rule text, joined by \n\n>
- *
  *   ## Context
- *   <canonical JSON of req.context>
- *
  *   ## Warnings
- *   <bullet list of warnings from upstream modules>
  *
- * The Context block is intentionally a `canonicalJsonStringify` so
- * byte-string determinism is preserved when the same context is sent
- * twice. Warnings are appended (when present) so log observability
+ * The `## Intel` section is emitted when the `intel` argument is
+ * non-null AND at least one of its fields is non-empty (D-005
+ * graceful degradation: empty intel = section omitted entirely, so
+ * the no-intel baseline byte-string stays byte-identical to the
+ * Phase 6a.2 byte-string).
+ *
+ * The Context block uses `canonicalJsonStringify` so byte-string
+ * determinism is preserved when the same context is sent twice.
+ * Warnings are appended (when present) so log observability
  * survives the round-trip.
  */
 function buildVariableSuffix(
   matched: ReadonlyArray<RankedItem>,
   context: Context | null | undefined,
   warnings: ReadonlyArray<string> | undefined,
+  intel: Intel | null | undefined,
 ): string {
   const sections: string[] = [];
+
+  // ## Intel — FIRST section in Block 2 (R-10 + AD-006 #1).
+  // Empty/null/undefined → section omitted (D-005). Empty literal
+  // (D-005 sentinel) is also omitted so the byte-string stays
+  // byte-identical to the no-intel baseline.
+  if (
+    intel !== null &&
+    intel !== undefined &&
+    (intel.agentState !== '' || intel.nextNeeds.length > 0 || intel.recentTopic !== '')
+  ) {
+    sections.push('## Intel\n' + serializeIntel(intel));
+  }
+
   const skills = matched.filter((m) => m.kind === 'skill');
   const rules = matched.filter((m) => m.kind === 'rule');
   if (skills.length > 0) {
@@ -158,6 +185,7 @@ export function buildSystemMessage(
     options.matched,
     effectiveContext,
     options.warnings,
+    options.intel,
   );
 
   const system: SystemBlock[] = [
