@@ -32,3 +32,20 @@ export {
 
 export { registerAugmentRoute, recordAugmentSuccess } from './augment.ts';
 export { registerHealthRoute } from './health.ts';
+
+// Phase 5b — audit async/fail-open runtime (D-007 CRITICAL). Additive
+// re-exports; Phase 5a consumers continue to work unchanged.
+export {
+  FLUSH_COUNT_TRIGGER,
+  FLUSH_TIME_MS,
+  RING_BUFFER_CAPACITY,
+  AuditRingBuffer,
+} from './audit/index.ts';
+export type {
+  AuditEvent,
+  AuditRow,
+  AuditWriter,
+  AuditEventType,
+  AuditBufferSnapshot,
+  FlushReason,
+} from './audit/index.ts';
