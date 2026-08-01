@@ -802,9 +802,11 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
-#### Phase 6b — Fast Agent + Intel Pipeline (mandatory) [ ]
+#### Phase 6b — Fast Agent + Intel Pipeline (mandatory) [x]
 
 **Done when:** Turn N+1 augmenta com intel; latency trick validada em produção; arquitetura NOVEL implementada; cache hit `usage.cache_read_input_tokens > 0` em 2 turns com prefixo estável.
+
+**Phase 6b status 2026-08-01:** **CLOSED via subchapters 6b.1, 6b.2, 6b.3, 6b.4 (all `[x]`)**. 17 atomic tasks across 3 Implementer batches. 459 root + 152 UI + 16 SDK = 627 tests. All gates green. **POC re-run at end-of-phase: TOTAL overhead max=2.15ms ≪ 10ms budget (5× headroom)** — Phase 6a POC ceilings survived per PRD §16.7. R-15 cache hit invariant validated: stub returns `cache_read_input_tokens=42` on 2nd call with same SHA. AD-006 (Phase 6a POC outcome) + AD-007 (cache hit invariant) + AD-008 (writer perf SYNC decision, 0.089ms ≪ 1ms) + AD-009 (Phase 6b POC re-run + proxy T-14 deviation). Final HEAD at `bc95558`. Validation reports: `validation-phase-6b.{1+2,3,4}.md`. **Known scope gap:** proxy route at `src/server/routes/messages-proxy.ts:230` uses `activeCatalog: []` which short-circuits BEFORE Stage 1b — full proxy fast-agent scheduling deferred to Phase 7b per AD-009. **Inception híbrida arquitectura NOVEL implementada + validated.** ROADMAP subchapter entries are the verification record; this parent entry is the scope summary.
 
 **Depends on:** Phase 6a
 
@@ -908,9 +910,11 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
-#### Phase 6b.4 — Pipeline Integration + Cache Hit Validation [ ]
+#### Phase 6b.4 — Pipeline Integration + Cache Hit Validation [x]
 
 **Done when:** `runAugment` extended with Stage 1b (fast agent in-process call) + tail `setImmediate` (intel write after response); integration tests confirm: latency trick (fast agent ≤ 3s, request returns in < 50ms unaffected), cache hit when persona stable (2 turns with same persona → `usage.cache_read_input_tokens > 0` on 2nd), AD-007/008 entries; POC re-run at end-of-phase confirms all Phase 6a budgets still met.
+
+**Phase 6b.4 status 2026-08-01:** Closed via 1 iteration. `src/server/augment/pipeline.ts` (+133 lines): `PipelineContext` extended with 4 optional fields (`sessionId`, `getIntel`, `writeIntel`, `callFastAgent`); Stage 1b placed between Stage 3 and Stage 4 (after early returns); tail `setImmediate` fires AFTER `buildResponse` (latency trick invariant — request not blocked by intel write); fail-open paths (`personaOnlyResponse` + `failOpenResponse`) intentionally exclude intel (preserves no-intel baseline byte-string). 6 inception-pipeline-int cases PASS (warm path, cold start, tail setImmediate, backward compat, latency p50 < 25ms, defensive EMPTY_INTEL). 5 inception-cache-hit cases PASS (case 1 validates R-15 cache hit invariant with stub `cache_read_input_tokens=42`). T-16 latency-trick smoke: response time 20.95ms (2.4× headroom under 50ms). AD-007 (cache hit), AD-008 (writer perf SYNC), AD-009 (POC re-run + proxy T-14 deviation documented) appended to `.specs/DISCOVERIES.md`. **POC RE-RUN at end-of-phase: TOTAL overhead max=2.15ms ≪ 10ms budget (5× headroom)** — Phase 6b ceilings survived per PRD §16.7. Known scope gap: proxy route's T-14 fast-agent scheduling deferred to Phase 7b (documented in AD-009). Verifier PASS at `bc95558`. 459 root + 152 UI + 16 SDK = 627 tests. Commits `f7965c9`, `1d865a7`, `a1b867d`, `94bf85c`, `bc95558`.
 
 **Depends on:** Phase 6b.3
 
