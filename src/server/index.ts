@@ -14,6 +14,7 @@ export {
   getLastRequestTimestampMs,
   recordLastRequestTimestampMs,
   resetServerMetadataForTests,
+  parsePortRangeEnv,
   type AugmentServerOptions,
   type AugmentServerHandle,
 } from './boot.ts';

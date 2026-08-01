@@ -156,8 +156,42 @@ function isMainModule(): boolean {
   );
 }
 
+// --- Env-driven port range override -----------------------------------------
+// `MEMORY_STUDIO_AUGMENT_PORT_RANGE="lo-hi"` lets users pin the server's
+// port-search range without rebuilding. Format: `"42900-43000"`. On any
+// parse failure, log a warning to stderr and fall back to
+// `DEFAULT_AUGMENT_PORT_RANGE` so the server still boots. The env var is
+// only honored when boot.ts is the entry module — programmatic imports
+// keep the explicit `options.portRange` for testability.
+
+const PORT_RANGE_ENV_VAR = 'MEMORY_STUDIO_AUGMENT_PORT_RANGE';
+const PORT_RANGE_PATTERN = /^(\d+)-(\d+)$/;
+
+export function parsePortRangeEnv(
+  raw: string | undefined,
+): [number, number] | null {
+  if (raw === undefined || raw === '') return null;
+  const match = PORT_RANGE_PATTERN.exec(raw);
+  if (match === null) return null;
+  const lo = Number(match[1]);
+  const hi = Number(match[2]);
+  if (!Number.isFinite(lo) || !Number.isFinite(hi)) return null;
+  if (lo < 0 || hi > 65_535 || lo > hi) return null;
+  return [lo, hi];
+}
+
 if (isMainModule()) {
-  createServer().then(
+  const envRange = parsePortRangeEnv(process.env[PORT_RANGE_ENV_VAR]);
+  if (process.env[PORT_RANGE_ENV_VAR] !== undefined && envRange === null) {
+    console.error(
+      `[boot] invalid ${PORT_RANGE_ENV_VAR}=${JSON.stringify(process.env[PORT_RANGE_ENV_VAR])} ` +
+        `(expected "lo-hi" with 0 <= lo <= hi <= 65535); falling back to ` +
+        `${DEFAULT_AUGMENT_PORT_RANGE[0]}-${DEFAULT_AUGMENT_PORT_RANGE[1]}`,
+    );
+  }
+  const portRange: [number, number] =
+    envRange ?? [DEFAULT_AUGMENT_PORT_RANGE[0], DEFAULT_AUGMENT_PORT_RANGE[1]];
+  createServer({ portRange }).then(
     (handle) => {
       console.log(`Memory Studio augment server: ${handle.url}`);
       let closing = false;
@@ -170,8 +204,12 @@ if (isMainModule()) {
           process.exit(0);
         }
       };
-      process.once('SIGINT', () => { void shutdown(); });
-      process.once('SIGTERM', () => { void shutdown(); });
+      process.once('SIGINT', () => {
+        void shutdown();
+      });
+      process.once('SIGTERM', () => {
+        void shutdown();
+      });
     },
     (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
