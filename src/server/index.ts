@@ -40,6 +40,8 @@ export {
   FLUSH_TIME_MS,
   RING_BUFFER_CAPACITY,
   AuditRingBuffer,
+  redactPlaceholders,
+  redactObjectRecursive,
 } from './audit/index.ts';
 export type {
   AuditEvent,

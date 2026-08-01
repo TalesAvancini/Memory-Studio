@@ -16,9 +16,8 @@ export type { AuditBufferSnapshot, FlushReason } from './buffer.ts';
 
 export type { AuditEvent, AuditRow, AuditWriter, AuditEventType } from './types.ts';
 
-// redact.ts is added by T-02 — exported here once that lands.
-// export {
-//   redactPlaceholders,
-//   redactObjectRecursive,
-//   PLACEHOLDER_PATTERNS,
-// } from './redact.ts';
+export {
+  redactPlaceholders,
+  redactObjectRecursive,
+  PLACEHOLDER_PATTERNS,
+} from './redact.ts';
