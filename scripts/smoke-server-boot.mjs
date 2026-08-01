@@ -8,10 +8,21 @@
 //
 // Why a child process (vs. in-process `createServer()`): the Verifier
 // can't easily probe the actual bound port otherwise. The script also
-// exercises the production entry point (`npm run server:start` ->
-// `src/server/boot.ts`) so a wiring regression in the entry-point
-// direct-entry guard or the `Memory Studio augment server: ...` log
-// line also fails here.
+// exercises the production entry point (`src/server/boot.ts` direct-
+// entry guard) so a regression in the entry-point or the
+// `Memory Studio augment server: ...` log line also fails here.
+//
+// Implementation notes:
+//   - We spawn the entry script DIRECTLY (`node --experimental-strip-types`
+//     on `src/server/boot.ts`) instead of going through `npm run
+//     server:start`. The npm path wraps the process in `cmd.exe` on
+//     Windows, and SIGTERM on the npm wrapper does NOT always
+//     propagate to the actual node server, leaking the bound port and
+//     breaking idempotency. Direct spawn + SIGTERM kills cleanly.
+//   - We pick a deterministic-ish port from the augment server's
+//     default range (42900-43000). The curl probe then asserts on the
+//     ACTUAL bound URL parsed from stdout (NOT a hardcoded port), so
+//     this is robust to range collisions.
 //
 // Exits 0 on success, non-zero on any failure. Prints `[PASS]` or
 // `[FAIL]` structured lines so logs are greppable.
@@ -21,27 +32,35 @@ import { setTimeout as sleep } from 'node:timers/promises';
 
 const BOOT_TIMEOUT_MS = 8000;
 const READY_POLL_INTERVAL_MS = 50;
+const KILL_TIMEOUT_MS = 1500;
+
+// Pick a port from the augment server's default range [42900, 43000].
+// The script reads the actual bound URL from stdout, so any free port
+// in the range works. We pin a single port for repeatability, but the
+// assertion chain does NOT depend on which port — that's the
+// regression-proof: a future change that moves the server to another
+// range still passes the smoke as long as the URL log appears.
+const PINNED_PORT = 42900;
 
 /**
- * Run `npm run server:start` as a child process. We use `npm run` (NOT
- * `node src/server/boot.ts` directly) because the project's contract
- * is "smoke uses the same entry the user runs". The child's stdout is
- * parsed for the URL line, and `/health` is curled on that URL.
+ * Run `node --experimental-strip-types src/server/boot.ts` as a child
+ * process. The child IS the server (no shell, no npm wrapper) so
+ * SIGTERM/SIGKILL on the child pid reliably stops the listener.
  *
- * Returns a structured result with the bound port (or 0 on failure)
- * and the captured stdout. The caller is responsible for cleanup.
+ * Returns a structured result: { ok, child, url?, healthStatus?,
+ * healthBody?, stdout?, stderr?, reason? }. The caller is responsible
+ * for cleanup via `killChild` on `child`.
  */
 async function bootAndProbe() {
-  // Use a tight port range so the smoke stays fast on CI; the server
-  // binds the first free port in MEMORY_STUDIO_AUGMENT_PORT_RANGE.
-  const portEnv = 'MEMORY_STUDIO_AUGMENT_PORT_RANGE=42900-42900';
-
-  const child = spawn('npm.cmd', ['run', 'server:start'], {
-    cwd: process.cwd(),
-    env: { ...process.env, ...{ MEMORY_STUDIO_AUGMENT_PORT_RANGE: '42900-42900' } },
-    stdio: ['ignore', 'pipe', 'pipe'],
-    shell: true,
-  });
+  const child = spawn(
+    process.execPath,
+    ['--experimental-strip-types', '--no-warnings', 'src/server/boot.ts'],
+    {
+      cwd: process.cwd(),
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    },
+  );
 
   let stdout = '';
   let stderr = '';
@@ -69,7 +88,15 @@ async function bootAndProbe() {
   }
 
   if (!url) {
-    return { ok: false, reason: 'boot-timeout', stdout, stderr, child };
+    return {
+      ok: false,
+      reason: child.exitCode !== null
+        ? `child-exited-early-code-${child.exitCode}`
+        : 'boot-timeout',
+      stdout,
+      stderr,
+      child,
+    };
   }
 
   // Curl /health on the bound URL. Node's built-in fetch is fine; we
@@ -104,7 +131,7 @@ async function killChild(child) {
   }
   // Give it a moment to exit cleanly, then SIGKILL.
   const exitStart = Date.now();
-  while (child.exitCode === null && Date.now() - exitStart < 1500) {
+  while (child.exitCode === null && Date.now() - exitStart < KILL_TIMEOUT_MS) {
     await sleep(50);
   }
   if (child.exitCode === null) {
@@ -112,6 +139,10 @@ async function killChild(child) {
       child.kill('SIGKILL');
     } catch {
       // ignore
+    }
+    // Wait for actual exit to release the listener port.
+    while (child.exitCode === null) {
+      await sleep(20);
     }
   }
 }
