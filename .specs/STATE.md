@@ -90,7 +90,8 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Planner Phase 6a (POC Validation: hot path + fast agent. Inception híbrida mandatory per ROADMAP. Validates §10.1 item 12 via real Claude Code session hitting `MEMORY_STUDIO_AUGMENT_PORT` server)
+- **próximo-step-concreto:** dispatch Implementer Phase 6a single batch (11 POC tasks: T-01..T-04 hot path overhead + T-05..T-08 fast agent latency + T-09..T-11 byte-string + AD-006 decision record)
+- **phase-6a-plan:** Planner artifacts at `.specs/features/phase-6a-poc-validation/{spec.md, design.md, tasks.md}` (commit `ddc7c0c`). 11 atomic POC tasks across 3 sub-chapters (6a.1 hot path, 6a.2 fast agent, 6a.3 byte-string + AD-006). Single Implementer batch (all measurement scripts, no production code). Pass/fail thresholds are p95 with 10 amostras + 5 warmup.
 - **working-tree:** working (`loop/phase-0` em `c7e7a8d`)
 - **lessons-store:** L-001..L-006 (Phase 1+3) + L-007 (Phase 5a.2: API 429 mid-task recovery) + L-008 (Phase 5b.3: deferred-wiring pattern for contractually-correct no-op fallback)
 - **working-tree:** working (`loop/phase-0` em `b6ced99`)

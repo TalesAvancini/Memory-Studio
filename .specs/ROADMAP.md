@@ -742,6 +742,58 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
+> **Phase 6a split (2026-08-01) — 3 subchapters per Planner recommendation (11 atomic POC tasks, single Implementer batch — all measurement scripts, no production code).**
+> Each subchapter is a fresh phase with own Planner→Implementer→Verifier cycle.
+> Source: `.specs/features/phase-6a-poc-validation/{spec.md, design.md, tasks.md}` (commit `ddc7c0c`).
+> Key decisions: Hot path overhead = PRIMARY criterion (PRD §10.2 budget); fast agent = `MiniMax-M2.7-highspeed` at `https://api.minimax.io/anthropic` with stub fallback (marked `[STUB]`); byte-string determinism uses inline `buildSystemMessageWithIntel()` helper (Phase 6b formalizes); AD-006 decision record mandatory in `.specs/DISCOVERIES.md` (load-bearing for Phase 6b's per-request latency budget); pass/fail thresholds are p95 with 10 amostras + 5 warmup.
+
+#### Phase 6a.1 — Hot Path Overhead POC [ ]
+
+**Done when:** 3 incremental costs measured (sqlite.get(intel) p95<5ms, concat(intel+prompt) p95<1ms, template render p95<1ms) and TOTAL hot path overhead p95<10ms (PRIMARY). Consolidated into `poc-result-6a.1.md` with raw timing samples.
+
+**Depends on:** Phase 5b
+
+**Scope (T-01..T-04):**
+- `scripts/poc-hot-path-harness.mjs` — boots augment server in-process via `app.inject()`; ONNX stubbed with cached 384d Float32Array; measures delta over no-op baseline (NOT full Phase 5a.4 pipeline ~1.91ms); 10 amostras + 5 warmup per component
+- `test/poc/hot-path-components.test.mjs` — 4 tests: harness scaffold + sqlite.get + concat + template render
+- `docs/poc-result-6a.1.md` — raw samples + p95 + decision (adjust if any target fails)
+
+**Output:** hot path overhead POC validated (or adjustment recommended in AD-006).
+
+---
+
+#### Phase 6a.2 — Fast Agent Latency POC [ ]
+
+**Done when:** real `MiniMax-M2.7-highspeed` latency p95<3s over 10 amostras (when `MINIMAX_API_KEY` env var set); stub fallback produces `[STUB]`-marked outputs when key unset. Consolidated into `poc-result-6a.2.md`.
+
+**Depends on:** Phase 6a.1
+
+**Scope (T-05..T-08):**
+- `scripts/stub-fast-agent.mjs` — Anthropic-compatible POST `/v1/messages` on port 47200, deterministic `Intel` literal response, `SIMULATED_LATENCY_MS=200ms` default, every log line prefixed `[STUB]`
+- `scripts/poc-fast-agent-harness.mjs` — tries `MINIMAX_API_KEY`; falls back to stub if unset; logs `[fast-agent] MODE=real|stub`; 10 amostras with 5 warmup
+- `test/poc/fast-agent.test.mjs` — 8 tests: stub fallback mode + real-mode contract + latency p95 budget
+- `docs/poc-result-6a.2.md` — raw samples + p95 + decision (adjust if real API exceeds budget; stub mode = human intervention required)
+
+**Output:** fast agent latency POC validated (or alternative model recommended).
+
+---
+
+#### Phase 6a.3 — Byte-String + AD-006 [ ]
+
+**Done when:** 2 inputs with identical (persona + intel + Skills) produce identical SHA-256 byte-string; SPEC §IMod-5 Intel schema validated (graceful degradation on empty fields); AD-006 decision recorded in `.specs/DISCOVERIES.md` with POC result summary.
+
+**Depends on:** Phase 6a.2
+
+**Scope (T-09..T-11):**
+- `scripts/poc-byte-string-harness.mjs` — inline `:memory:` SQLite with `intel(session_id, agent_state, next_needs, recent_topic, ts)` DDL; inline `buildSystemMessageWithIntel()` helper; uses existing `canonicalSha256()` from `src/server/augment/byte-string.ts` (read-only)
+- `test/poc/byte-string-determinism.test.mjs` — 4 tests: equality + schema literal + JSON round-trip + graceful degradation
+- `test/poc/intel-schema.test.mjs` — 6 tests: D-005 hardening (literal shape, empty fields OK, type validation)
+- `.specs/DISCOVERIES.md` AD-006 entry — POC results table + adjustment recommendations + Phase 6b per-request latency budget derivation
+
+**Output:** byte-string determinism POC + AD-006 decision record.
+
+---
+
 #### Phase 6b — Fast Agent + Intel Pipeline (mandatory) [ ]
 
 **Done when:** Turn N+1 augmenta com intel; latency trick validada em produção; arquitetura NOVEL implementada; cache hit `usage.cache_read_input_tokens > 0` em 2 turns com prefixo estável.
