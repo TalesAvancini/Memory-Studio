@@ -425,9 +425,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 5a — API + Retrieval + Byte-string [ ]
+#### Phase 5a — API + Retrieval + Byte-string [x]
 
 **Done when:** `/augment` smoke test com Claude Code; byte-string determinístico (SHA256); cache do provedor hit verificado em log; p50<50ms.
+
+**Phase 5a status 2026-08-01:** **CLOSED via subchapters 5a.1, 5a.2, 5a.3, 5a.4 (all `[x]`)**. 13 atomic commits across 4 Implementer batches. 309 root + 152 UI + 16 SDK = 477 tests. All 13 gates green (typecheck, verify-env, build-index, catalog:load, smoke-server-boot, smoke-augment-server, UI/SDK tests, fastify single version, perf p50<50ms p99<200ms with ~30× headroom, scope guard empty, test:idempotent 2× stable). Final HEAD at `701a2f2`. Validation reports: `validation-phase-5a.{1,2,2-iter2,2-iter3,3,4}.md`. **Discovery for Phase 5b:** R-06 `agentId` restriction deferred (documented in `src/server/schema.ts:12-17` as intentional MVP exception). ROADMAP subchapter entries are the verification record; this parent entry is the scope summary.
 
 **Depends on:** Phase 1, Phase 3, Phase 4
 
@@ -541,7 +543,7 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 5a.4 — Perf + Hardening [ ]
+#### Phase 5a.4 — Perf + Hardening [x]
 
 **Done when:** perf harness reports `min/median/p95/p99` across N=3 rounds × 1000 requests; gates `median < 50ms` AND `p99 < 200ms`; e2e route + entry point + `package.json` wiring complete; full gate passes.
 
@@ -553,6 +555,8 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 - Final phase closeout smoke + full gate
 
 **Output:** measured perf within budget; server fully integrated.
+
+**Phase 5a.4 status 2026-08-01:** Closed via 1 iteration. T-12 perf harness: median=1.91ms, p99=6.24ms across 3 rounds × 1000 requests (~30× under 50ms/200ms budget). T-13 e2e route + concurrent load (10/10 simultaneous 200s, server stable): `test/augment/route-e2e.test.mjs` 394 lines, 10 test cases. LOW follow-ups both done: `MEMORY_STUDIO_AUGMENT_PORT_RANGE` env var wired into `boot.ts` (16-case unit test, manual smoke verified), `smoke:augment-server` package.json script added. Final scope guard clean: `git diff 5cf6894..HEAD -- <locked-layers>` empty. Verifier PASS at `701a2f2`. 309 root + 152 UI + 16 SDK = 477 tests. Validation report: `.specs/features/phase-5a-api-retrieval/validation-phase-5a.4.md`. Commits `5731b6b`, `6116585`, `e6e6e5f`, `701a2f2`. **Discovery flagged:** spec.md R-06 says `agentId` MUST equal "claude-code" but `src/server/schema.ts:56-62` has `z.string()` unrestricted — documented as intentional MVP exception deferred to Phase 5b proxy-layer visibility.
 
 ---
 
