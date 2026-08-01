@@ -126,11 +126,29 @@
       ],
       "created": "2026-08-01T03:36:37Z",
       "last_seen": "2026-08-01T03:36:37Z"
+    },
+    {
+      "id": "L-008",
+      "key": "spec_deviation::when wiring a route that depends on optional service dependencies catalog rebuild loader provide a contractually correct no op fallback so the route stays testable bootable but document the fallback in the file header lines 17 23 here so the deferred wiring gap is grep able for a follow up phase phase 5b 3 t 09 wired post catalog rebuild with a fallback rebuild that returns getcatalogsummary count route works contractually 200 idempotent mutex but cannot recover from corrupted catalog real rebuild temp rename deferred pending stable yaml catalog dir embedder",
+      "text": "When wiring a route that depends on optional service dependencies (catalog rebuild loader), provide a contractually-correct no-op fallback so the route stays testable + bootable, but DOCUMENT the fallback in the file header (lines 17-23 here) so the deferred-wiring gap is grep-able for a follow-up phase. Phase 5b.3 T-09 wired POST /catalog/rebuild with a FALLBACK_REBUILD that returns getCatalogSummary.count — route works contractually (200 + idempotent + mutex) but cannot recover from corrupted catalog. Real rebuild (TEMP+rename) deferred pending stable YAML catalog dir + embedder.",
+      "signal": "spec_deviation",
+      "scope": "Phase 5b deferral wiring pattern",
+      "status": "candidate",
+      "features": [
+        "phase-5b.3"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "src/server/routes/catalog-rebuild.ts:55-65 (Phase 5b deferral wiring pattern)"
+      ],
+      "created": "2026-08-01T08:03:39Z",
+      "last_seen": "2026-08-01T08:03:39Z"
     }
   ],
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
   "schema": 1,
-  "next_id": 8
+  "next_id": 9
 }

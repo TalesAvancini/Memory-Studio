@@ -74,8 +74,9 @@ related:
 
 ## Handoff
 
-- **phase:** "Phase 5b — Audit + Endpoints + Security"
-- **phase-previous:** "Phase 5a — API + Retrieval + Byte-string" (DONE 2026-08-01 via subchapters 5a.1, 5a.2, 5a.3, 5a.4. 13 atomic commits. 309 root + 152 UI + 16 SDK = 477 tests. All gates green. Final HEAD at `701a2f2`. Sub-phases: 5a.1 Server Foundation (`5cf6894`), 5a.2 Retrieval Pipeline (`3fe84ba`), 5a.3 Tests + Smoke (`ad8be1c`), 5a.4 Perf + Hardening (`701a2f2`))
+- **phase:** "Phase 6a — POC Validation (hot path + fast agent)"
+- **phase-previous:** "Phase 5b — Audit + Endpoints + Security" (DONE 2026-08-01 via subchapters 5b.1, 5b.2, 5b.3, 5b.4. 11 atomic commits. 391 root + 152 UI + 16 SDK = 559 tests. All gates green. Final HEAD at `c7e7a8d`. Sub-phases: 5b.1 Audit Foundation (`d232927`), 5b.2 Read Endpoints (`351ca9e`), 5b.3 Write Endpoints + R-06 (`76b7951`), 5b.4 Transparent Proxy (`c7e7a8d`). Deferred gap documented: POST /catalog/rebuild uses FALLBACK no-op — real TEMP+rename swap deferred pending stable YAML catalog dir + embedder)
+- **phase-5a-status:** "Phase 5a — API + Retrieval + Byte-string" (DONE 2026-08-01 via subchapters 5a.1, 5a.2, 5a.3, 5a.4. 13 atomic commits. 309 root + 152 UI + 16 SDK = 477 tests. All gates green. Final HEAD at `701a2f2`)
 - **phase-5a.2:** "Phase 5a.2 — Retrieval Pipeline" (DONE 2026-08-01, 3 iterations — iter 1 FAIL on G1 CRITICAL tiebreak, iter 2 Implementer died API 429 with FT-01/02 committed, iter 3 Windows cleanup + R-14 fail-open. Verifier iter 3 PASS. ~443 tests: 275 root + 152 UI + 16 SDK. Commits `fe07efa`, `526ddf5`, `23f6242`, `17a0d32`, `3fe84ba`)
 - **phase-5a.1:** "Phase 5a.1 — Server Foundation" (DONE 2026-07-31, 1 iteration, Verifier PASS commit `5cf6894`, ~395 tests: 227 root + 152 UI + 16 SDK)
 - **phase-4-status:** "Phase 4 (UI Panel) entire phase DONE via subchapters 4.1, 4.2, 4.3, 4.4 — all `[x]`. 375 tests total."
@@ -89,9 +90,9 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Implementer Batch 2 Phase 5b (5b.3 Write Endpoints + R-06 + 5b.4 Transparent Proxy, T-09..T-14 = 6 atomic tasks: POST /catalog/rebuild + POST /state/toggle + tighten agentId to literal 'claude-code' + /v1/messages proxy + local-only allowlist + Claude Code integration)
-- **phase-5b.1-status:** "Phase 5b.1 — Audit Foundation" (DONE 2026-08-01, 1 iteration, Verifier PASS at `351ca9e`, 352 root + 152 UI + 16 SDK = 520 tests. Audit buffer fail-open verified end-to-end. Commits `0031787`, `4724309`, `d232927`)
-- **phase-5b.2-status:** "Phase 5b.2 — Read Endpoints" (DONE 2026-08-01, 1 iteration, Verifier PASS at `351ca9e`. GET /catalog + /audit + /audit/summary + enhanced /health. Perf gate <100ms/30d verified. Commits `17d562f`, `351ca9e`)
+- **próximo-step-concreto:** dispatch Planner Phase 6a (POC Validation: hot path + fast agent. Inception híbrida mandatory per ROADMAP. Validates §10.1 item 12 via real Claude Code session hitting `MEMORY_STUDIO_AUGMENT_PORT` server)
+- **working-tree:** working (`loop/phase-0` em `c7e7a8d`)
+- **lessons-store:** L-001..L-006 (Phase 1+3) + L-007 (Phase 5a.2: API 429 mid-task recovery) + L-008 (Phase 5b.3: deferred-wiring pattern for contractually-correct no-op fallback)
 - **working-tree:** working (`loop/phase-0` em `b6ced99`)
 - **phase-5b-plan:** Planner artifacts at `.specs/features/phase-5b-aux-endpoints/{spec.md, design.md, tasks.md}` (commit `b6ced99`). 14 atomic tasks across 4 sub-chapters (5b.1 audit foundation, 5b.2 read endpoints, 5b.3 write endpoints + R-06, 5b.4 transparent proxy). 2 Implementer batches of 8+6.
 - **lessons-store:** L-001..L-004 (Phase 1) + L-005/L-006 (Phase 3) + L-007 (Phase 5a.2: API 429 mid-task recovery pattern)

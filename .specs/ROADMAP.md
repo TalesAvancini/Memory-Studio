@@ -560,9 +560,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 5b — Audit + Endpoints + Security [ ]
+#### Phase 5b — Audit + Endpoints + Security [x]
 
 **Done when:** 5 auxiliary endpoints respondendo (catalog/catalog-rebuild/audit/audit-summary/health/state-toggle); audit async+fail-open; security invariants honrados.
+
+**Phase 5b status 2026-08-01:** **CLOSED via subchapters 5b.1, 5b.2, 5b.3, 5b.4 (all `[x]`)**. 11 atomic commits across 2 Implementer batches. 391 root + 152 UI + 16 SDK = 559 tests. All gates green. Endpoints: GET /catalog, GET /audit, GET /audit/summary, POST /catalog/rebuild, POST /state/toggle, enhanced GET /health. Audit: D-007 CRITICAL fail-open verified end-to-end (independently), count=100 + time=1000ms triggers, ring cap 10000. Redact: 4 placeholder patterns + recursive. Tenant-hash: sha256[0:16]. R-06 agentId restriction enforced at `schema.ts:58`. Transparent proxy at `/v1/messages` with local-only allowlist; disabled by default (503 if `MEMORY_STUDIO_ANTHROPIC_BASE_URL` missing); Claude Code integration ready. Final HEAD at `c7e7a8d`. Validation reports: `validation-phase-5b.{1+2,3+4}.md`. **Deferred gap:** POST /catalog/rebuild production wiring uses FALLBACK no-op (cannot recover from corrupted catalog). Real TEMP+rename swap deferred pending stable YAML catalog dir + embedder — flagged for Phase 5c/7a follow-up. ROADMAP subchapter entries are the verification record; this parent entry is the scope summary.
 
 **Depends on:** Phase 5a
 
@@ -659,9 +661,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 5b.3 — Write Endpoints + R-06 [ ]
+#### Phase 5b.3 — Write Endpoints + R-06 [x]
 
 **Done when:** `POST /catalog/rebuild` (TEMP DB + atomic rename + mutex) is idempotent + safe during concurrent requests; `POST /state/toggle` (Promise-based Mutex) accepts `action: on|off` + optional `critical_confirm`; **`agentId` restricted to literal `"claude-code"`** at `src/server/schema.ts:56-62` (Phase 5a.4 R-06 drift resolved); Phase 5a.4 substitute test (`missing fingerprint → 400`) replaced with spec-correct case (`agentId: "cursor" → 400`).
+
+**Phase 5b.3 status 2026-08-01:** Closed via 1 iteration. POST /catalog/rebuild: contractually correct (idempotent, mutex-serialized, `setLastRebuildTs` called) — but **production wiring uses FALLBACK no-op** (`src/server/routes/catalog-rebuild.ts:55-65`). Real TEMP-DB + atomic-rename swap deferred pending stable YAML catalog dir + embedder (file header lines 17-23 document this). Endpoint cannot recover from corrupted catalog in MVP — flagged as documented gap. POST /state/toggle: inline Promise Mutex, Zod body validation, critical_confirm_required enforcement. Synthetic tenantId `hashTenantId('state-toggle-tenant')` for audit column NOT NULL constraint — acceptable per spec. R-06 schema tightened: `z.string()` → `z.literal('claude-code', { errorMap })` at `schema.ts:58`; MVP-exception comment removed (lines 12-17). 0 test replacements needed (all 14 agentId usages already canonical). Phase 5a.4 substitute test REPLACED with `agentId: "cursor" → 400` + `agentId missing → 400` cases. Verifier PASS at `f643595`. 391 root + 152 UI + 16 SDK = 559 tests. Validation: `.specs/features/phase-5b-aux-endpoints/validation-phase-5b.3+5b.4.md`. Commits `f643595`, `17501b3`, `76b7951`.
 
 **Depends on:** Phase 5b.2
 
@@ -674,9 +678,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 5b.4 — Transparent Proxy [ ]
+#### Phase 5b.4 — Transparent Proxy [x]
 
 **Done when:** `POST /v1/messages` proxies Anthropic requests to upstream (`MEMORY_STUDIO_ANTHROPIC_BASE_URL`); disabled by default (returns 503 `proxy_disabled` if env var missing); audit event `messages_proxy` enqueued with `cache_read_input_tokens` from upstream response; proxy allowlist rejects non-loopback upstream hosts (PRD §10.3.4); `scripts/smoke-proxy-local-only.mjs` proves zero external requests via network capture.
+
+**Phase 5b.4 status 2026-08-01:** Closed via 1 iteration. POST /v1/messages: 503 `proxy_disabled` when env missing; otherwise extracts first user message, builds internal AugmentRequest, calls `runAugment()` in-process, rewrites `system` to Memory Studio's 2-block structure (`buildSystemMessage(...).system`), forwards via Node 22 fetch, captures `usage.cache_read_input_tokens` + `cache_creation_input_tokens`. Audit `event_type: 'messages_proxy'` enqueued with cache metrics + `redactedPromptHash` + `tenantId_hashed` + matched_ids. Failure semantics NOT fail-open (502 `augment_failed` on pipeline error — proxy IS the LLM agent's failure signal). Proxy allowlist at `src/server/security/proxy-allowlist.ts` with `LOOPBACK_HOSTS = {'127.0.0.1', 'localhost', '::1'}`. Stub smoke at `scripts/smoke-proxy-local-only.mjs` (333 lines, 10/10 checks, ~7.5s) confirmed stub observed exactly 1 request → zero external network calls. Verifier PASS at `c7e7a8d`. Commits `8234eb7`, `a54bca2`, `c7e7a8d`.
 
 **Depends on:** Phase 5b.3
 

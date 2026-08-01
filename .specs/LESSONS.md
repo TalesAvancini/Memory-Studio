@@ -58,6 +58,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: orchestrator pattern (session handoff-orchestrator.md) (loop orchestration + API 429 recovery)
 - last seen: 2026-08-01T03:36:37Z
 
+### L-008 — When wiring a route that depends on optional service dependencies (catalog rebuild loader), provide a contractually-correct no-op fallback so the route stays testable + bootable, but DOCUMENT the fallback in the file header (lines 17-23 here) so the deferred-wiring gap is grep-able for a follow-up phase. Phase 5b.3 T-09 wired POST /catalog/rebuild with a FALLBACK_REBUILD that returns getCatalogSummary.count — route works contractually (200 + idempotent + mutex) but cannot recover from corrupted catalog. Real rebuild (TEMP+rename) deferred pending stable YAML catalog dir + embedder.
+- signal: `spec_deviation` · recurrence: 1 feature(s) · scope: `Phase 5b deferral wiring pattern` · harmful: 0
+- features: phase-5b.3
+- evidence: src/server/routes/catalog-rebuild.ts:55-65 (Phase 5b deferral wiring pattern)
+- last seen: 2026-08-01T08:03:39Z
+
 ## Quarantined (failed when applied — ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
