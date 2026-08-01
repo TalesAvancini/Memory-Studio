@@ -619,6 +619,72 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
+> **Phase 5b split (2026-08-01) — 4 subchapters per Planner recommendation (14 atomic tasks, dependency-seam boundaries).**
+> Each subchapter is a fresh phase with own Planner→Implementer→Verifier cycle.
+> Source: `.specs/features/phase-5b-aux-endpoints/{spec.md, design.md, tasks.md}` (commit `b6ced99`).
+> Key decisions: Audit buffer at `src/server/audit/buffer.ts` (count=100 OR time=1000ms triggers, fail-open try/catch, ring buffer cap 10000); transparent proxy disabled by default (env var `MEMORY_STUDIO_ANTHROPIC_BASE_URL`, returns 503 if missing); R-06 agentId restriction enforced at `src/server/schema.ts:56-62` (Phase 5a.4 MVP-exception comment removed); no new npm deps; empty catalog D-008 already shipped in 5a.2 pipeline.ts:172-203; 2 Implementer batches (5b.1+5b.2 = 8 tasks, 5b.3+5b.4 = 6 tasks).
+
+#### Phase 5b.1 — Audit Foundation [ ]
+
+**Done when:** audit buffer module (`src/server/audit/buffer.ts`) enforces count=100 OR time=1000ms flush triggers, fail-open on SQLite write errors, ring buffer cap 10000; audit row schema matches PRD §10.3.1 (zero raw persistence); tenantId hashing at `src/server/security/tenant-hash.ts` (sha256[0:16]); 003_audit_events_ts_index.sql migration applied.
+
+**Depends on:** Phase 5b
+
+**Scope (T-01..T-04):**
+- `src/server/audit/buffer.ts` — in-memory ring buffer + count/time triggers + fail-open try/catch + shutdown flush in `boot.ts` SIGTERM handler
+- `src/server/audit/redact.ts` — 4 placeholder regex patterns (`${VAR}=value`, `password|token|api_key|secret_key=`, `sk-...`, `Bearer ...`); recursive redaction for objects
+- `src/server/security/tenant-hash.ts` — extract tenantId hashing from `src/server/augment.ts:51-54`; emit `tenantId_hashed` (sha256[0:16] = 16 hex chars)
+- `src/catalog/migrations/003_audit_events_ts_index.sql` — additive perf index on `audit_events.ts` (existing 001_init.sql table shape preserved)
+
+**Output:** audit buffer wired + 10000-event ring cap + perf index + security helpers + unit tests.
+
+---
+
+#### Phase 5b.2 — Read Endpoints [ ]
+
+**Done when:** `GET /catalog`, `GET /audit`, `GET /audit/summary`, enhanced `GET /health` (with `audit_buffer.{depth, capacity, last_flush_ts}` + `catalog.{count, last_rebuild_ts}`) all return 200 with documented contracts; `/audit` query <100ms / 30 dias.
+
+**Depends on:** Phase 5b.1
+
+**Scope (T-05..T-08):**
+- `src/server/routes/catalog.ts` — GET returns full catalog YAML + embeddings metadata (no raw embeddings, just presence + hash)
+- `src/server/routes/audit.ts` — GET returns last N augmentations redacted; `/audit/summary` returns daily rollups; sub-100ms perf gate verified with 1000-row seed
+- `src/server/health/route.ts` — extend payload with `audit_buffer.{depth, capacity, last_flush_ts}` + `catalog.{count, last_rebuild_ts}` blocks; backward-compatible with Phase 5a.1
+
+**Output:** 3 read endpoints + enhanced /health + perf subtest for /audit.
+
+---
+
+#### Phase 5b.3 — Write Endpoints + R-06 [ ]
+
+**Done when:** `POST /catalog/rebuild` (TEMP DB + atomic rename + mutex) is idempotent + safe during concurrent requests; `POST /state/toggle` (Promise-based Mutex) accepts `action: on|off` + optional `critical_confirm`; **`agentId` restricted to literal `"claude-code"`** at `src/server/schema.ts:56-62` (Phase 5a.4 R-06 drift resolved); Phase 5a.4 substitute test (`missing fingerprint → 400`) replaced with spec-correct case (`agentId: "cursor" → 400`).
+
+**Depends on:** Phase 5b.2
+
+**Scope (T-09..T-11):**
+- `src/server/routes/catalog-rebuild.ts` — TEMP DB build + atomic rename; mutex scope = file rename (not rebuild computation); concurrent `/augment` requests during rebuild stay 200
+- `src/server/routes/state-toggle.ts` — Promise-based inline `class Mutex`; writes `.memory-studio/state.json`; validates `critical_confirm: "OVERRIDE: <itemId>"` (or YAML override) for critical Rule toggles
+- `src/server/schema.ts:56-62` — tighten `agentId` from `z.string()` to `z.literal('claude-code')` with custom errorMap; remove MVP-exception comment at `src/server/schema.ts:12-17`; audit all `test/augment/*.test.mjs` for non-canonical `agentId` and replace
+
+**Output:** 2 write endpoints + R-06 schema tightened + state.json persistence + concurrent rebuild safety test.
+
+---
+
+#### Phase 5b.4 — Transparent Proxy [ ]
+
+**Done when:** `POST /v1/messages` proxies Anthropic requests to upstream (`MEMORY_STUDIO_ANTHROPIC_BASE_URL`); disabled by default (returns 503 `proxy_disabled` if env var missing); audit event `messages_proxy` enqueued with `cache_read_input_tokens` from upstream response; proxy allowlist rejects non-loopback upstream hosts (PRD §10.3.4); `scripts/smoke-proxy-local-only.mjs` proves zero external requests via network capture.
+
+**Depends on:** Phase 5b.3
+
+**Scope (T-12..T-14):**
+- `src/server/security/proxy-allowlist.ts` — `LOOPBACK_HOSTS = {'127.0.0.1', 'localhost', '::1'}`; rejects any non-loopback upstream
+- `src/server/routes/messages-proxy.ts` — extracts first user message from Anthropic request, builds internal `AugmentRequest`, calls `runAugment()` in-process (no HTTP hop), rewrites `system` field to Memory Studio's 2-block structure, forwards to upstream, captures `usage.cache_read_input_tokens` + `cache_creation_input_tokens` for audit; returns 502 on pipeline errors (NOT fail-open — proxy is the LLM agent's failure signal)
+- `scripts/smoke-proxy-local-only.mjs` — boots proxy on `MEMORY_STUDIO_AUGMENT_PORT_RANGE=47100-47100`, points `MEMORY_STUDIO_ANTHROPIC_BASE_URL` to local stub on 47200, sends 1 `/v1/messages`, asserts (a) proxy works, (b) no external network requests observed, (c) audit row contains `cacheReadInputTokens`
+
+**Output:** proxy route + allowlist + local-only smoke + Claude Code `ANTHROPIC_BASE_URL` integration ready.
+
+---
+
 #### Phase 6a — POC Validation (hot path + fast agent) [ ]
 
 **Done when:** inception híbrida valida overhead hot path <10ms E fast agent <3s em 10 amostras; targets medidos, não estimados.

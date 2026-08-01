@@ -89,8 +89,9 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Planner Phase 5b (6 auxiliary endpoints: /catalog, /catalog/rebuild, /audit, /audit/summary, /state/toggle, + transparent proxy layer for ANTHROPIC_BASE_URL + audit async/fail-open D-007 CRITICAL + R-06 agentId restriction pick-up)
-- **working-tree:** working (`loop/phase-0` em `701a2f2`)
+- **próximo-step-concreto:** dispatch Implementer Batch 1 Phase 5b (5b.1 Audit Foundation + 5b.2 Read Endpoints, T-01..T-08 = 8 atomic tasks: audit buffer + count/time triggers + fail-open + ring cap 10000 + redact + tenant hash + ts perf index + 3 GET endpoints + /health enhancement)
+- **working-tree:** working (`loop/phase-0` em `b6ced99`)
+- **phase-5b-plan:** Planner artifacts at `.specs/features/phase-5b-aux-endpoints/{spec.md, design.md, tasks.md}` (commit `b6ced99`). 14 atomic tasks across 4 sub-chapters (5b.1 audit foundation, 5b.2 read endpoints, 5b.3 write endpoints + R-06, 5b.4 transparent proxy). 2 Implementer batches of 8+6.
 - **lessons-store:** L-001..L-004 (Phase 1) + L-005/L-006 (Phase 3) + L-007 (Phase 5a.2: API 429 mid-task recovery pattern)
 - **next-pending-action:** save L-007 lesson (recurrence=2), then dispatch Implementer Phase 5a.3 (T-09 byte-string equality + T-10 tiebreak stress [already done as byte-string-determinism.test.mjs] + T-11 end-to-end smoke + Claude Code integration guide)
 - **phase-3-feature-dir:** `.specs/features/phase-3-sdk-client/{spec.md, design.md, tasks.md, validation.md}` (commit `fe20a66`)
