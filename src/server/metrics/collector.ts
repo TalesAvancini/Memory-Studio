@@ -87,12 +87,22 @@ export function recordProxySample(opts: {
  * Translate `AugmentResponse.emptyReason` to the buffer's
  * `AugmentOutcome`. The mapping is enforced here (not in the
  * buffer) so the buffer's API stays clean and self-documenting.
+ *
+ * Per spec.md R-1 denominator table, the EXCLUDED outcomes are:
+ *   - 'social'
+ *   - 'no_active_items'
+ *   - 'timeout'
+ * Other emptyReason values ('low_confidence' is the only other
+ * defined one — it indicates matched.count === 0 after thresholds,
+ * not a pipeline failure) are counted as 'measured'.
  */
 function outcomeFromEmptyReason(emptyReason: string | null): AugmentOutcome {
   if (emptyReason === null) return 'measured';
   if (emptyReason === 'social') return 'social';
   if (emptyReason === 'no_active_items') return 'no_active_items';
   if (emptyReason === 'timeout') return 'timeout';
-  // Defensive fallback — should not happen, but log silently.
+  // 'low_confidence' (the only other defined value) and any
+  // unknown future value default to 'measured' — the request DID
+  // reach the retrieval stage; it just returned 0 matches.
   return 'measured';
 }
