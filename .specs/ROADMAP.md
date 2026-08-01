@@ -624,9 +624,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 > Source: `.specs/features/phase-5b-aux-endpoints/{spec.md, design.md, tasks.md}` (commit `b6ced99`).
 > Key decisions: Audit buffer at `src/server/audit/buffer.ts` (count=100 OR time=1000ms triggers, fail-open try/catch, ring buffer cap 10000); transparent proxy disabled by default (env var `MEMORY_STUDIO_ANTHROPIC_BASE_URL`, returns 503 if missing); R-06 agentId restriction enforced at `src/server/schema.ts:56-62` (Phase 5a.4 MVP-exception comment removed); no new npm deps; empty catalog D-008 already shipped in 5a.2 pipeline.ts:172-203; 2 Implementer batches (5b.1+5b.2 = 8 tasks, 5b.3+5b.4 = 6 tasks).
 
-#### Phase 5b.1 — Audit Foundation [ ]
+#### Phase 5b.1 — Audit Foundation [x]
 
 **Done when:** audit buffer module (`src/server/audit/buffer.ts`) enforces count=100 OR time=1000ms flush triggers, fail-open on SQLite write errors, ring buffer cap 10000; audit row schema matches PRD §10.3.1 (zero raw persistence); tenantId hashing at `src/server/security/tenant-hash.ts` (sha256[0:16]); 003_audit_events_ts_index.sql migration applied.
+
+**Phase 5b.1 status 2026-08-01:** Closed via 1 iteration. Audit buffer: ring cap 10000, count=100 OR time=1000ms triggers, fail-open independently verified (5 enqueues with stub writer that throws → 5 events dropped, stderr line, lastFlushTs=null, 6th enqueue succeeds = buffer not poisoned). Audit row schema matches PRD §10.3.1 (zero raw persistence). Redact: 4 placeholder regex patterns (`${VAR}=value`, `password|token|api_key|secret_key=`, `sk-...`, `Bearer ...`) + recursive. TenantId hashing: sha256[0:16] = 16 hex chars. Migration 003 additive perf index on `audit_events.ts`. Verifier PASS at `351ca9e`. 352 root + 152 UI + 16 SDK = 520 tests (target ≥520 met). Validation: `.specs/features/phase-5b-aux-endpoints/validation-phase-5b.1+5b.2.md`. Commits `0031787`, `4724309`, `d232927`.
 
 **Depends on:** Phase 5b
 
@@ -640,9 +642,11 @@ Phase 0 ──> Phase 1 ──┬──> Phase 2 ──┐
 
 ---
 
-#### Phase 5b.2 — Read Endpoints [ ]
+#### Phase 5b.2 — Read Endpoints [x]
 
 **Done when:** `GET /catalog`, `GET /audit`, `GET /audit/summary`, enhanced `GET /health` (with `audit_buffer.{depth, capacity, last_flush_ts}` + `catalog.{count, last_rebuild_ts}`) all return 200 with documented contracts; `/audit` query <100ms / 30 dias.
+
+**Phase 5b.2 status 2026-08-01:** Closed via 1 iteration. GET /catalog returns full catalog YAML + embeddings metadata (NOT raw embeddings), sorted by id ASC. GET /audit returns last N augmentations (redacted), `?limit=600` clamps to 500. GET /audit/summary returns daily rollups. GET /health enhanced with `audit_buffer.{depth, capacity: 10000, last_flush_ts}` + `catalog.{count, last_rebuild_ts}` blocks (backward-compatible with Phase 5a.1). Perf gate < 100ms / 30 dias verified: max=10.70ms, median=5.65ms (9.3× headroom). Verifier PASS at `351ca9e`. Commits `17d562f`, `351ca9e`.
 
 **Depends on:** Phase 5b.1
 

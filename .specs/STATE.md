@@ -89,7 +89,9 @@ related:
 - **skill-version:** v0.2 (LOCAL + GLOBAL em parity)
 - **produção-Memory-Studio:** autorizada via PRD fechado; execução via loop
 - **branch-ativa:** `loop/phase-0`
-- **próximo-step-concreto:** dispatch Implementer Batch 1 Phase 5b (5b.1 Audit Foundation + 5b.2 Read Endpoints, T-01..T-08 = 8 atomic tasks: audit buffer + count/time triggers + fail-open + ring cap 10000 + redact + tenant hash + ts perf index + 3 GET endpoints + /health enhancement)
+- **próximo-step-concreto:** dispatch Implementer Batch 2 Phase 5b (5b.3 Write Endpoints + R-06 + 5b.4 Transparent Proxy, T-09..T-14 = 6 atomic tasks: POST /catalog/rebuild + POST /state/toggle + tighten agentId to literal 'claude-code' + /v1/messages proxy + local-only allowlist + Claude Code integration)
+- **phase-5b.1-status:** "Phase 5b.1 — Audit Foundation" (DONE 2026-08-01, 1 iteration, Verifier PASS at `351ca9e`, 352 root + 152 UI + 16 SDK = 520 tests. Audit buffer fail-open verified end-to-end. Commits `0031787`, `4724309`, `d232927`)
+- **phase-5b.2-status:** "Phase 5b.2 — Read Endpoints" (DONE 2026-08-01, 1 iteration, Verifier PASS at `351ca9e`. GET /catalog + /audit + /audit/summary + enhanced /health. Perf gate <100ms/30d verified. Commits `17d562f`, `351ca9e`)
 - **working-tree:** working (`loop/phase-0` em `b6ced99`)
 - **phase-5b-plan:** Planner artifacts at `.specs/features/phase-5b-aux-endpoints/{spec.md, design.md, tasks.md}` (commit `b6ced99`). 14 atomic tasks across 4 sub-chapters (5b.1 audit foundation, 5b.2 read endpoints, 5b.3 write endpoints + R-06, 5b.4 transparent proxy). 2 Implementer batches of 8+6.
 - **lessons-store:** L-001..L-004 (Phase 1) + L-005/L-006 (Phase 3) + L-007 (Phase 5a.2: API 429 mid-task recovery pattern)
