@@ -204,6 +204,14 @@ One boundary worth preserving in future tests: `createServer().close()` stops th
 
 None of these gaps is a critical hot-path, locked-layer, persistence, or endpoint-availability failure. The first item is the only observed behavior that can change a non-happy-path R-2 ratio; it is not exercised by Anthropic-shaped AC-3 fixtures.
 
+> **Phase 7b T-04 status — resolution of ranked gaps:**
+>
+> 1. **R-2 denominator fix — FOLDED into Phase 7b T-04** (load-bearing acceptance math change). The collector normalizes a null/missing/zero `cacheReadTokens` to `0` before calling `MetricsRingBuffer.recordProxy()`. Tests at `test/server/metrics/provider-denominator.test.mjs` enforce the contract.
+> 2. **Sliding-window wording vs cumulative counters — FOLDED** into Phase 7b T-04. Spec.md R-6 now formalizes the cumulative-per-process contract. The schema v2 evidence block exposes raw counters for the acceptance evaluator.
+> 3. **Fractional p50/p99 — FOLDED** into Phase 7b T-04. The implementation retained fractional values; the spec.md response contract is now annotated as "finite non-negative fractional ms" (no `Math.floor` is applied to latency values). `working_set_mb` remains integer-floor at MB granularity.
+> 4. **`/metrics` pino info logging — DEFERRED to v3.1+.** Production boot deliberately disables Fastify request logging. Adding a no-op or noisy request logger does not improve evidence for the acceptance gate. Documented as a carry-forward item in Phase 7b spec/design.
+> 5. **Direct `recordAugment` task signature drift — UNCHANGED.** Internal API; no external callers expected.
+
 ## Lesson signals
 
 1. **L-006 reinforced:** Reading the real source caught the post-Implementer `collector.ts` correction, confirmed that `low_confidence` is measured rather than excluded, and exposed the missing-usage denominator behavior that the Implementer summary did not mention.

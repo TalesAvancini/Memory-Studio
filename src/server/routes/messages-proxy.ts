@@ -415,12 +415,12 @@ export async function registerMessagesProxyRoute(
             outputTokens: usage.outputTokens,
             responseComplete: false,
           });
-          if (upstreamResponse.status === 200) {
-            recordProxySample({
-              cacheReadTokens: usage.cacheReadInputTokens,
-              latencyMs: performance.now() - tProxyStart,
-            });
-          }
+          // Phase 7b T-04: do NOT record the proxy metric per usage event.
+          // The metric is recorded exactly ONCE at completion (see
+          // onComplete below) so the denominator counts the request,
+          // not the per-event usage updates. A missing usage field
+          // (cache_read_input_tokens null) normalizes to 0 — counted
+          // as a miss, not as a no-op.
         },
         onComplete: () => {
           clearTimeout(timer);
@@ -431,6 +431,12 @@ export async function registerMessagesProxyRoute(
             outputTokens: tee.usage.outputTokens,
             responseComplete: true,
           });
+          if (upstreamResponse.status === 200) {
+            recordProxySample({
+              cacheReadTokens: tee.usage.cacheReadInputTokens,
+              latencyMs: performance.now() - tProxyStart,
+            });
+          }
           scheduleFastAgentTail(tee.assistantText, session.hash, augmentResult, runtimeContext, fastAgentCaller);
         },
         onParseError: (err) => {

@@ -171,6 +171,8 @@ token_cache_coverage = cache_hit_requests ÷ proxy_requests
 
 **PRD reference:** §14.6 ("Token cache coverage = Σ `cache_read_input_tokens` ÷ Σ `total_prompt_tokens`") and §17.1 (cache do provedor metric).
 
+> **Phase 7b T-04 resolution note (R-2 denominator edge):** A completed HTTP 200 response that OMITS `usage.cache_read_input_tokens` (or any of the `usage` block) is now counted in the `proxy_requests` denominator. The collector normalizes a null/missing/zero `cacheReadTokens` to `0` BEFORE calling `MetricsRingBuffer.recordProxy()`. This counts as a zero-valued miss (NOT a no-op, NOT a hit). The previous Phase 7a behavior — silently dropping these requests from the denominator — produced an artificially high cache coverage ratio. The fix is the load-bearing acceptance math change in Phase 7b; tests at `test/server/metrics/provider-denominator.test.mjs` enforce the contract.
+
 > **Formula simplification caveat:** PRD §14.6 defines token cache coverage as Σ cache_read_input_tokens ÷ Σ total_prompt_tokens (a token-weighted ratio). Phase 7a uses a request-weighted ratio (cache_hit_requests ÷ proxy_requests) for dashboard simplicity. Token-weighted ratio requires summing per-call tokens which is more expensive to maintain in a ring buffer. The Verifier should note this simplification in `validation-phase-7a.md`. PRD §14.6's exact formula is a v3.1+ enhancement if `working_set_mb` shows Phase 7a's simpler version misses edge cases.
 
 ### R-3 — `p50_latency_ms`
@@ -245,6 +247,8 @@ Whichever fires first wins. The ring buffer's recompute is O(N) where N ≤ wind
 
 **PRD reference:** ROADMAP.md Phase 7a entry "atualizado a cada N=10 requests ou T=60s".
 
+> **Phase 7b T-04 resolution note:** The R-6 trigger cadence (N=10 / T=60s) is the **recompute cadence only** — it does NOT evict ratio counters. The match/cache ratio counters (`attemptedRequests`, `matchedRequests`, `proxyRequests`, `cacheHitRequests`) are **cumulative within one process epoch** (transient persistence: reset on server stop / restart, no SQLite storage). The latency ring buffer remains last-100 samples (R-3/R-4). The previous "sliding N=10/60s" wording was misleading; the implementation was always cumulative. Phase 7b formalizes this in the contract — see spec.md AC-8 and the schema v2 evidence block (`process_started_at` anchors the epoch).
+
 ### R-7 — `/metrics` endpoint contract
 
 A NEW endpoint `GET /metrics` returns the 5 metrics as JSON.
@@ -257,16 +261,24 @@ A NEW endpoint `GET /metrics` returns the 5 metrics as JSON.
 interface MetricsResponse {
   request_hit_rate: number | null;       // 0..1, null when attempted_requests = 0
   token_cache_coverage: number | null;   // 0..1, null when proxy disabled or proxy_requests = 0
-  p50_latency_ms: number | null;         // integer ms, null when window empty
-  p99_latency_ms: number | null;         // integer ms, null when window empty
-  working_set_mb: number;                // integer MB, always present
+  p50_latency_ms: number | null;         // finite non-negative fractional ms, null when window empty (Phase 7b T-04)
+  p99_latency_ms: number | null;         // finite non-negative fractional ms, null when window empty (Phase 7b T-04)
+  working_set_mb: number;                // integer MB (MB granularity), always present
   window: {
     request_count: number;               // how many /augment requests in window
     proxy_request_count: number;         // how many /v1/messages requests in window
     window_age_ms: number;               // ms since window started (or last reset)
   };
   proxy_enabled: boolean;                // mirrors MEMORY_STUDIO_ANTHROPIC_BASE_URL
-  schema_version: 1;
+  evidence: {                            // Phase 7b T-04 — raw counters for acceptance evaluator
+    matched_requests: number;
+    attempted_requests: number;
+    cache_hit_requests: number;
+    proxy_requests: number;
+    latency_sample_count: number;
+    process_started_at: number;
+  };
+  schema_version: 2;                     // Phase 7b T-04: bumped from 1
   timestamp: number;                     // epoch ms of dashboard recompute
 }
 ```

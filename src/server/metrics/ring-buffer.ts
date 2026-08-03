@@ -1,5 +1,6 @@
 /**
- * Metrics ring buffer (Phase 7a — Metrics Instrumentation).
+ * Metrics ring buffer (Phase 7a — Metrics Instrumentation; Phase 7b
+ * T-04 — schema v2 + acceptance evidence).
  *
  * Mirrors `AuditRingBuffer` (`src/server/audit/buffer.ts`) but stores
  * the 5 metrics counters + a 100-element latency ring buffer (for
@@ -28,6 +29,33 @@
  * Counters are cumulative since the last `resetForTests()`. The
  * `recomputeDashboard()` method produces a `MetricsSnapshot`; the
  * `/metrics` route reads the cached snapshot for O(1) responses.
+ *
+ * Phase 7b T-04 — schema v2 + acceptance evidence:
+ *   - schema_version bumped from 1 to 2
+ *   - `evidence` block exposes raw non-sensitive counters
+ *     (`matched_requests`, `attempted_requests`, `cache_hit_requests`,
+ *     `proxy_requests`, `latency_sample_count`, `process_started_at`)
+ *     so the acceptance evaluator can compute exact non-negative
+ *     counter deltas across threshold epochs + process restarts.
+ *   - `process_started_at` is set in the constructor (process epoch
+ *     anchor). A new process epoch (e.g. server restart) makes the
+ *     counter reset visible in the metric.
+ *   - `recordProxy()` ALWAYS increments `proxyRequests` on a
+ *     completed 200 — even when the upstream response omits
+ *     `usage.cache_read_input_tokens` (R-2 denominator fix from
+ *     Phase 7a gap). A missing/zero usage counts as a zero-valued
+ *     miss (NOT null and NOT a no-op).
+ *   - Phase 7a spec §3 wording ("sliding N=10/T=60s") is RESOLVED:
+ *     ratio counters are cumulative-per-process; N=10/T=60s is the
+ *     recompute cadence only. Latency percentiles are over the
+ *     last-100 ring buffer (still nearest-rank). Documented in
+ *     spec.md §3 + design.md §7.
+ *   - p50/p99 are finite non-negative fractional milliseconds.
+ *     `Math.floor` was previously applied to latency values —
+ *     that has been REMOVED. The implementation already retained
+ *     fractional values; the only correction is in stale comments
+ *     and the working_set_mb (which is intentionally integer-floor
+ *     because it's MB granularity, not a measurement).
  *
  * Naming divergence from PRD §14.6 (intentional, documented in
  * spec.md §5):
@@ -59,10 +87,28 @@ export const METRICS_RECOMPUTE_TIME_MS = 60_000;
 export type RecomputeReason = 'count-trigger' | 'time-trigger' | 'manual';
 
 /**
+ * Schema v2 evidence block (Phase 7b T-04). Raw non-sensitive
+ * counters + process epoch anchor so the acceptance evaluator can
+ * compute exact non-negative deltas across process restarts and
+ * threshold changes. These values are NOT sent to clients; they
+ * are exposed on the `/metrics` response for snapshot capture.
+ */
+export interface MetricsEvidenceV2 {
+  readonly matched_requests: number;
+  readonly attempted_requests: number;
+  readonly cache_hit_requests: number;
+  readonly proxy_requests: number;
+  readonly latency_sample_count: number;
+  readonly process_started_at: number;
+}
+
+/**
  * Snapshot returned by `MetricsRingBuffer.snapshot()` and surfaced by
  * `GET /metrics`. All rates are 0..1 floats (or `null` when the
  * denominator is zero — NOT 0, which would falsely signal 100% miss).
- * Percentiles are integer ms (or `null` when no samples in window).
+ * Percentiles are finite non-negative fractional milliseconds (or
+ * `null` when no samples in window). `working_set_mb` is an integer
+ * floor at MB granularity.
  */
 export interface MetricsSnapshot {
   readonly request_hit_rate: number | null;
@@ -76,7 +122,8 @@ export interface MetricsSnapshot {
     readonly window_age_ms: number;
   };
   readonly proxy_enabled: boolean;
-  readonly schema_version: 1;
+  readonly evidence: MetricsEvidenceV2;
+  readonly schema_version: 2;
   readonly timestamp: number;
 }
 
@@ -110,7 +157,9 @@ export class MetricsRingBuffer {
   // --- Latency ring buffer (last N samples, O(1) push) --------------------
   // Plain number[] for ergonomic sort + index access. 100 capacity
   // gives p99 nearest-rank headroom when bursts hit (10 samples is
-  // degenerate — index 9 is always the last sample).
+  // degenerate — index 9 is always the last sample). Values are
+  // finite non-negative fractional milliseconds (Phase 7b T-04
+  // fractional precision contract — AC-8).
   private readonly latencySamples: number[] = new Array(METRICS_LATENCY_BUFFER_CAPACITY).fill(0);
   private latencyWriteIdx = 0;
   private latencyCount = 0;
@@ -123,9 +172,17 @@ export class MetricsRingBuffer {
   private windowStartTs = 0;
   private lastRecomputeTs = 0;
   private lastSnapshot: MetricsSnapshot | null = null;
+  /**
+   * Phase 7b T-04 — process epoch anchor. A new MetricsRingBuffer
+   * instance starts a new process epoch. The acceptance evaluator
+   * uses this to detect counter regressions and to never subtract
+   * across process restarts.
+   */
+  private readonly processStartedAt: number;
 
-  constructor() {
-    this.windowStartTs = Date.now();
+  constructor(now: number = Date.now()) {
+    this.windowStartTs = now;
+    this.processStartedAt = now;
   }
 
   /**
@@ -168,6 +225,11 @@ export class MetricsRingBuffer {
    *   - `totalAugmentRequests` increments regardless — this is the
    *     window.request_count raw volume.
    *
+   * Counters are cumulative within one process epoch (Phase 7b
+   * T-04 resolution of Phase 7a's "sliding N=10/T=60s" wording —
+   * see spec.md R-7 / AC-8). The N=10/T=60s is a recompute cadence
+   * for the snapshot, NOT counter eviction.
+   *
    * Fires the count trigger when
    * `totalRequestCountSinceReset % METRICS_RECOMPUTE_COUNT_TRIGGER === 0`.
    */
@@ -189,25 +251,25 @@ export class MetricsRingBuffer {
   }
 
   /**
-   * Record a /v1/messages proxy sample on a 200 response. Increments
-   * the cache_hit / proxy counter pair per R-2. The latency is NOT
-   * added to the ring buffer (latency is per-/augment; proxy has its
-   * own column in audit, but the R-3/R-4 percentiles are end-to-end
-   * /augment latency).
+   * Record a /v1/messages proxy sample. Phase 7b T-04: the
+   * `proxyRequests` denominator ALWAYS increments on a completed
+   * 200, even when the upstream response omits
+   * `usage.cache_read_input_tokens` (R-2 denominator fix). The
+   * `cacheHitRequests` numerator only increments when
+   * `cacheReadTokens > 0`. A null/missing/zero usage block
+   * therefore counts as a miss (not as a no-op), which is the
+   * Phase 7a gap resolution documented in spec.md R-7.
    *
-   * Per spec.md R-2 + EC-4: only called when upstream returned 200
-   * AND cache_read_input_tokens was captured. The collector
-   * (`collector.ts`) enforces this gate.
+   * The collector (`collector.ts`) is responsible for normalizing a
+   * missing `usage` field to `cacheReadTokens: 0` BEFORE calling
+   * this method. The collector's fail-open contract is preserved
+   * here — this method only increments counters.
    */
-  recordProxy(opts: { cacheReadTokens: number; latencyMs: number }): void {
+  recordProxy(opts: { cacheReadTokens: number }): void {
     this.proxyRequests++;
     if (opts.cacheReadTokens > 0) {
       this.cacheHitRequests++;
     }
-    // Note: latency NOT pushed to ring buffer (proxy is not a /augment
-    // request). Proxy latency is reported separately via the audit
-    // `messages_proxy` event. Counting proxy requests here keeps the
-    // R-2 denominator honest.
   }
 
   /**
@@ -235,7 +297,8 @@ export class MetricsRingBuffer {
 
   /**
    * Test-only — reset module-scoped state between runs. Mirrors
-   * `AuditRingBuffer.resetForTests()`.
+   * `AuditRingBuffer.resetForTests()`. A new `process_started_at`
+   * is stamped by the constructor.
    */
   resetForTests(): void {
     if (this.recomputeTimer !== null) {
@@ -256,6 +319,16 @@ export class MetricsRingBuffer {
     this.lastSnapshot = null;
   }
 
+  /**
+   * The anchor for the current process epoch. A server restart
+   * instantiates a new buffer with a new `process_started_at`;
+   * the acceptance evaluator uses this to detect counter resets
+   * and never subtracts across process restarts.
+   */
+  get processEpochStart(): number {
+    return this.processStartedAt;
+  }
+
   // --- Private helpers ----------------------------------------------------
 
   private pushLatencySample(ms: number): void {
@@ -270,6 +343,10 @@ export class MetricsRingBuffer {
    * Compute the dashboard snapshot from current state. Nearest-rank
    * percentile formula: `idx = Math.ceil(p / 100 * sorted.length) - 1`.
    * On an empty buffer returns 0 (caller null-checks via window).
+   *
+   * Phase 7b T-04: latency values are returned as-is (fractional
+   * milliseconds). Working-set memory is intentionally integer-floor
+   * because it's reported in MB granularity, not as a measurement.
    */
   private computeDashboard(): MetricsSnapshot {
     const now = Date.now();
@@ -288,10 +365,26 @@ export class MetricsRingBuffer {
       : null;
 
     // R-3 / R-4: nearest-rank percentile of the latency ring.
+    // Phase 7b T-04: returns fractional values; the cache hit / miss
+    // contract is "finite non-negative". The `null when no samples`
+    // behavior is preserved (caller-facing via the MetricsSnapshot).
     const { p50, p99 } = this.computePercentiles();
 
-    // R-5: working_set_mb — integer floor.
+    // R-5: working_set_mb — integer floor at MB granularity.
     const working_set_mb = Math.floor(process.memoryUsage().rss / 1024 / 1024);
+
+    // Phase 7b T-04 — evidence block (schema v2). Raw counters
+    // permit exact snapshot deltas across threshold epochs and
+    // process restarts. `latency_sample_count` is the active count
+    // in the ring (capped at 100).
+    const evidence: MetricsEvidenceV2 = {
+      matched_requests: this.matchedRequests,
+      attempted_requests: this.attemptedRequests,
+      cache_hit_requests: this.cacheHitRequests,
+      proxy_requests: this.proxyRequests,
+      latency_sample_count: this.latencyCount,
+      process_started_at: this.processStartedAt,
+    };
 
     return {
       request_hit_rate,
@@ -305,7 +398,8 @@ export class MetricsRingBuffer {
         window_age_ms: now - this.windowStartTs,
       },
       proxy_enabled: proxyEnabled,
-      schema_version: 1,
+      evidence,
+      schema_version: 2,
       timestamp: now,
     };
   }
@@ -314,7 +408,8 @@ export class MetricsRingBuffer {
    * Extract the active latency samples (in insertion order) and
    * compute the nearest-rank p50/p99 percentiles. The samples form
    * a ring buffer of capacity 100; we only sort the first
-   * `latencyCount` entries.
+   * `latencyCount` entries. Values are finite non-negative
+   * fractional milliseconds (Phase 7b T-04).
    */
   private computePercentiles(): { p50: number; p99: number } {
     if (this.latencyCount === 0) {
@@ -344,7 +439,8 @@ export class MetricsRingBuffer {
 /**
  * Nearest-rank percentile: `idx = Math.ceil(p / 100 * n) - 1`,
  * clamped to `[0, n - 1]`. Matches Phase 5a's mental model — the
- * value at the boundary, not interpolated.
+ * value at the boundary, not interpolated. Returns finite
+ * non-negative fractional milliseconds (Phase 7b T-04).
  */
 function nearestRank(sortedSamples: ReadonlyArray<number>, p: number): number {
   if (sortedSamples.length === 0) return 0;

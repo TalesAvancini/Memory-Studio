@@ -62,9 +62,9 @@ test('recordProxy_increments_counters', () => {
     const prev = process.env['MEMORY_STUDIO_ANTHROPIC_BASE_URL'];
     process.env['MEMORY_STUDIO_ANTHROPIC_BASE_URL'] = 'http://127.0.0.1:65535';
     try {
-      buf.recordProxy({ cacheReadTokens: 42, latencyMs: 100 });
-      buf.recordProxy({ cacheReadTokens: 0, latencyMs: 110 });
-      buf.recordProxy({ cacheReadTokens: 5, latencyMs: 120 });
+      buf.recordProxy({ cacheReadTokens: 42 });
+      buf.recordProxy({ cacheReadTokens: 0 });
+      buf.recordProxy({ cacheReadTokens: 5 });
       const snap = buf.snapshot();
       // 2 cache hits out of 3 proxy requests.
       assert.equal(snap.token_cache_coverage, 2 / 3);

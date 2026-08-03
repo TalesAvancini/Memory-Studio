@@ -18,7 +18,7 @@ explanation: |
   Ring buffer vs counter for each metric: HYBRID approach. Counters
   (cumulative since boot, monotonic) for `request_hit_rate` (the
   numerator and denominator are both counters; the RING buffer isn't
-  needed for the ratio). Ring buffer (last N=10 latency samples) for
+  needed for the ratio). Ring buffer (last 100 latency samples) for
   `p50/p99` (percentile needs the actual samples, not just a count).
   `working_set_mb` is sampled at flush time (one number, no buffer).
 
@@ -27,6 +27,19 @@ explanation: |
   counter % 10 === 0). The time trigger is asynchronous
   (setInterval(60_000) cleared on stop). This mirrors AuditRingBuffer's
   count + time pattern from src/server/audit/buffer.ts.
+
+  > **Phase 7b T-04 resolution note:** The R-6 trigger cadence
+  > (N=10 / T=60s) is the **recompute cadence only** — it does NOT
+  > evict ratio counters. The match/cache ratio counters are
+  > cumulative within one process epoch (transient persistence: reset
+  > on server stop / restart, no SQLite storage). The latency ring
+  > buffer remains last-100 samples for p50/p99. The previous "sliding
+  > N=10/60s" wording was misleading; the implementation was always
+  > cumulative. Phase 7b T-04 adds the schema v2 evidence block
+  > (`matched_requests`, `attempted_requests`, `cache_hit_requests`,
+  > `proxy_requests`, `latency_sample_count`, `process_started_at`)
+  > so the acceptance evaluator can compute exact non-negative
+  > counter deltas across threshold epochs and process restarts.
 
   Persistence: TRANSIENT (reset on restart). No SQLite persistence.
   Rationale: metrics are operational observability, not audit. PRD §10.4

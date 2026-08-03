@@ -1,12 +1,12 @@
 /**
- * GET /metrics route tests (Phase 7a T-07).
+ * GET /metrics route tests (Phase 7a T-07; Phase 7b T-04 — schema v2).
  *
  * Tests the Fastify route registered by `registerMetricsRoute`. Uses
  * `app.inject()` (no HTTP) per the existing Phase 5b pattern from
  * `test/audit/endpoints.test.mjs`.
  *
  * Coverage:
- *   1. metrics_endpoint_shape (AC-8) — 200 + 9 keys present
+ *   1. metrics_endpoint_shape (AC-8) — 200 + v2 keys + evidence block
  *   2. metrics_endpoint_always_200 (AC-8) — empty buffer still 200
  */
 
@@ -26,7 +26,7 @@ test('metrics_endpoint_shape', async () => {
     const res = await app.inject({ method: 'GET', url: '/metrics' });
     assert.equal(res.statusCode, 200);
     const body = res.json();
-    // 9 keys per spec.md R-7 + AC-8.
+    // v1 + v2 keys (Phase 7b T-04: evidence block + schema_version 2).
     assert.ok('request_hit_rate' in body, 'request_hit_rate present');
     assert.ok('token_cache_coverage' in body, 'token_cache_coverage present');
     assert.ok('p50_latency_ms' in body, 'p50_latency_ms present');
@@ -36,7 +36,15 @@ test('metrics_endpoint_shape', async () => {
     assert.ok('proxy_enabled' in body, 'proxy_enabled present');
     assert.ok('schema_version' in body, 'schema_version present');
     assert.ok('timestamp' in body, 'timestamp present');
-    assert.equal(body.schema_version, 1, 'AC-8: schema_version 1');
+    assert.ok('evidence' in body, 'evidence block present (Phase 7b T-04)');
+    assert.equal(body.schema_version, 2, 'AC-8: schema_version 2 (Phase 7b T-04)');
+    // evidence block has all 6 fields
+    assert.equal(typeof body.evidence.matched_requests, 'number');
+    assert.equal(typeof body.evidence.attempted_requests, 'number');
+    assert.equal(typeof body.evidence.cache_hit_requests, 'number');
+    assert.equal(typeof body.evidence.proxy_requests, 'number');
+    assert.equal(typeof body.evidence.latency_sample_count, 'number');
+    assert.equal(typeof body.evidence.process_started_at, 'number');
   } finally {
     buf.resetForTests();
     await app.close();
@@ -60,6 +68,13 @@ test('metrics_endpoint_always_200', async () => {
     // working_set_mb is always present.
     assert.ok(typeof body.working_set_mb === 'number');
     assert.ok(body.working_set_mb > 0);
+    // evidence block is present with zero counters + a process_started_at
+    assert.equal(body.evidence.matched_requests, 0);
+    assert.equal(body.evidence.attempted_requests, 0);
+    assert.equal(body.evidence.cache_hit_requests, 0);
+    assert.equal(body.evidence.proxy_requests, 0);
+    assert.equal(body.evidence.latency_sample_count, 0);
+    assert.ok(body.evidence.process_started_at > 0);
   } finally {
     buf.resetForTests();
     await app.close();

@@ -53,7 +53,7 @@ test('metrics_reset_on_restart', () => {
 test('MetricsRingBuffer.resetForTests_clears_state', () => {
   const buf = new MetricsRingBuffer();
   buf.recordAugment({ matched: true, outcome: 'measured', latencyMs: 5 });
-  buf.recordProxy({ cacheReadTokens: 10, latencyMs: 100 });
+  buf.recordProxy({ cacheReadTokens: 10 });
   const snapBefore = buf.snapshot();
   assert.equal(snapBefore.window.request_count, 1);
   assert.equal(snapBefore.window.proxy_request_count, 1);

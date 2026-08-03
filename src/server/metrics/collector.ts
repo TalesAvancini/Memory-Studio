@@ -59,10 +59,19 @@ export function recordAugmentSample(opts: {
 }
 
 /**
- * Record a /v1/messages proxy sample. Only called when the upstream
- * returned 200 AND `cache_read_input_tokens` was captured (per
- * R-2 + EC-4). The collector enforces this gate at the call site
- * (see `messages-proxy.ts` T-06 hook).
+ * Record a /v1/messages proxy sample. Phase 7b T-04: a completed
+ * 200 response is ALWAYS counted in the proxy_requests denominator,
+ * even when the upstream response omits `usage.cache_read_input_tokens`
+ * (R-2 denominator fix from Phase 7a gap). A null/missing/zero
+ * `cacheReadTokens` value counts as a zero-valued miss — the
+ * `cacheHitRequests` numerator only increments when
+ * `cacheReadTokens > 0`.
+ *
+ * The proxy call site (`messages-proxy.ts`) is responsible for:
+ *   - Only calling this on a completed HTTP 200 (non-200 is NOT
+ *     in the denominator per spec.md R-2 + EC-4).
+ *   - Passing `cacheReadTokens: 0` when the response omits `usage`
+ *     or the value is null/missing — NOT skipping the call.
  */
 export function recordProxySample(opts: {
   cacheReadTokens: number | null;
@@ -71,13 +80,15 @@ export function recordProxySample(opts: {
   try {
     const buf = getMetricsBuffer();
     if (buf === null) return;
-    // Skip when cacheReadTokens is null (callers should pre-check,
-    // but defensive guard for robustness).
-    if (opts.cacheReadTokens === null) return;
-    buf.recordProxy({
-      cacheReadTokens: opts.cacheReadTokens,
-      latencyMs: opts.latencyMs,
-    });
+    // Phase 7b T-04: normalize null/missing cache usage to 0 (R-2
+    // denominator fix). The call site is expected to pass 0 for a
+    // missing usage block; this is a defensive guard for robustness.
+    const cacheReadTokens = opts.cacheReadTokens === null
+      || !Number.isFinite(opts.cacheReadTokens)
+      || opts.cacheReadTokens < 0
+        ? 0
+        : opts.cacheReadTokens;
+    buf.recordProxy({ cacheReadTokens });
   } catch {
     // Fail-open.
   }

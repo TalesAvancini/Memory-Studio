@@ -91,9 +91,9 @@ test('token_cache_coverage_proxy_enabled', () => {
     try {
       // 1 cache hit out of 10 proxy requests.
       for (let i = 0; i < 9; i++) {
-        buf.recordProxy({ cacheReadTokens: 0, latencyMs: 100 });
+        buf.recordProxy({ cacheReadTokens: 0 });
       }
-      buf.recordProxy({ cacheReadTokens: 42, latencyMs: 100 });
+      buf.recordProxy({ cacheReadTokens: 42 });
       const snap = buf.recomputeDashboard();
       assert.equal(snap.token_cache_coverage, 0.1);
       assert.equal(snap.proxy_enabled, true);
