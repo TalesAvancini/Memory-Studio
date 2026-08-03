@@ -31,6 +31,7 @@ import {
 import { requestLogger } from './logger.ts';
 import { recordLastRequestTimestampMs } from './boot.ts';
 import { runAugment, type PipelineContext } from './augment/pipeline.ts';
+import type { RuntimeStateSnapshot } from './config/runtime-state.ts';
 import { initializeSearchStorage } from '../search/schema.ts';
 import type { Embedder } from '../catalog/embedder/types.ts';
 import { EMBEDDING_DIMENSIONS } from '../catalog/embedder/index.ts';
@@ -43,11 +44,19 @@ export interface AugmentRouteOptions {
   onSuccess?: (timeMs?: number) => void;
   /**
    * Optional explicit pipeline provider. When supplied, the route
-   * handler uses this for every request. When omitted, the module-level
-   * provider (set via `setAugmentPipelineProvider`) is used; the
-   * module-level provider defaults to a lazy in-memory pipeline.
+   * handler uses this for every request. The provider may be async so a
+   * production context can load one state snapshot before building it.
    */
-  pipelineProvider?: () => PipelineContext;
+  pipelineProvider?: () => PipelineContext | Promise<PipelineContext>;
+  /**
+   * Atomic production seam. It returns one state snapshot and the pipeline
+   * derived from that same snapshot; the route overrides the request's
+   * activeCatalog with the state authority before running augmentation.
+   */
+  requestContextProvider?: () => Promise<{
+    readonly state: RuntimeStateSnapshot;
+    readonly pipeline: PipelineContext;
+  }>;
 }
 
 const PERFORMANCE_BUDGET_RERANK_MS = 0;
@@ -194,7 +203,9 @@ function createInMemoryPipelineContext(): PipelineContext {
   return { db, embedder };
 }
 
-function resolveProvider(opts: AugmentRouteOptions): () => PipelineContext {
+function resolveProvider(
+  opts: AugmentRouteOptions,
+): () => PipelineContext | Promise<PipelineContext> {
   if (opts.pipelineProvider !== undefined) return opts.pipelineProvider;
   if (pipelineProviderOverride !== null) return pipelineProviderOverride;
   return defaultPipelineContext;
@@ -246,8 +257,20 @@ export async function registerAugmentRoute(
     // because the test suite may swap it between calls; the default
     // returns a memoized context (cheap to share).
     let response: AugmentResponse;
+    let effectiveRequest = parsed.data;
     try {
-      response = await runAugment(parsed.data, provider());
+      let pipelineContext: PipelineContext;
+      if (options.requestContextProvider !== undefined) {
+        const requestContext = await options.requestContextProvider();
+        effectiveRequest = {
+          ...parsed.data,
+          activeCatalog: [...requestContext.state.activeCatalog],
+        };
+        pipelineContext = requestContext.pipeline;
+      } else {
+        pipelineContext = await provider();
+      }
+      response = await runAugment(effectiveRequest, pipelineContext);
     } catch (err) {
       // Defensive: the pipeline is fail-open by contract; a throw
       // here is a programmer error, not a retrieval error. Log and

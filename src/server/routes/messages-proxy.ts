@@ -43,6 +43,7 @@ import { getAuditBuffer } from '../audit/lifecycle.ts';
 import type { AuditEvent } from '../audit/types.ts';
 import { AugmentRequestSchema, type AugmentRequest } from '../schema.ts';
 import { runAugment, type PipelineContext } from '../augment/pipeline.ts';
+import type { ProductionRequestContext } from '../config/production-context.ts';
 import { buildSystemMessage } from '../augment/augmenter.ts';
 import { recordProxySample } from '../metrics/collector.ts';
 
@@ -156,6 +157,12 @@ export interface MessagesProxyRouteOptions {
   allowedHostsCsv?: string;
   /** Provider of the in-process pipeline context (db + embedder). */
   pipelineProvider: () => PipelineContext;
+  /**
+   * Production-only atomic state/context seam. T-01 uses one snapshot for
+   * activeCatalog + thresholds; T-02 replaces the temporary session argument
+   * with the caller-derived hash.
+   */
+  runtimeContextProvider?: (sessionId: string) => Promise<ProductionRequestContext>;
   /** Upstream request timeout in ms (default 30s). */
   timeoutMs?: number;
   /** Test-only fetch override (defaults to global `fetch`). */
@@ -224,7 +231,20 @@ export async function registerMessagesProxyRoute(
     const hashInput = systemText + JSON.stringify(anthropicReq.messages);
     const redactedPromptHash = sha256Hex(hashInput);
 
-    // --- 4. Build internal /augment request -------------------------------
+    // --- 4. Resolve one runtime state/context snapshot ----------------------
+    let runtimeContext: ProductionRequestContext | null = null;
+    try {
+      if (opts.runtimeContextProvider !== undefined) {
+        // T-02 replaces the temporary literal with the caller-derived hash.
+        runtimeContext = await opts.runtimeContextProvider('proxy');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      reply.code(502);
+      return { error: 'augment_failed', message };
+    }
+
+    // --- 5. Build internal /augment request -------------------------------
     const augmentReq: AugmentRequest = AugmentRequestSchema.parse({
       prompt: promptText,
       context: null,
@@ -234,15 +254,20 @@ export async function registerMessagesProxyRoute(
         sessionId: 'proxy',
         gitBranch: 'main',
       },
-      activeCatalog: [],
+      activeCatalog: runtimeContext === null
+        ? []
+        : [...runtimeContext.state.activeCatalog],
       tenantId: 'proxy-tenant',
       schemaVersion: 3,
     });
 
-    // --- 5. Run pipeline (in-process) -------------------------------------
+    // --- 6. Run pipeline (in-process) -------------------------------------
     let augmentResponse;
     try {
-      augmentResponse = await runAugment(augmentReq, opts.pipelineProvider());
+      augmentResponse = await runAugment(
+        augmentReq,
+        runtimeContext?.pipeline ?? opts.pipelineProvider(),
+      );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       // 502 — proxy IS the failure signal for the LLM agent.

@@ -65,6 +65,11 @@ export interface PipelineContext {
    */
   readonly encodeQuery?: (prompt: string) => Promise<Float32Array>;
   /**
+   * Test/smoke retrieval seam. Production uses `runRetrieval`; fixtures can
+   * supply ranked candidates without depending on native FTS/vec behavior.
+   */
+  readonly retrieve?: typeof runRetrieval;
+  /**
    * Phase 6b (T-13) — Session ID for the in-process call chain.
    * When set, Stage 1b reads prior intel via `getIntel(sessionId)`
    * and the tail setImmediate writes back the intel used in this
@@ -214,9 +219,12 @@ export async function runAugment(
   // --- Stage 5: Retrieval (FTS + vec + RRF + hydrate + active filter) ---
   let retrievalMs = 0;
   let ranked: ReadonlyArray<RankedItem>;
+  let ftsTotalHits = 0;
   try {
-    const out = runRetrieval(context.db, request.prompt, queryVec, validActiveCatalog);
+    const retrieve = context.retrieve ?? runRetrieval;
+    const out = retrieve(context.db, request.prompt, queryVec, validActiveCatalog);
     ranked = out.ranked;
+    ftsTotalHits = out.ftsTotalHits;
     retrievalMs = out.retrievalMs;
   } catch (err) {
     return failOpenResponse(request, t0, embeddingMs, err);
@@ -229,7 +237,11 @@ export async function runAugment(
   // values actually affect the gate. Without an override the search
   // module's compiled defaults (`0.75/1`) remain in effect — that is
   // the pre-7b effective baseline recorded by the acceptance
-  // evaluator.
+  // evaluator. `ftsTotalHits` is threaded through the existing
+  // per-slug option so minFtsHits > 1 is an effective runtime gate.
+  const ftsHitCountBySlug = new Map(
+    ranked.map((item) => [item.slug, ftsTotalHits] as const),
+  );
   const { passed, rejected } = applyThresholds(ranked, {
     ...(context.thresholds?.minCosineSimilarity !== undefined
       ? { minCosineSimilarity: context.thresholds.minCosineSimilarity }
@@ -237,6 +249,7 @@ export async function runAugment(
     ...(context.thresholds?.minFtsHits !== undefined
       ? { minFtsHits: context.thresholds.minFtsHits }
       : {}),
+    ftsHitCountBySlug,
   });
   rejectedByFloor = [...rejectedByFloor, ...rejected];
 

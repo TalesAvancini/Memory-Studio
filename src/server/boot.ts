@@ -22,6 +22,8 @@
  */
 
 import { createServer as createHttpServer } from 'node:http';
+import { stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { registerAugmentRoute, getAugmentPipelineProviderOverride } from './augment.ts';
@@ -51,6 +53,77 @@ import {
   getEndpoint as getFastAgentEndpoint,
 } from './fast-agent/client.ts';
 import { setIntelWriterDb } from './fast-agent/writer.ts';
+import {
+  MultilingualE5SmallEmbedder,
+  type Embedder as CatalogEmbedder,
+} from '../catalog/embedder/index.ts';
+import {
+  createProductionContext,
+  type ProductionContext,
+} from './config/production-context.ts';
+import {
+  resolveStatePath,
+  type StateReader,
+} from './config/runtime-state.ts';
+
+/** Runtime mode selected by the caller/entrypoint. */
+export type ServerRuntimeMode = 'stub' | 'production';
+
+/** Production embedder factories are injectable for tests and smoke fixtures. */
+export type EmbedderFactory = () => CatalogEmbedder | Promise<CatalogEmbedder>;
+
+export interface ProductionServerOptions {
+  readonly statePath?: string;
+  readonly catalogDir?: string;
+  readonly stateReader?: StateReader;
+  readonly embedder?: CatalogEmbedder;
+  readonly embedderFactory?: EmbedderFactory;
+}
+
+async function loadProductionEmbedder(
+  options: ProductionServerOptions = {},
+): Promise<CatalogEmbedder> {
+  const embedder = options.embedder
+    ?? (options.embedderFactory !== undefined
+      ? await options.embedderFactory()
+      : new MultilingualE5SmallEmbedder({ kind: 'query' }));
+  const init = (embedder as CatalogEmbedder & { init?: () => Promise<void> }).init;
+  if (init !== undefined) await init.call(embedder);
+  return embedder;
+}
+
+async function assertProductionCatalogDir(catalogDir: string): Promise<void> {
+  const info = await stat(catalogDir);
+  if (!info.isDirectory()) {
+    throw new Error(`production catalog path is not a directory: ${catalogDir}`);
+  }
+}
+
+async function createProductionRuntime(
+  options: AugmentServerOptions,
+): Promise<ProductionContext> {
+  if (options.db === undefined) {
+    throw new Error('production runtime requires an opened catalog DB');
+  }
+  const production = options.production ?? {};
+  const catalogDir = resolve(
+    production.catalogDir
+      ?? process.env['MEMORY_STUDIO_CATALOG_DIR']
+      ?? 'config/catalog',
+  );
+  await assertProductionCatalogDir(catalogDir);
+  const embedder = await loadProductionEmbedder(production);
+  const context = createProductionContext({
+    db: options.db,
+    embedder,
+    catalogDir,
+    statePath: production.statePath,
+    stateReader: production.stateReader,
+  });
+  // Validate state and model before registering/serving production routes.
+  await context.getStateSnapshot();
+  return context;
+}
 
 export interface AugmentServerOptions {
   portRange?: [number, number];
@@ -65,6 +138,13 @@ export interface AugmentServerOptions {
    * request).
    */
   db?: DatabaseType;
+  /**
+   * Stub is the default for programmatic tests/smokes. The direct entrypoint
+   * selects production whenever MEMORY_STUDIO_CATALOG_DB_PATH is configured.
+   */
+  runtimeMode?: ServerRuntimeMode;
+  /** Required/injected production resources when runtimeMode=production. */
+  production?: ProductionServerOptions;
   /**
    * Phase 5b T-13 — transparent /v1/messages proxy options.
    * When omitted, the proxy reads `MEMORY_STUDIO_ANTHROPIC_BASE_URL`
@@ -194,7 +274,16 @@ export async function createServer(
     setIntelWriterDb(options.db);
   }
 
-  // Phase 7a (T-05) — metrics module wiring. The buffer is
+  // Phase 7b T-01 — production is explicit for programmatic callers and
+  // mandatory for the env-driven on-disk boot path. The preflight eagerly
+  // validates state, catalog directory, and model before routes can serve.
+  const runtimeMode = options.runtimeMode ?? 'stub';
+  const productionContext = runtimeMode === 'production'
+    ? await createProductionRuntime(options)
+    : null;
+  console.log(`[boot] runtime MODE=${runtimeMode}`);
+
+  // Phase 7a (T-05) — metrics module wiring.
   // initialized AFTER the audit buffer + Intel writer so the
   // metrics module sees the audit + intel lifecycles first
   // (audit owns the DB; intel owns the writer). `startMetricsBuffer`
@@ -209,6 +298,9 @@ export async function createServer(
   await registerHealthRoute(app);
   await registerAugmentRoute(app, {
     onSuccess: recordLastRequestTimestampMs,
+    ...(productionContext !== null
+      ? { requestContextProvider: () => productionContext.requestContext() }
+      : {}),
   });
 
   // Phase 5b — auxiliary read endpoints. Only register when a DB is
@@ -219,23 +311,6 @@ export async function createServer(
     await registerCatalogRebuildRoute(app, { db: options.db });
     await registerAuditListRoute(app, { db: options.db });
     await registerAuditSummaryRoute(app, { db: options.db });
-  }
-
-  // Phase 7b T-01 — production pipeline context. When a DB is wired
-  // the augment provider uses the real ONNX embedder + state snapshot
-  // instead of the in-memory zero-vector context. This closes the
-  // L-006 finding that production boot could select the stub context.
-  if (options.db !== undefined) {
-    const productionEmbedder = await loadProductionEmbedder(options.db);
-    const productionContext = (await import('./config/production-context.ts'))
-      .createProductionContext({
-        db: options.db,
-        embedder: productionEmbedder,
-        catalogDir: options.catalogDir,
-      });
-    setAugmentPipelineProvider(() =>
-      productionContext.pipelineContext(),
-    );
   }
 
   // Phase 5b — transparent /v1/messages proxy. Registered whenever an
@@ -256,14 +331,10 @@ export async function createServer(
     upstreamUrl: proxyUpstreamUrl,
     allowedHostsCsv: proxyAllowedHosts,
     pipelineProvider: () => defaultProxyPipelineContext(options.db),
-    ...(options.db !== undefined
+    ...(productionContext !== null
       ? {
-          productionContext: (await import('./config/production-context.ts'))
-            .createProductionContext({
-              db: options.db,
-              embedder: await loadProductionEmbedder(options.db),
-              catalogDir: options.catalogDir,
-            }),
+          runtimeContextProvider: (sessionId: string) =>
+            productionContext.requestContext({ sessionId }),
         }
       : {}),
   });
@@ -387,6 +458,11 @@ if (isMainModule()) {
       try {
         const db = await mod.openCatalogDbForBoot(dbPath);
         bootOptions.db = db;
+        bootOptions.runtimeMode = 'production';
+        bootOptions.production = {
+          statePath: resolveStatePath({ env: process.env }),
+          catalogDir: process.env['MEMORY_STUDIO_CATALOG_DIR'] ?? 'config/catalog',
+        };
       } catch (err) {
         console.error(
           `[boot] failed to open MEMORY_STUDIO_CATALOG_DB_PATH=${dbPath}: ${err instanceof Error ? err.message : String(err)}`,
