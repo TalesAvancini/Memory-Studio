@@ -10,24 +10,22 @@ audience: "orchestrator agent (post-compaction) + the human user"
 ## TL;DR
 
 - **Branch:** `loop/phase-0` (only branch in use; do NOT work on `main`)
-- **Mission:** Phase 7b Verifier — Verify T-01..T-06 then ORCHESTRATOR PAUSES for T-07 user-driven wall-clock
-- **Tests baseline:** 533 root + 152 UI + 16 SDK = 701 total (was 478; +55 new tests in 7b.1B: 20 evaluator + 7 gate CLI + 8 snapshot + 5 R-2 denominator + 4 fast-agent-tail + 11 misc)
-- **HEAD:** `1b136b4` (retrospective + gate hardening)
+- **Mission:** **ORCHESTRATOR PAUSES FOR T-07 USER-DRIVEN WALL-CLOCK** (≥7 days of real production traffic)
+- **Tests baseline:** 533 root + 152 UI + 16 SDK = 701 total (was 478; +55 new tests in 7b.1B)
+- **HEAD:** `71a137d` (validation-phase-7b.md commit)
 - **10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
 
-> **Phase 7a CLOSED 2026-08-02.** Verifier PASS at `.specs/features/phase-7a-metrics/validation-phase-7a.md`. Final HEAD `ca3b22c + 9024006` (closure).
+> **Phase 7a CLOSED 2026-08-02.** Verifier PASS at `.specs/features/phase-7a-metrics/validation-phase-7a.md`.
 >
-> **Phase 7b 7b.1A + 7b.1B COMPLETE 2026-08-03** (commits `8449251`, `aac824b`, `fa399c2`, `fb75813`, `33b46ab`, `fc4ffe8`, `15f7ced`).
-> - T-01 fix: state.json consumed by runAugment via typed adapter
-> - T-02 fix: proxy forwards real active catalog + per-session identity + exact matched system
-> - T-03 fix: streaming SSE tee + response-first fast-agent tail with `fastAgentCaller` injection seam
-> - T-04 fix: R-2 denominator (null→0), sliding-window/cumulative contract, fractional latency
-> - T-05 fix: deterministic 7-day evaluator + strict gate (production vs --allow-synthetic)
-> - T-06 fix: snapshot collector + synthetic smoke + runbook
+> **Phase 7b 7b.1A + 7b.1B + Verifier ALL COMPLETE 2026-08-03.**
+> - **Verifier LEAN PASS** at `.specs/features/phase-7b-acceptance-gate/validation-phase-7b.md` (commit `71a137d`).
+> - 533/533 root tests PASS (2x stable, zero flake). 152 UI + 16 SDK PASS.
+> - All 5 L-006 critical findings RESOLVED with real evidence (not stubs).
+> - POC re-run: TOTAL p95 = 0.18ms (≪ 5ms budget).
+> - Scope guard: empty (no locked-layer leakage).
+> - Verdict format: `PASS — 7b.1 scaffolding; PHASE 7b REMAINS OPEN pending user T-07`
 >
-> **Phase 7b Verifier dispatched** (agent `a162e99042f4859bf`). After PASS, ORCHESTRATOR PAUSES for T-07 user-driven wall-clock (≥7 days).
->
-> **Retrospective agent COMPLETE** (parallel dispatch while 7b.1B ran, agent `adc6642bac874f480`). `.specs/RETROSPECTIVE-PHASE-7b.md` (20635 bytes), AD-010, L-009, L-010, 3 MEMORY.md files added.
+> **ORCHESTRATOR PAUSES.** T-07 is user-driven wall-clock evidence (≥7 days, ≥5 sessions, ≥10 turns/session). After T-07, dispatch T-08 (autonomous hydration + state freeze).
 
 ## Phase Status (snapshot at handoff)
 
@@ -60,7 +58,7 @@ audience: "orchestrator agent (post-compaction) + the human user"
 | **6b.3** BuildOptions.intel | ✅ `[x]` | `2a692ac` | 1 |
 | **6b.4** Pipeline + Cache Hit | ✅ `[x]` | `bc95558` | 1 |
 | **7a** Metrics Instrumentation | ✅ `[x]` | `9024006` (closure) | 1 |
-| **7b** Real API Measurement + Tuning | ⏳ 7b.1 complete (T-01..T-06), Verifier running | `1b136b4` (HEAD) | 7b.1 done + Verifier in-flight |
+| **7b** Real API Measurement + Tuning | ⏳ 7b.1 Verifier PASS, awaiting T-07 user-driven | `71a137d` (HEAD) | Verifier PASS + ORCHESTRATOR PAUSES |
 
 **10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
 
