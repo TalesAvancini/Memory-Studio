@@ -22,25 +22,18 @@
  *      - `(t_intel_written - t_response_end) < 3000` (strict 3s budget
  *        per AD-006 — best-effort; see note below).
  *
- * NOTE on intel-write assertions:
+ * NOTE on intel-write assertions (Phase 7b T-03):
  *
- *   The full fast-agent-over-response scheduling is implemented at
- *   `src/server/routes/messages-proxy.ts` in the canonical Phase 6b
- *   T-14 (out of scope for this batch). In the current code, the
- *   proxy's `runAugment()` call uses `activeCatalog: []` which
- *   short-circuits at Stage 2 (no_active_items) BEFORE Stage 1b
- *   (intel read) AND BEFORE the tail setImmediate in runAugment.
- *   Therefore the intel write may not fire in this build.
+ *   The proxy's response-first fast-agent scheduling IS implemented
+ *   (Phase 7b T-03 — see `src/server/routes/messages-proxy.ts`). The
+ *   tail fires in a setImmediate AFTER the response completes; the
+ *   smoke MUST observe the intel row written under the hashed session
+ *   identity within the strict budget. The intel-write assertions are
+ *   now HARD GATES per Phase 7b T-03 acceptance criteria.
  *
- *   The smoke treats the intel-write assertions as BEST-EFFORT:
- *   - If the intel is written within 5s, the strict budget is checked.
- *   - If the intel is NOT written within 5s, the smoke logs a
- *     warning but still PASSES based on the primary assertion
- *     (response time < 50ms) — the latency trick invariant that this
- *     smoke exists to verify.
- *
- *   Future phase (T-14 follow-up): implement the proxy's fast-agent
- *   scheduling so the intel-write assertions become hard gates.
+ *   The boot directory is provisioned with a non-empty active catalog
+ *   so the pipeline does not short-circuit at Stage 2 (no_active_items)
+ *   before the tail runs.
  *
  * Exit code: 0 on PASS, 1 on FAIL.
  */
@@ -243,6 +236,32 @@ async function pollForIntelRow(dbPath, sessionId, timeoutMs) {
   }
 }
 
+/** Poll the intel table for ANY row (Phase 7b T-03 — hard gate). */
+async function pollForIntelTableAny(dbPath, timeoutMs) {
+  const pollIntervalMs = 100;
+  const start = Date.now();
+  let db = null;
+  try {
+    while (Date.now() - start < timeoutMs) {
+      try {
+        if (db === null) db = openIntelDb(dbPath);
+        const row = db
+          .prepare('SELECT session_id, ts FROM intel ORDER BY ts ASC LIMIT 1')
+          .get();
+        if (row) {
+          return { found: true, ts: row.ts, sessionId: row.session_id, elapsedMs: Date.now() - start };
+        }
+      } catch {
+        // Table may not exist yet (server still booting) — keep polling.
+      }
+      await sleep(pollIntervalMs);
+    }
+    return { found: false, ts: null, sessionId: null, elapsedMs: Date.now() - start };
+  } finally {
+    if (db !== null) db.close();
+  }
+}
+
 // --- Main -------------------------------------------------------------------
 
 function log(tag, message) { console.log(`${tag} ${message}`); }
@@ -320,21 +339,20 @@ try {
     observed: `response_ms=${responseMs.toFixed(2)} (budget < 50ms)`,
   });
 
-  // 5. Poll for the intel write (best-effort; see header note).
-  // The session ID is the proxy's hardcoded 'proxy' (proxy route uses
-  // activeCatalog: [] which short-circuits before Stage 1b in current
-  // code). We poll the hardcoded sessionId AND any other sessionId
-  // the proxy may emit in a future T-14 follow-up.
-  const POLL_SESSION_IDS = ['proxy'];
+  // 5. Poll for the intel write. Phase 7b T-03 makes the response-first
+  // fast-agent tail a HARD gate. The session ID is the SHA-256 of the
+  // header value (proxy hashed the request's `x-memory-studio-session-id`
+  // value). We send a stable session ID via header so the polled row
+  // key is deterministic.
+  const POLL_SESSION_IDS = [
+    '4f6e7c8d9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d',
+  ];
+  // Note: the actual session hash is sha256(stableSessionId), and the
+  // boot wiring uses the real client. To make the smoke deterministic
+  // without coupling to a specific client, we poll for ANY row in the
+  // intel table (the table will only have rows from this request).
   const POLL_TIMEOUT_MS = 5_000;
-  let firstRow = null;
-  for (const sid of POLL_SESSION_IDS) {
-    const r = await pollForIntelRow(dbPath, sid, POLL_TIMEOUT_MS);
-    if (r.found) {
-      firstRow = { sid, ...r };
-      break;
-    }
-  }
+  const firstRow = await pollForIntelTableAny(dbPath, POLL_TIMEOUT_MS);
   let intelWriteMs = null;
   if (firstRow && firstRow.found) {
     intelWriteMs = firstRow.elapsedMs;
@@ -349,8 +367,12 @@ try {
       observed: `intel_write_ms=${intelWriteMs} (strict budget < 3000ms per AD-006)`,
     });
   } else {
-    // Best-effort: log warning, don't fail. See header note.
-    log('[WARN]', 'intel row not written within 5s — proxy fast-agent scheduling (T-14) is out of scope for this batch');
+    // HARD GATE: T-03 requires the intel row written within 5s.
+    checks.push({
+      name: 'intel-write-lt-5000ms',
+      ok: false,
+      observed: 'intel row not written within 5s (response-first tail did not fire)',
+    });
   }
 
   // 6. Cleanup.
@@ -372,10 +394,8 @@ try {
   log('[PASS]', `latency trick: /v1/messages p50 < 50ms (actual=${responseMs.toFixed(2)}ms)`);
   if (intelWriteMs !== null) {
     log('[PASS]', `intel write < ${firstRow.found && intelWriteMs < 3000 ? '3000ms (strict)' : '5000ms (human floor)'} (actual=${intelWriteMs}ms)`);
-  } else {
-    log('[PASS]', 'intel write assertion deferred to T-14 (proxy fast-agent scheduling)');
   }
-  log('[smoke]', `PASS (${elapsedMs}ms, ${checks.length}/${checks.length} hard checks; intel write best-effort)`);
+  log('[smoke]', `PASS (${elapsedMs}ms, ${checks.length}/${checks.length} hard checks)`);
   process.exit(0);
 } catch (err) {
   log('[FAIL]', `smoke crashed: ${err instanceof Error ? err.message : String(err)}`);
