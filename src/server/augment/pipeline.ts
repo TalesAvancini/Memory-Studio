@@ -102,6 +102,22 @@ export interface PipelineContext {
    * request response.
    */
   readonly callFastAgent?: (req: { readonly prompt: string; readonly model: string }) => Promise<{ readonly intel: Intel }>;
+  /**
+   * Phase 7b (T-01) — Optional threshold override for the retrieval
+   * stage. When provided, `applyThresholds` receives these values
+   * instead of the search module defaults. Production wires this from
+   * the runtime state snapshot (`.memory-studio/state.json`); tests
+   * inject fixture values to exercise the state→pipeline seam.
+   *
+   * Pre-7b effective default (still hard-coded inside
+   * `src/search/types.ts`) was `0.75/1`; the configured initial value
+   * in `.memory-studio/state.json` is `0.60/2`. Both baselines are
+   * recorded by the acceptance evaluator.
+   */
+  readonly thresholds?: {
+    readonly minCosineSimilarity?: number;
+    readonly minFtsHits?: number;
+  };
 }
 
 /** Internal pipeline result. */
@@ -207,7 +223,21 @@ export async function runAugment(
   }
 
   // --- Stage 6: Double threshold -----------------------------------------
-  const { passed, rejected } = applyThresholds(ranked);
+  // Phase 7b (T-01): when the caller supplied a thresholds override
+  // (typically from the runtime state snapshot), forward it to
+  // `applyThresholds` so the configured `.memory-studio/state.json`
+  // values actually affect the gate. Without an override the search
+  // module's compiled defaults (`0.75/1`) remain in effect — that is
+  // the pre-7b effective baseline recorded by the acceptance
+  // evaluator.
+  const { passed, rejected } = applyThresholds(ranked, {
+    ...(context.thresholds?.minCosineSimilarity !== undefined
+      ? { minCosineSimilarity: context.thresholds.minCosineSimilarity }
+      : {}),
+    ...(context.thresholds?.minFtsHits !== undefined
+      ? { minFtsHits: context.thresholds.minFtsHits }
+      : {}),
+  });
   rejectedByFloor = [...rejectedByFloor, ...rejected];
 
   // --- Stage 7: Top-K + tiebreak (D-006) --------------------------------

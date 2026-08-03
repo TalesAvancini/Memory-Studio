@@ -221,11 +221,34 @@ export async function createServer(
     await registerAuditSummaryRoute(app, { db: options.db });
   }
 
+  // Phase 7b T-01 — production pipeline context. When a DB is wired
+  // the augment provider uses the real ONNX embedder + state snapshot
+  // instead of the in-memory zero-vector context. This closes the
+  // L-006 finding that production boot could select the stub context.
+  if (options.db !== undefined) {
+    const productionEmbedder = await loadProductionEmbedder(options.db);
+    const productionContext = (await import('./config/production-context.ts'))
+      .createProductionContext({
+        db: options.db,
+        embedder: productionEmbedder,
+        catalogDir: options.catalogDir,
+      });
+    setAugmentPipelineProvider(() =>
+      productionContext.pipelineContext(),
+    );
+  }
+
   // Phase 5b — transparent /v1/messages proxy. Registered whenever an
   // upstream URL is configured (env var MEMORY_STUDIO_ANTHROPIC_BASE_URL
   // for the entry-point path; the explicit `proxy` option for
   // programmatic callers). When the URL is null, the route returns
   // 503 proxy_disabled on every call (the default behavior).
+  //
+  // Phase 7b T-01/T-02: the proxy now consumes the production
+  // context — real embedder + on-disk DB + runtime state snapshot.
+  // When `options.db` is set the production context is mandatory; we
+  // fail loud on embedder/state load failure rather than silently
+  // falling back to the zero-vector stub.
   const proxyUpstreamUrl = options.proxy?.upstreamUrl ?? readUpstreamUrl();
   const proxyAllowedHosts = options.proxy?.allowedHostsCsv
     ?? process.env['MEMORY_STUDIO_PROXY_ALLOWED_HOSTS'];
@@ -233,6 +256,16 @@ export async function createServer(
     upstreamUrl: proxyUpstreamUrl,
     allowedHostsCsv: proxyAllowedHosts,
     pipelineProvider: () => defaultProxyPipelineContext(options.db),
+    ...(options.db !== undefined
+      ? {
+          productionContext: (await import('./config/production-context.ts'))
+            .createProductionContext({
+              db: options.db,
+              embedder: await loadProductionEmbedder(options.db),
+              catalogDir: options.catalogDir,
+            }),
+        }
+      : {}),
   });
 
   await app.listen({ port, host });
