@@ -354,7 +354,8 @@ CLEAN — no other modifications
 2. **Read `.specs/DISCOVERIES.md` AD-001..AD-010** for accumulated architectural decisions.
 3. **Read `.specs/features/phase-7b-acceptance-gate/validation-phase-7b.md`** for Verifier PASS report.
 4. **Read this handoff** (you're reading it now) for context + T-07 instructions.
-5. **Read `.specs/features/phase-7b-acceptance-gate/runbook.md`** for full T-07 operator runbook.
+5. **Read `.specs/features/phase-7b-acceptance-gate/HANDOFF-T07.md`** for the practical T-07 manual (human + post-compaction reference).
+6. **Read `.specs/features/phase-7b-acceptance-gate/runbook.md`** for the formal T-07 operator runbook (more rigorous).
 6. **`cd C:\Users\User\Desktop\AI-Project\Memory-Studio`** + `git checkout loop/phase-0`.
 7. **Check current state:**
    - `git log -10 --oneline` — see commit chain.
