@@ -47,9 +47,12 @@ export interface RuntimeStateSnapshot {
 }
 
 export class RuntimeStateValidationError extends Error {
-  constructor(message: string, public readonly field: string) {
+  readonly field: string;
+
+  constructor(message: string, field: string) {
     super(message);
     this.name = 'RuntimeStateValidationError';
+    this.field = field;
   }
 }
 
