@@ -148,22 +148,26 @@ async function main() {
     logOut(`wrote report: ${outPath}`);
   }
 
-  if (evaluation.verdict !== 'PASS') {
-    const failing = evaluation.criteria.filter((c) => !c.passed).map((c) => c.id);
-    logErr(`verdict=${evaluation.verdict}; failing criteria: ${failing.join(', ') || '(none — incomplete evidence)'}`);
-    process.exit(1);
-  }
-  if (!evaluation.eligible_for_phase_closure) {
-    // PASS verdict but closure is not eligible. In --allow-synthetic
-    // mode this is expected (synthetic is test-only); exit 0 because
-    // the machinery works. In production mode it indicates synthetic
-    // / stub evidence slipped through filtering — exit 1.
-    if (opts.allowSynthetic) {
-      logErr('verdict=PASS, eligible_for_phase_closure=false (synthetic mode — expected)');
-      process.exit(0);
+  if (!opts.allowSynthetic) {
+    if (evaluation.verdict !== 'PASS') {
+      const failing = evaluation.criteria.filter((c) => !c.passed).map((c) => c.id);
+      logErr(`verdict=${evaluation.verdict}; failing criteria: ${failing.join(', ') || '(none — incomplete evidence)'}`);
+      process.exit(1);
     }
-    logErr('verdict=PASS but eligible_for_phase_closure=false (synthetic evidence present or --allow-synthetic set)');
-    process.exit(1);
+    if (!evaluation.eligible_for_phase_closure) {
+      logErr('verdict=PASS but eligible_for_phase_closure=false (synthetic evidence present)');
+      process.exit(1);
+    }
+  } else {
+    // --allow-synthetic mode (test-only): the gate runs the machinery
+    // and reports the verdict / eligible_for_phase_closure. The smoke
+    // is expected to exit 0 because the machinery works — the verdict
+    // is INCOMPLETE for short test runs and the closure is always
+    // false under --allow-synthetic.
+    if (evaluation.eligible_for_phase_closure) {
+      logErr('--allow-synthetic produced eligible_for_phase_closure=true (unexpected; this should always be false)');
+      process.exit(1);
+    }
   }
   process.exit(0);
 }

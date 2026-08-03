@@ -235,3 +235,36 @@ that fires after the response is built).
 - AD-006: Phase 6a POC result (the ceilings this re-run honors)
 - AD-008: Sync writer perf (0.089ms p95)
 
+---
+
+## 2026-08-03 — AD-010: Phase 7b L-006 production wiring gaps
+
+### AD-010 — Phase 7b L-006 production wiring gaps (2026-08-03)
+
+**Decisão:** Production wiring had 5 critical L-006 findings the Planner discovered, BEFORE Phase 7b T-07 wall-clock validation could produce usable evidence:
+
+1. **`.memory-studio/state.json` thresholds NOT consumed by `runAugment`** (effective defaults `0.75/1` vs configured `0.60/2`). T-01 fix: typed adapter `src/server/config/runtime-state.ts` + `production-context.ts`; `PipelineContext` carries readonly thresholds; one snapshot per request.
+2. **Proxy hardcoded `activeCatalog: []`** — pipeline short-circuits before Stage 1b. T-02 fix: forward caller's real catalog from the same runtime state snapshot.
+3. **Proxy hardcoded session ID `"proxy"`** — every request collapses into one identity (R-9 ≥5 sessions structurally impossible). T-02 fix: hashed `x-memory-studio-session-id` header OR SHA-256 of stable original system + first user prompt; only the hash enters audit/intel/snapshots.
+4. **Proxy discarded matched pipeline output by rebuilding system with `matched: []`** (audit SHA was the empty system's SHA, not the matched system's). T-02 fix: internal detailed seam returns `{response, system}`; proxy forwards pipeline's exact matched system blocks + preserves caller's original system verbatim in stable prefix.
+5. **Proxy stripped broader Messages fields + auth headers + lacked SSE measurement path** — JSON-only stub; no tool/tool_choice/metadata/future-field passthrough; no usage extraction. T-02 fix: body passthrough + safe header allowlist. T-03 fix: streaming SSE tee + response-first fast-agent tail + usage extraction.
+
+**Por quê:** Wall-clock validation with a stubbed path measures stubs, not Memory Studio. These 5 fixes are prerequisites for T-07 evidence collection. Without them, the 7-day acceptance run would have produced a false PASS (gate evaluating a non-functional route).
+
+**Regras da era (vigentes):**
+
+- Production wiring correctness MUST be verified BEFORE any wall-clock validation.
+- L-006 (read actual code) is non-negotiable for production-correctness decisions.
+- State.json thresholds MUST be consumed by `runAugment` via a typed adapter (no hardcoded defaults).
+- Proxy MUST forward the pipeline's exact matched system + active catalog + per-session identity.
+- Proxy MUST support streaming SSE usage capture + body passthrough + safe header allowlist.
+- L-007 + L-010 (Implementer sub-agent context limits at ~6 atomic tasks): split batches > 4 tasks into 1A+1B prophylactically.
+- L-009 (Node 22 strip-types limitation): no TypeScript parameter properties; explicit field declarations + constructor-body assignment only.
+
+**Related:**
+
+- Retrospective: `.specs/RETROSPECTIVE-PHASE-7b.md`
+- Spec/design/tasks: `.specs/features/phase-7b-acceptance-gate/{spec,design,tasks}.md`
+- Implementation commits: `8449251`, `aac824b`, `fa399c2` (T-01+T-02 wiring) + `fb75813`, `33b46ab` (T-03+T-04 streaming + metrics v2)
+- Lessons: L-009 (`gate_fail`, parameter properties) + L-010 (`surviving_mutant`, batch sizing)
+

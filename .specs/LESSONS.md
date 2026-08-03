@@ -64,6 +64,18 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: src/server/routes/catalog-rebuild.ts:55-65 (Phase 5b deferral wiring pattern)
 - last seen: 2026-08-01T08:03:39Z
 
+### L-009 — Node 22 --experimental-strip-types does NOT support TypeScript parameter properties (constructor(private foo: Bar)). Use explicit field declarations: declare field, then assign in constructor body. Symptom: TypeError on module load. Fix: replace shorthand with explicit field + assignment. tsc --noEmit accepts the syntax; only --experimental-strip-types rejects it.
+- signal: `gate_fail` · recurrence: 1 feature(s) · scope: `src/server/**/*.ts + Node 22 strip-types` · harmful: 0
+- features: phase-7b
+- evidence: src/server/config/runtime-state.ts:1 (src/server/**/*.ts + Node 22 strip-types)
+- last seen: 2026-08-03T13:57:35Z
+
+### L-010 — Implementer sub-agent context limits at 5-7h batch (~6 atomic tasks). L-007 protocol: if API 429 risk detected, commit partial work as WIP, return structured report. Actually-occurred: Phase 7b Implementer #1 returned corrupted output mid-T-01, Implementer #2 hit API 429 token limit mid-T-03. Both recovered via WIP commits. RECOMMENDATION: split batches > 4 tasks into 1A+1B.
+- signal: `surviving_mutant` · recurrence: 1 feature(s) · scope: `loop orchestration + batch sizing + API 429 recovery` · harmful: 0
+- features: phase-7b
+- evidence: handoff-orchestrator.md + Implementer #1 casualty (loop orchestration + batch sizing + API 429 recovery)
+- last seen: 2026-08-03T13:57:55Z
+
 ## Quarantined (failed when applied — ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.
