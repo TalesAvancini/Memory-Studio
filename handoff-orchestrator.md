@@ -10,10 +10,12 @@ audience: "orchestrator agent (post-compaction) + the human user"
 ## TL;DR
 
 - **Branch:** `loop/phase-0` (only branch in use; do NOT work on `main`)
-- **Mission:** Phase 7a — Metrics Instrumentation — *Implementer PASS, awaiting Verifier*
+- **Mission:** Phase 7b — Real API Measurement + Tuning — *Planner dispatched, awaiting artifacts*
 - **Tests baseline:** 646 total (478 root + 152 UI + 16 SDK)
-- **HEAD:** `03cee68` (Phase 7a T-07 — last Implementer commit)
-- **9 of 11 main phases DONE.** 2 phases left: 7a (Verifier + close) + 7b (Real API measurement + tuning).
+- **HEAD:** `9024006` (Phase 7a closure commit)
+- **10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
+
+> **Phase 7a CLOSED 2026-08-02.** Verifier PASS at `.specs/features/phase-7a-metrics/validation-phase-7a.md`. Final HEAD `ca3b22c + 9024006` (closure).
 
 ## Phase Status (snapshot at handoff)
 
@@ -45,16 +47,29 @@ audience: "orchestrator agent (post-compaction) + the human user"
 | **6b.2** Fast Agent Module | ✅ `[x]` | `fbc6c47` | 1 |
 | **6b.3** BuildOptions.intel | ✅ `[x]` | `2a692ac` | 1 |
 | **6b.4** Pipeline + Cache Hit | ✅ `[x]` | `bc95558` | 1 |
-| **7a** Metrics Instrumentation | ⏳ **Implementer PASS, Verifier dispatched** | `03cee68` (HEAD) | iter 1 of 3 cap |
-| **7b** Real API Measurement | ⏳ | – | – |
+| **7a** Metrics Instrumentation | ✅ `[x]` | `9024006` (closure) | 1 |
+| **7b** Real API Measurement + Tuning | ⏳ **Planner dispatched** | `9024006` (HEAD) | planning |
 
-**9 of 11 main phases DONE.** 2 phases left: 7a (verifier + close) + 7b.
+**10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
 
 ## Current In-Flight
 
-**Phase 7a — Metrics Instrumentation — Implementer iter 1 returned PASS, awaiting Verifier.**
+**Phase 7b — Real API Measurement + Tuning — Planner dispatched, awaiting artifacts.**
 
-### Implementer Iter 1 RESULT: PASS (`03cee68`)
+### Phase 7a — CLOSED 2026-08-02 (`9024006`)
+
+**Verifier PASS at `.specs/features/phase-7a-metrics/validation-phase-7a.md`.**
+
+- 478 root + 152 UI + 16 SDK = 646 tests PASS twice
+- POC re-run 4/4 PASS at total overhead p95 0.14-0.21ms (≪ 0.30ms Phase 7a ceiling)
+- 8/8 forge tests PASS
+- AC-1..AC-14 all PASS
+- R-1 naming divergence + R-2 formula simplification documented
+- 5 non-blocking gaps (R-2 denominator edge, sliding-window vs cumulative, fractional latency, missing pino info log, direct `recordAugment` signature drift) carried to Phase 7b cleanup
+
+### Phase 7a — Pre-closure Implementer result (rolled into above)
+
+**(Historical; preserved for traces)**
 
 **Tasks completed:** T-01..T-07 (T-08 skipped as optional per Planner's note "Implementer judgment").
 
@@ -106,25 +121,24 @@ audience: "orchestrator agent (post-compaction) + the human user"
 
 ### Next actions (when resuming)
 
-1. **Inspect working tree first:** `git status --short` — see if `src/server/metrics/collector.ts` was edited between Implementer commit and now. (committed at `87c9c96` — should be clean.)
-2. **Commit any pending edits** if any.
-3. **Dispatch Verifier Phase 7a** — audit metrics ring buffer, dashboard, endpoint, refresh trigger.
-4. **If Verifier PASS:** Flip Phase 7a [ ]→[x] in ROADMAP, update STATE.md, commit validation report.
-5. **If Verifier FAIL:** handle per phase cap (iter 2 of 3 cap available; iterate).
-6. **Dispatch Planner Phase 7b** after Phase 7a closes. Phase 7b is the LAST phase.
+1. **Inspect working tree first:** `git status --short` — should be clean (Phase 7a closed at `9024006`).
+2. **Check if Phase 7b Planner artifacts landed** (`ls .specs/features/phase-7b-acceptance-gate/`).
+3. **If Planner returned:** commit artifacts, dispatch Implementer Phase 7b (single batch or sub-batch 1 of N).
+4. **If Verifier-Implementer pipeline running:** follow closure protocol (ROADMAP flip, STATE.md update, commit).
+5. **Phase 7b is the LAST phase.** Closure of 7b = Memory Studio in production.
 
 ### Quick decision tree (when resuming)
 
 ```
-Is there a Verifier pending for Phase 7a?
-├── YES → dispatch Verifier (use prompt template below)
+Is there a Planner returned for Phase 7b?
+├── YES → commit artifacts + dispatch Implementer Phase 7b
+├── NO → check `.specs/features/phase-7b-acceptance-gate/` for spec.md/design.md/tasks.md
+
+Is there a Verifier pending for the current Phase 7b batch?
+├── YES → dispatch Verifier (use Phase 6b.4 validation report template)
 └── NO → read STATE.md ## Handoff for current phase pointer
 
-Did Phase 7a Implementer return PASS but no Verifier dispatched yet?
-├── YES → dispatch Verifier 7a (pattern from .specs/features/phase-6b-fast-agent-intel/validation-phase-6b.4.md as template)
-└── NO → check if Phase 7b Planner dispatched → if not, dispatch Planner 7b
-
-Is HEAD < 87c9c96?
+Is HEAD < 9024006?
 ├── YES → run `git log -10 --oneline` to see current state, then catch up
 └── NO → proceed with current state pointer
 
