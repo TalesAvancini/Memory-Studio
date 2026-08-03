@@ -985,7 +985,16 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 - §10.2 Performance (4 items: p50<50ms, p99<200ms, working set<1.5GB, cache hit>70%)
 - §14.6 métricas definition
 
-**Estimate:** 3-4h + 1 semana wall-clock de produção
+**Estimate:** 5-7h autonomous + ≥7 days wall-clock user operation + 0.5-1.5h closure (Planner revision 2026-08-02: ROADMAP's optimistic 3-4h replaced by 5-7h because L-006 source inspection found production wiring that must be corrected before measurement).
+
+**Phase 7b status 2026-08-02:** Planner artifacts at `.specs/features/phase-7b-acceptance-gate/{spec.md, design.md, tasks.md}`. 8 atomic tasks (T-01..T-08) across 3 execution batches (NO subchapter split — within 8-task cap):
+- **7b.1 / Batch 1 — T-01..T-06:** autonomous production repairs + acceptance scaffolding (5-7h). T-01..T-03 fix L-006 critical findings: state.json thresholds NOT consumed by runAugment (defaults 0.75/1 vs configured 0.60/2), proxy discards matched pipeline output + session ID "proxy" hardcoded + strips messages fields + no streaming path. T-04..T-06 build metrics v2 + acceptance evaluator + snapshot tool.
+- **7b.2 / Batch 2 — T-07:** explicit USER-DRIVEN seven-day wall-clock collection (≥7×24h, ≥5 sessions, ≥10 turns/session). State is OPEN / waiting, not FAIL.
+- **7b.3 / Batch 3 — T-08:** deterministic report hydration + threshold freeze (0.5-1.5h). Final closure.
+
+**Carries 4 from Phase 7a Verifier (folded into 7b.1):** R-2 denominator edge case (200 without usage), sliding-window vs cumulative counters, fractional p50/p99 contract, Proxy T-14 deviation.
+
+**Deferred to v3.1+:** /metrics pino info logging, POST /catalog/rebuild TEMP+rename, global test#366 port-range cleanup.
 
 **Done criteria:**
 - [ ] **1 semana de sessões reais** (não sintéticas): audit log tem ≥ 7 dias wall-clock com ≥ 10 turns/sessão em ≥ 5 sessões distintas
@@ -995,10 +1004,11 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 - [ ] **Working set <1.5GB** validado em 1 semana: `working_set_mb < 1500` após operação sustentada
 - [ ] Thresholds finais documentados: `min_cosine_similarity` e `min_fts_hits` valores finais + log de tuning empírico
 - [ ] Phase 6b é mandatório desde 2026-07-28 (Branch B removido); Phase 7b depende de Phase 5 + Phase 6b
+- [ ] **Production wiring corrections** (T-01..T-03): state.json consumed by runAugment, proxy forwards exact matched system + active catalog + real session ID + streaming + safe header allowlist
 
 **Output do Processador:**
 - Acceptance report (`acceptance-2026-MM-DD.md`) com métricas finais
-- Threshold config final em `.memory-studio/state.json`
+- Threshold config final em `.memory-studio/state.json` (state.json MUST be consumed by runAugment via T-01 typed adapter)
 
 ---
 
