@@ -23,15 +23,23 @@ import { SEARCH_EMBEDDING_DIMENSIONS } from '../../src/search/types.ts';
 function freshDb() {
   const db = new Database(':memory:');
   db.exec(`
-    CREATE TABLE IF NOT EXISTS skills (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      slug TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      content_yaml TEXT NOT NULL,
-      embedding BLOB NOT NULL,
-      hash TEXT NOT NULL,
+    CREATE TABLE IF NOT EXISTS catalog (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      title TEXT,
+      text TEXT NOT NULL,
+      category TEXT,
+      critical INTEGER,
+      is_default INTEGER,
+      content_hash TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS embeddings (
+      catalog_id TEXT PRIMARY KEY REFERENCES catalog(id) ON DELETE CASCADE,
+      vector BLOB NOT NULL,
+      model_version TEXT NOT NULL,
+      embedded_at INTEGER NOT NULL
     );
   `);
   try {
@@ -49,16 +57,15 @@ function emptyEmbedding() {
 }
 
 function seedRow(db, row) {
+  const id = row.slug;
   db.prepare(
-    `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 1, 1)`,
-  ).run(
-    row.slug,
-    row.kind ?? 'skill',
-    row.content,
-    row.embedding ?? emptyEmbedding(),
-    `h-${row.slug}`,
-  );
+    `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 1, 1)`,
+  ).run(id, row.kind ?? 'skill', row.content, `h-${id}`);
+  db.prepare(
+    `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+     VALUES (?, ?, ?, 1)`,
+  ).run(id, row.embedding ?? emptyEmbedding(), 'multilingual-e5-small@1');
 }
 
 test('retrieval: empty corpus returns empty ranked array + zero ftsTotalHits', () => {

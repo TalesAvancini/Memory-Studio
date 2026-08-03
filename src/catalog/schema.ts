@@ -30,7 +30,7 @@ export function createSchema(db: Database): void {
       updated_at INTEGER NOT NULL
     );
     CREATE TABLE IF NOT EXISTS embeddings (
-      catalog_id TEXT PRIMARY KEY,
+      catalog_id TEXT PRIMARY KEY REFERENCES catalog(id) ON DELETE CASCADE,
       vector BLOB NOT NULL,
       model_version TEXT NOT NULL,
       embedded_at INTEGER NOT NULL

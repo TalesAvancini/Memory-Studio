@@ -63,7 +63,26 @@ function migrationsDir() {
  */
 function freshMainPathDb() {
   const db = new Database(':memory:');
-  db.exec(`CREATE TABLE IF NOT EXISTS skills (id INTEGER PRIMARY KEY AUTOINCREMENT, slug TEXT, kind TEXT, content_yaml TEXT, embedding BLOB, hash TEXT, created_at INTEGER, updated_at INTEGER);`);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS catalog (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      title TEXT,
+      text TEXT NOT NULL,
+      category TEXT,
+      critical INTEGER,
+      is_default INTEGER,
+      content_hash TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS embeddings (
+      catalog_id TEXT PRIMARY KEY REFERENCES catalog(id) ON DELETE CASCADE,
+      vector BLOB NOT NULL,
+      model_version TEXT NOT NULL,
+      embedded_at INTEGER NOT NULL
+    );
+  `);
   initializeSearchStorage(db);
   const fullSql = readFileSync(join(migrationsDir(), '004_intel.sql'), 'utf8');
   const ddlOnly = fullSql.replace(/PRAGMA\s+journal_mode\s*=\s*WAL\s*;/gi, '');

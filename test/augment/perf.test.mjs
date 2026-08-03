@@ -133,15 +133,23 @@ function deterministicQueryVector() {
 function freshSeededDb() {
   const db = new Database(':memory:');
   db.exec(`
-    CREATE TABLE IF NOT EXISTS skills (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      slug TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      content_yaml TEXT NOT NULL,
-      embedding BLOB NOT NULL,
-      hash TEXT NOT NULL,
+    CREATE TABLE IF NOT EXISTS catalog (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      title TEXT,
+      text TEXT NOT NULL,
+      category TEXT,
+      critical INTEGER,
+      is_default INTEGER,
+      content_hash TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS embeddings (
+      catalog_id TEXT PRIMARY KEY REFERENCES catalog(id) ON DELETE CASCADE,
+      vector BLOB NOT NULL,
+      model_version TEXT NOT NULL,
+      embedded_at INTEGER NOT NULL
     );
   `);
   try {
@@ -155,12 +163,17 @@ function freshSeededDb() {
     return Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength);
   })();
 
-  const insert = db.prepare(
-    `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 1, 1)`,
+  const insertCatalog = db.prepare(
+    `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 1, 1)`,
+  );
+  const insertEmbed = db.prepare(
+    `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+     VALUES (?, ?, ?, 1)`,
   );
   for (const row of FIXTURE_ROWS) {
-    insert.run(row.slug, row.kind, row.content, zeroEmbedding, `h-${row.slug}`);
+    insertCatalog.run(row.slug, row.kind, row.content, `h-${row.slug}`);
+    insertEmbed.run(row.slug, zeroEmbedding, 'multilingual-e5-small@1');
   }
   return db;
 }

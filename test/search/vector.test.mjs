@@ -56,9 +56,13 @@ function embeddingBuffer(arr) {
 
 function seedEmbedding(db, id, arr) {
   db.prepare(
-    `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(`slug-${id}`, 'skill', `content-${id}`, embeddingBuffer(arr), `h-${id}`, 1, 1);
+    `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+     VALUES (?, 'skill', ?, ?, ?, ?)`,
+  ).run(`slug-${id}`, `content-${id}`, `h-${id}`, 1, 1);
+  db.prepare(
+    `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+     VALUES (?, ?, ?, ?)`,
+  ).run(`slug-${id}`, embeddingBuffer(arr), 'multilingual-e5-small@1', 1);
 }
 
 test('T-VEC-01: validateEmbedding accepts a 384-dim Float32Array of finite values', () => {

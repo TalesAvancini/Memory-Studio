@@ -130,20 +130,22 @@ function acceptanceCorpus(db) {
     },
   ];
 
-  const insert = db.prepare(
-    `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  const insertCatalog = db.prepare(
+    `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  const insertEmbed = db.prepare(
+    `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+     VALUES (?, ?, ?, ?)`,
   );
   rows.forEach((row, i) => {
     const arr = new Float32Array(EMBEDDING_DIMENSIONS);
     arr[row.dim] = 1; // unit vector on the row's dimension
-    insert.run(
+    insertCatalog.run(row.slug, 'skill', row.content, `h-${i}`, 1, 1);
+    insertEmbed.run(
       row.slug,
-      'skill',
-      row.content,
       Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength),
-      `h-${i}`,
-      1,
+      'multilingual-e5-small@1',
       1,
     );
   });
@@ -646,22 +648,24 @@ test('T-ORCH-19: vector thresholding preserves original ranks (no compaction)', 
  * the first k components. The shared query vector is unit e_0.
  */
 function controlledVectorCorpus(db, { n = 5 } = {}) {
-  const insert = db.prepare(
-    `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  const insertCatalog = db.prepare(
+    `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  const insertEmbed = db.prepare(
+    `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+     VALUES (?, ?, ?, ?)`,
   );
   for (let i = 0; i < n; i += 1) {
     const k = i + 1;
     const arr = new Float32Array(EMBEDDING_DIMENSIONS);
     const norm = Math.sqrt(k);
     for (let j = 0; j < k; j += 1) arr[j] = 1 / norm;
-    insert.run(
+    insertCatalog.run(`cv-${k}`, 'skill', `controlled vector row with ${k} components`, `cv-h-${i}`, 1, 1);
+    insertEmbed.run(
       `cv-${k}`,
-      'skill',
-      `controlled vector row with ${k} components`,
       Buffer.from(arr.buffer, arr.byteOffset, arr.byteLength),
-      `cv-h-${i}`,
-      1,
+      'multilingual-e5-small@1',
       1,
     );
   }
@@ -712,7 +716,7 @@ test('T-ORCH-19b: rank-preservation through filtering — boundary row at exactl
       minFtsHits: 1000,
     });
     const raw = db.prepare(
-      `SELECT skill_id, distance FROM skill_embeddings WHERE embedding MATCH ? AND k = 5 ORDER BY distance ASC`,
+      `SELECT rowid, distance FROM catalog_vec WHERE embedding MATCH ? AND k = 5 ORDER BY distance ASC`,
     ).all(
       Buffer.from((() => {
         const arr = new Float32Array(EMBEDDING_DIMENSIONS);
@@ -721,7 +725,7 @@ test('T-ORCH-19b: rank-preservation through filtering — boundary row at exactl
       })().buffer),
     );
     const rawRankById = new Map();
-    raw.forEach((r, idx) => rawRankById.set(r.skill_id, idx + 1));
+    raw.forEach((r, idx) => rawRankById.set(r.rowid, idx + 1));
 
     const results = await search('anything that does not lexically match', 100);
     // Rank-4 boundary candidate MUST survive with its original rank.
@@ -879,9 +883,13 @@ function observeTotalHits(rows, query) {
       const arr = new Float32Array(EMBEDDING_DIMENSIONS);
       arr[0] = 1;
       probe.prepare(
-        `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      ).run(row.slug, 'skill', row.content, Buffer.from(arr.buffer), `h-${i}`, 1, 1);
+        `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      ).run(row.slug, 'skill', row.content, `h-${i}`, 1, 1);
+      probe.prepare(
+        `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+         VALUES (?, ?, ?, ?)`,
+      ).run(row.slug, Buffer.from(arr.buffer), 'multilingual-e5-small@1', 1);
     });
     return queryFts(probe, query, 100).totalHits;
   } finally {
@@ -894,9 +902,13 @@ function seedBoundaryCorpus(db, rows) {
     const arr = new Float32Array(EMBEDDING_DIMENSIONS);
     arr[0] = 1;
     db.prepare(
-      `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(row.slug, 'skill', row.content, Buffer.from(arr.buffer), `h-${i}`, 1, 1);
+      `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(row.slug, 'skill', row.content, `h-${i}`, 1, 1);
+    db.prepare(
+      `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+       VALUES (?, ?, ?, ?)`,
+    ).run(row.slug, Buffer.from(arr.buffer), 'multilingual-e5-small@1', 1);
   });
 }
 

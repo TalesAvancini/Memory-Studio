@@ -6,7 +6,7 @@
  *
  * Strategy: each test opens a fresh DB, runs `createSchema` (the catalog
  * contract) then `initializeSearchStorage`. Assertions probe sqlite_master,
- * pragma table_info, count() on the index tables, and mutating skills rows
+ * pragma table_info, count() on the index tables, and mutating catalog rows
  * to confirm triggers reflect changes.
  */
 
@@ -24,11 +24,10 @@ import { SEARCH_EMBEDDING_DIMENSIONS } from '../../src/search/types.ts';
 
 /**
  * Build a fresh :memory: db with the catalog schema, search indexes and a
- * pre-populated skill row. Embeddings are float32 of the locked dimension.
+ * pre-populated catalog row. Embeddings are float32 of the locked dimension.
  */
 function freshDbWithOneSkill({
-  id = 1,
-  slug = 'demo-skill',
+  id = 'demo-skill',
   content = 'debugar react hooks com useEffect',
 } = {}) {
   const db = new Database(':memory:');
@@ -44,9 +43,13 @@ function freshDbWithOneSkill({
     embeddingArr.byteLength,
   );
   db.prepare(
-    `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(slug, 'skill', content, embedding, `hash-${id}`, 1, 1);
+    `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+     VALUES (?, 'skill', ?, ?, ?, ?)`,
+  ).run(id, content, `hash-${id}`, 1, 1);
+  db.prepare(
+    `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+     VALUES (?, ?, ?, ?)`,
+  ).run(id, embedding, 'multilingual-e5-small@1', 1);
   return db;
 }
 
@@ -63,7 +66,7 @@ test('T-SCHEMA-01: extension loads and vec_version() returns a non-empty string 
   }
 });
 
-test('T-SCHEMA-02: content_fts is an FTS5 virtual table with external content on content_yaml (SEARCH-01)', () => {
+test('T-SCHEMA-02: catalog_fts is an FTS5 virtual table with external content on text (SEARCH-01)', () => {
   const db = freshDbWithOneSkill();
   try {
     const row = /** @type {{ type: string, sql: string }} */ (
@@ -74,17 +77,16 @@ test('T-SCHEMA-02: content_fts is an FTS5 virtual table with external content on
         .get(SEARCH_TABLES.fts)
     );
     assert.equal(row.type, 'table', 'FTS virtual table is reported as table');
-    assert.match(row.sql, /content_fts/i);
+    assert.match(row.sql, /catalog_fts/i);
     assert.match(row.sql, /USING fts5/i);
-    assert.match(row.sql, /content_yaml/i);
-    assert.match(row.sql, /content='skills'/i);
+    assert.match(row.sql, /content='catalog'/i);
     assert.match(row.sql, /unicode61/i);
   } finally {
     db.close();
   }
 });
 
-test('T-SCHEMA-03: skill_embeddings is a vec0 virtual table with float[384] cosine (SEARCH-02)', () => {
+test('T-SCHEMA-03: catalog_vec is a vec0 virtual table with float[384] cosine (SEARCH-02)', () => {
   const db = freshDbWithOneSkill();
   try {
     const row = /** @type {{ type: string, sql: string }} */ (
@@ -103,41 +105,6 @@ test('T-SCHEMA-03: skill_embeddings is a vec0 virtual table with float[384] cosi
   }
 });
 
-test('T-SCHEMA-03b: skill_embeddings declares skill_id INTEGER PRIMARY KEY (SEARCH-02)', () => {
-  const db = freshDbWithOneSkill();
-  try {
-    const cols = /** @type {Array<{ name: string; pk: number }>} */ (
-      db.prepare(`PRAGMA table_info(${SEARCH_TABLES.vec})`).all()
-    );
-    // The design contract requires an INTEGER PRIMARY KEY column tied to
-    // skills.id. sqlite-vec 0.1.9 reports the column's `type` as empty
-    // (vec0 is a virtual table with custom storage) but the `pk` flag is
-    // the authoritative INTEGER PRIMARY KEY marker.
-    const pk = cols.find((c) => c.name === 'skill_id');
-    assert.ok(pk, 'skill_id column must exist on skill_embeddings');
-    assert.equal(
-      /** @type {{ name: string; pk: number }} */ (pk).pk,
-      1,
-      'skill_id must be the INTEGER PRIMARY KEY column (pk=1)',
-    );
-    // Only one column can claim pk=1 — embedding must be pk=0.
-    const emb = cols.find((c) => c.name === 'embedding');
-    assert.ok(emb, 'embedding column must exist on skill_embeddings');
-    assert.equal(
-      /** @type {{ name: string; pk: number }} */ (emb).pk,
-      0,
-      'embedding cannot be a primary key column',
-    );
-    // The vec DDL SQL in sqlite_master must show the explicit PK clause.
-    const row = /** @type {{ sql: string }} */ (
-      db.prepare("SELECT sql FROM sqlite_master WHERE name = ?").get(SEARCH_TABLES.vec)
-    );
-    assert.match(row.sql, /skill_id\s+INTEGER\s+PRIMARY\s+KEY/i);
-  } finally {
-    db.close();
-  }
-});
-
 test('T-SCHEMA-04: existing rows backfill into both indexes; second init is idempotent (SEARCH-01/02)', () => {
   const db = new Database(':memory:');
   try {
@@ -151,20 +118,27 @@ test('T-SCHEMA-04: existing rows backfill into both indexes; second init is idem
       embeddingArr.byteOffset,
       embeddingArr.byteLength,
     );
-    const insert = db.prepare(
-      `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    const insertCatalog = db.prepare(
+      `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     );
-    insert.run('a', 'skill', 'first row content', embedding, 'h1', 1, 1);
-    insert.run('b', 'rule', 'second row content', embedding, 'h2', 1, 1);
-    insert.run('c', 'persona', 'third row content', embedding, 'h3', 1, 1);
+    const insertEmbed = db.prepare(
+      `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+       VALUES (?, ?, ?, ?)`,
+    );
+    insertCatalog.run('a', 'skill', 'first row content', 'h1', 1, 1);
+    insertEmbed.run('a', embedding, 'multilingual-e5-small@1', 1);
+    insertCatalog.run('b', 'rule', 'second row content', 'h2', 1, 1);
+    insertEmbed.run('b', embedding, 'multilingual-e5-small@1', 1);
+    insertCatalog.run('c', 'persona', 'third row content', 'h3', 1, 1);
+    insertEmbed.run('c', embedding, 'multilingual-e5-small@1', 1);
 
     initializeSearchStorage(db); // backfills 3 rows into both indexes
 
-    const skillsCount = /** @type {{ n: number }} */ (
-      db.prepare('SELECT COUNT(*) AS n FROM skills').get()
+    const catalogCount = /** @type {{ n: number }} */ (
+      db.prepare('SELECT COUNT(*) AS n FROM catalog').get()
     ).n;
-    assert.equal(skillsCount, 3);
+    assert.equal(catalogCount, 3);
 
     // FTS: each rowid exists exactly once.
     const ftsIds = /** @type {Array<{ rowid: number }>} */ (
@@ -172,11 +146,10 @@ test('T-SCHEMA-04: existing rows backfill into both indexes; second init is idem
     ).map((r) => r.rowid);
     assert.deepEqual(ftsIds, [1, 2, 3]);
 
-    // Vec: each skill_id exists exactly once (sqlite-vec 0.1.9 exposes
-    // an explicit INTEGER PRIMARY KEY column, not the implicit rowid).
-    const vecIds = /** @type {Array<{ skill_id: number }>} */ (
-      db.prepare(`SELECT skill_id FROM ${SEARCH_TABLES.vec} ORDER BY skill_id`).all()
-    ).map((r) => r.skill_id);
+    // Vec: each rowid exists exactly once.
+    const vecIds = /** @type {Array<{ rowid: number }>} */ (
+      db.prepare(`SELECT rowid FROM ${SEARCH_TABLES.vec} ORDER BY rowid`).all()
+    ).map((r) => r.rowid);
     assert.deepEqual(vecIds, [1, 2, 3]);
 
     // Re-init again — counts must remain identical.
@@ -194,7 +167,7 @@ test('T-SCHEMA-04: existing rows backfill into both indexes; second init is idem
   }
 });
 
-test('T-SCHEMA-05: INSERT on skills is mirrored to content_fts (SEARCH-01)', () => {
+test('T-SCHEMA-05: INSERT on catalog is mirrored to catalog_fts (SEARCH-01)', () => {
   const db = freshDbWithOneSkill();
   try {
     const embeddingArr = new Float32Array(SEARCH_EMBEDDING_DIMENSIONS);
@@ -204,9 +177,13 @@ test('T-SCHEMA-05: INSERT on skills is mirrored to content_fts (SEARCH-01)', () 
       embeddingArr.byteLength,
     );
     db.prepare(
-      `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run('inserted', 'skill', 'palavra nova', embedding, 'h-new', 1, 1);
+      `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+       VALUES (?, 'skill', ?, ?, ?, ?)`,
+    ).run('inserted', 'palavra nova', 'h-new', 1, 1);
+    db.prepare(
+      `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+       VALUES (?, ?, ?, ?)`,
+    ).run('inserted', embedding, 'multilingual-e5-small@1', 1);
 
     const ftsRows = /** @type {Array<{ rowid: number }>} */ (
       db.prepare(`SELECT rowid FROM ${SEARCH_TABLES.fts} ORDER BY rowid`).all()
@@ -224,11 +201,12 @@ test('T-SCHEMA-05: INSERT on skills is mirrored to content_fts (SEARCH-01)', () 
   }
 });
 
-test('T-SCHEMA-06: UPDATE of content_yaml on skills updates the FTS row (SEARCH-01)', () => {
+test('T-SCHEMA-06: UPDATE of text on catalog updates the FTS row (SEARCH-01)', () => {
   const db = freshDbWithOneSkill();
   try {
-    db.prepare(`UPDATE skills SET content_yaml = ? WHERE id = 1`).run(
+    db.prepare(`UPDATE catalog SET text = ? WHERE id = ?`).run(
       'conteudo totalmente novo',
+      'demo-skill',
     );
     const oldHits = db
       .prepare(
@@ -238,7 +216,7 @@ test('T-SCHEMA-06: UPDATE of content_yaml on skills updates the FTS row (SEARCH-
     assert.deepEqual(
       oldHits.map((/** @type {{ rowid: number }} */ r) => r.rowid),
       [],
-      'old lexical content must be gone after content_yaml update',
+      'old lexical content must be gone after text update',
     );
     const newHits = db
       .prepare(
@@ -254,7 +232,7 @@ test('T-SCHEMA-06: UPDATE of content_yaml on skills updates the FTS row (SEARCH-
   }
 });
 
-test('T-SCHEMA-07: UPDATE of embedding on skills replaces the vec row (SEARCH-02)', () => {
+test('T-SCHEMA-07: UPDATE of vector on embeddings replaces the vec row (SEARCH-02)', () => {
   const db = freshDbWithOneSkill();
   try {
     const newEmbeddingArr = new Float32Array(SEARCH_EMBEDDING_DIMENSIONS);
@@ -266,11 +244,14 @@ test('T-SCHEMA-07: UPDATE of embedding on skills replaces the vec row (SEARCH-02
       newEmbeddingArr.byteOffset,
       newEmbeddingArr.byteLength,
     );
-    db.prepare(`UPDATE skills SET embedding = ? WHERE id = 1`).run(newEmbedding);
+    db.prepare(`UPDATE embeddings SET vector = ? WHERE catalog_id = ?`).run(
+      newEmbedding,
+      'demo-skill',
+    );
 
     const row = db
       .prepare(
-        `SELECT skill_id FROM ${SEARCH_TABLES.vec} WHERE skill_id = ?`,
+        `SELECT rowid FROM ${SEARCH_TABLES.vec} WHERE rowid = ?`,
       )
       .get(1);
     assert.ok(row, 'vec row must still exist after update');
@@ -285,10 +266,10 @@ test('T-SCHEMA-07: UPDATE of embedding on skills replaces the vec row (SEARCH-02
   }
 });
 
-test('T-SCHEMA-08: DELETE on skills removes row from both indexes (SEARCH-01/02)', () => {
+test('T-SCHEMA-08: DELETE on catalog removes row from both indexes (SEARCH-01/02)', () => {
   const db = freshDbWithOneSkill();
   try {
-    db.prepare(`DELETE FROM skills WHERE id = 1`).run();
+    db.prepare(`DELETE FROM catalog WHERE id = ?`).run('demo-skill');
 
     const ftsCount = /** @type {{ n: number }} */ (
       db.prepare(`SELECT COUNT(*) AS n FROM ${SEARCH_TABLES.fts}`).get()
@@ -303,7 +284,7 @@ test('T-SCHEMA-08: DELETE on skills removes row from both indexes (SEARCH-01/02)
   }
 });
 
-test('T-SCHEMA-09: missing skills table throws SearchError(SCHEMA_ERROR) before extension load (SEARCH-15)', () => {
+test('T-SCHEMA-09: missing catalog table throws SearchError(SCHEMA_ERROR) before extension load (SEARCH-15)', () => {
   const db = new Database(':memory:');
   try {
     // Deliberately skip createSchema — initializeSearchStorage must refuse.

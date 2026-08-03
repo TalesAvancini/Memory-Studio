@@ -37,20 +37,20 @@ function emptyEmbedding() {
 }
 
 function seedRows(db, rows) {
-  const insert = db.prepare(
-    `INSERT INTO skills (slug, kind, content_yaml, embedding, hash, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  const insertCatalog = db.prepare(
+    `INSERT INTO catalog (id, type, text, content_hash, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  );
+  const insertEmbed = db.prepare(
+    `INSERT INTO embeddings (catalog_id, vector, model_version, embedded_at)
+     VALUES (?, ?, ?, ?)`,
   );
   rows.forEach((row, i) => {
-    insert.run(
-      row.slug ?? `slug-${i}`,
-      row.kind ?? 'skill',
-      row.content,
-      row.embedding ?? emptyEmbedding(),
-      row.hash ?? `h-${i}`,
-      1,
-      1,
-    );
+    const id = row.slug ?? `slug-${i}`;
+    const type = row.kind ?? 'skill';
+    const hash = row.hash ?? `h-${i}`;
+    insertCatalog.run(id, type, row.content, hash, 1, 1);
+    insertEmbed.run(id, row.embedding ?? emptyEmbedding(), 'multilingual-e5-small@1', 1);
   });
 }
 
