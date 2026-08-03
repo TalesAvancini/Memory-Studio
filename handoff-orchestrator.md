@@ -10,12 +10,14 @@ audience: "orchestrator agent (post-compaction) + the human user"
 ## TL;DR
 
 - **Branch:** `loop/phase-0` (only branch in use; do NOT work on `main`)
-- **Mission:** Phase 7b — Real API Measurement + Tuning — *Planner dispatched, awaiting artifacts*
-- **Tests baseline:** 646 total (478 root + 152 UI + 16 SDK)
-- **HEAD:** `9024006` (Phase 7a closure commit)
+- **Mission:** Phase 7b Batch 1 — Empirical Tuning + Acceptance Gate (T-01..T-06) — *Implementer #2 running after respawn*
+- **Tests baseline:** 478 root + 152 UI + 16 SDK = 646 total (currently 17 FAIL — Implementer #1 introduced TS parameter property bug; WIP committed at `3331660`)
+- **HEAD:** `3331660` (WIP+T-01 partial)
 - **10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
 
 > **Phase 7a CLOSED 2026-08-02.** Verifier PASS at `.specs/features/phase-7a-metrics/validation-phase-7a.md`. Final HEAD `ca3b22c + 9024006` (closure).
+>
+> **Phase 7b IMPLEMENTER #1 DIED (agent `a68b42aac9239a8db`).** Partial T-01 work committed at `3331660` with TS parameter property bug. Fresh Implementer #2 dispatched (agent `a5ab666311b294249`).
 
 ## Phase Status (snapshot at handoff)
 
@@ -48,7 +50,7 @@ audience: "orchestrator agent (post-compaction) + the human user"
 | **6b.3** BuildOptions.intel | ✅ `[x]` | `2a692ac` | 1 |
 | **6b.4** Pipeline + Cache Hit | ✅ `[x]` | `bc95558` | 1 |
 | **7a** Metrics Instrumentation | ✅ `[x]` | `9024006` (closure) | 1 |
-| **7b** Real API Measurement + Tuning | ⏳ **Planner dispatched** | `9024006` (HEAD) | planning |
+| **7b** Real API Measurement + Tuning | ⏳ **Implementer #2 dispatched** (T-01..T-06) | `3331660` (HEAD, WIP) | respawn |
 
 **10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
 
