@@ -1,8 +1,8 @@
 ---
-date: 2026-08-01
-title: "Orchestrator handoff — tlc-roadmap-loop mid-flight"
-purpose: "Resume state for session compaction / credit exhaustion"
-audience: "orchestrator agent (post-compaction) + the human user"
+date: 2026-08-03
+title: "Orchestrator handoff — tlc-roadmap-loop mid-flight (T-07 PAUSE)"
+purpose: "Resume state for session compaction / credit exhaustion / role handoff"
+audience: "orchestrator agent (post-compaction) + the human user + any future agent"
 ---
 
 # Orchestrator Handoff — `tlc-roadmap-loop`
@@ -12,8 +12,8 @@ audience: "orchestrator agent (post-compaction) + the human user"
 - **Branch:** `loop/phase-0` (only branch in use; do NOT work on `main`)
 - **Mission:** **ORCHESTRATOR PAUSES FOR T-07 USER-DRIVEN WALL-CLOCK** (≥7 days of real production traffic)
 - **Tests baseline:** 533 root + 152 UI + 16 SDK = 701 total (was 478; +55 new tests in 7b.1B)
-- **HEAD:** `71a137d` (validation-phase-7b.md commit)
-- **10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
+- **HEAD:** `dd987d8` (handoff update)
+- **10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — awaits user-driven wall-clock validation).
 
 > **Phase 7a CLOSED 2026-08-02.** Verifier PASS at `.specs/features/phase-7a-metrics/validation-phase-7a.md`.
 >
@@ -57,184 +57,255 @@ audience: "orchestrator agent (post-compaction) + the human user"
 | **6b.2** Fast Agent Module | ✅ `[x]` | `fbc6c47` | 1 |
 | **6b.3** BuildOptions.intel | ✅ `[x]` | `2a692ac` | 1 |
 | **6b.4** Pipeline + Cache Hit | ✅ `[x]` | `bc95558` | 1 |
-| **7a** Metrics Instrumentation | ✅ `[x]` | `9024006` (closure) | 1 |
-| **7b** Real API Measurement + Tuning | ⏳ 7b.1 Verifier PASS, awaiting T-07 user-driven | `71a137d` (HEAD) | Verifier PASS + ORCHESTRATOR PAUSES |
-
-**10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
+| **7a** Metrics Instrumentation | ✅ `[x]` | `9024006` | 1 |
+| **7b** Empirical Tuning + Acceptance Gate | ⏸️ Open — 7b.1 Verifier PASS, awaiting T-07 user-driven | `dd987d8` (HEAD) | 7b.1 PASS + T-07 PAUSE |
 
 ## Current In-Flight
 
-**Phase 7b — Real API Measurement + Tuning — Planner dispatched, awaiting artifacts.**
+**Phase 7b — Phase 7b.1 (T-01..T-06) scaffolding VERIFIED; ORCHESTRATOR PAUSES for T-07 user-driven wall-clock.**
 
-### Phase 7a — CLOSED 2026-08-02 (`9024006`)
+### 7b.1 Verifier PASS
 
-**Verifier PASS at `.specs/features/phase-7a-metrics/validation-phase-7a.md`.**
+**Verifier LEAN PASS at `71a137d`. 533/533 root tests PASS twice (stable). All 5 L-006 critical findings RESOLVED with real code evidence:**
 
-- 478 root + 152 UI + 16 SDK = 646 tests PASS twice
-- POC re-run 4/4 PASS at total overhead p95 0.14-0.21ms (≪ 0.30ms Phase 7a ceiling)
-- 8/8 forge tests PASS
-- AC-1..AC-14 all PASS
-- R-1 naming divergence + R-2 formula simplification documented
-- 5 non-blocking gaps (R-2 denominator edge, sliding-window vs cumulative, fractional latency, missing pino info log, direct `recordAugment` signature drift) carried to Phase 7b cleanup
-
-### Phase 7a — Pre-closure Implementer result (rolled into above)
-
-**(Historical; preserved for traces)**
-
-**Tasks completed:** T-01..T-07 (T-08 skipped as optional per Planner's note "Implementer judgment").
-
-| File | Lines | Purpose |
+| Fix | Verdict | Evidence |
 |---|---|---|
-| `src/server/metrics/ring-buffer.ts` | 366 | `MetricsRingBuffer` class — counters + 100-element latency ring + dashboard recompute |
-| `src/server/metrics/lifecycle.ts` | 59 | Singleton accessor (mirrors `audit/lifecycle.ts`) |
-| `src/server/metrics/collector.ts` | 98 | Write seam (recordAugment + recordProxy) |
-| `src/server/metrics/dashboard.ts` | 39 | Read helper (compute 5 metrics from ring buffer) |
-| `src/server/routes/metrics.ts` | 43 | `GET /metrics` endpoint (constant-time < 1ms) |
-| `test/server/metrics/{ring-buffer,dashboard,route,reset}.test.mjs` | 457 | 19 new tests |
-| `scripts/smoke-metrics.mjs` | 163 | Smoke boots server, sends 50 requests, asserts metrics |
+| state.json consumed by runAugment | RESOLVED | `production-context.ts:82` → `pipeline.ts:277-281` |
+| proxy activeCatalog wired | RESOLVED | `messages-proxy.ts:270-272` reads `runtimeContext.state.activeCatalog` |
+| proxy session ID wired | RESOLVED | `deriveSessionIdentity` at `messages-proxy.ts:105-119` (sha256-hashed) |
+| proxy exact system forwarding | RESOLVED | `composeForwardedSystem` at `messages-proxy.ts:318` |
+| streaming SSE tee | RESOLVED | `src/server/proxy/sse-tee.ts` (276 lines), wired at `messages-proxy.ts:25, 409, 517` |
 
-**Files modified:**
-- `src/server/boot.ts` — +24/-2 (init + start + register + stop on SIGTERM)
-- `src/server/augment/pipeline.ts` — +33/-9 (3 hook sites: matched path, personaOnlyResponse, failOpenResponse)
-- `src/server/routes/messages-proxy.ts` — +18/-4 (tProxyStart capture + recordProxySample on 200)
-- `src/server/routes/index.ts` — +2/-1 (re-export registerMetricsRoute)
+**4 PRD §10.2 budgets measurable through `/metrics`:**
+- `p50_latency_ms`
+- `p99_latency_ms`
+- `working_set_mb`
+- `request_hit_rate` + `token_cache_coverage` (cumulative-per-process)
 
-**Gates result:**
-- `npm test`: 478/478 PASS (target ≥ 475 met)
-- `npm run typecheck`: exit 0
-- `node scripts/smoke-metrics.mjs`: PASS
-- `node scripts/poc-6a-hot-path.mjs`: **total overhead 0.10ms p95** ≪ 10ms budget (Phase 6b invariant preserved)
-- All other gates green
+**POC re-run:** TOTAL p95 = 0.18ms (≪ 5ms budget).
 
-**GET /metrics sample response:**
+**Scope guard:** empty (no locked-layer leakage).
+
+---
+
+## T-07 — USER-DRIVEN WALL-CLOCK (7 days)
+
+**This is YOUR job. The orchestrator cannot simulate this.**
+
+### Pre-flight checklist (BEFORE starting the clock)
+
+```bash
+cd "C:/Users/User/Desktop/AI-Project/Memory-Studio"
+
+# 1. Confirm HEAD
+git log -1 --oneline  # should be dd987d8
+
+# 2. Confirm gates
+npm test                                # 533/533 PASS
+npm run typecheck                       # exit 0
+npm run verify-env                      # 6/6 PASS
+node scripts/smoke-acceptance-gate.mjs  # PASS
+
+# 3. Build the on-disk catalog
+npm run build-index
+
+# 4. Set environment (NEVER commit secrets)
+export MINIMAX_API_KEY=<real-key>                              # real provider key
+export MEMORY_STUDIO_CATALOG_DB_PATH=$(pwd)/data/memory-studio.sqlite
+export MEMORY_STUDIO_STATE_PATH=$(pwd)/.memory-studio/state.json
+
+# 5. Edit .memory-studio/state.json — ensure activeCatalog is NON-EMPTY
+# (Empty activeCatalog short-circuits the pipeline at Stage 2.)
+# Current state.json: thresholds: minCosineSimilarity=0.6, minFtsHits=2
+
+# 6. Boot the augment server in another terminal
+npm run server:start
+# Verify log shows "MODE=real" for fast agent and "MODE=production"
+
+# 7. Spot-check one real /v1/messages request with your coding agent
+# Verify system prompt preserved, usage.cache_read_input_tokens > 0 for stable prompts
+
+# 8. Capture FIRST snapshot (anchors the evidence timeline)
+node scripts/snapshot-metrics.mjs \
+  --url http://127.0.0.1:42900 \
+  --state .memory-studio/state.json \
+  --db data/memory-studio.sqlite \
+  --source real \
+  --provider-mode anthropic-real \
+  --fast-agent-mode real \
+  --runtime-mode production \
+  --out-dir .specs/acceptance/snapshots
+# This writes .specs/acceptance/snapshots/<ISO_TIMESTAMP>.json
+```
+
+### Daily cadence (per session)
+
+For each qualifying session (≥10 turns, stable identity):
+
+```bash
+# 1. Use Claude Code / Mavis / Cursor normally with the augment server as proxy
+# 2. Set x-memory-studio-session-id header to a unique value per session
+# 3. End the session:
+node scripts/snapshot-metrics.mjs \
+  --url http://127.0.0.1:42900 \
+  --state .memory-studio/state.json \
+  --db data/memory-studio.sqlite \
+  --source real \
+  --provider-mode anthropic-real \
+  --fast-agent-mode real \
+  --runtime-mode production \
+  --out-dir .specs/acceptance/snapshots
+
+# 4. Check the gate (read-only) for tuning recommendation
+node scripts/acceptance-gate.mjs \
+  --snapshots .specs/acceptance/snapshots \
+  --state .memory-studio/state.json
+# Output: tuning_recommendation: freeze | lower_cosine | lower_fts | inspect_cache | fix_performance | wait | escalate
+```
+
+### Eligibility requirements (the gate checks these)
+
+| Requirement | Threshold |
+|---|---|
+| Wall-clock span | `max(audit.ts) - min(audit.ts) >= 604_800_000ms` (7 × 24 hours) |
+| Distinct sessions | ≥ 5 (each with ≥ 10 audited turns) |
+| Total qualifying turns | ≥ 50 |
+| Snapshot source | `real` only (synthetic rejected in production mode) |
+| Provider mode | `anthropic-real` |
+| Fast agent mode | `real` |
+| Runtime mode | `production` |
+| Final threshold epoch | ≥ 2 sessions, ≥ 20 turns |
+
+### 4 budgets the gate enforces (PRD §10.2 + §14.6)
+
+| Budget | Strict inequality |
+|---|---|
+| `request_hit_rate` | `> 0.70` |
+| `token_cache_coverage` | `> 0.60` |
+| `p50_latency_ms` | `< 50` (worst observed across qualifying real snapshots) |
+| `p99_latency_ms` | `< 200` |
+| `working_set_mb` | `< 1500` (≥1h sustained process epoch) |
+
+**Both cache ratios are mandatory (AND, not OR).**
+
+### Mechanical completion check
+
+```bash
+node scripts/acceptance-gate.mjs \
+  --snapshots .specs/acceptance/snapshots \
+  --state .memory-studio/state.json
+# MUST exit 0 (without --allow-synthetic) AND report eligible_for_phase_closure: true
+# BEFORE T-07 is considered complete.
+```
+
+---
+
+## After T-07 — what to return to the orchestrator
+
+The orchestrator will dispatch T-08 once you provide these:
+
+```
+.specs/acceptance/snapshots/*.json         # all committed snapshots
+.memory-studio/state.json                 # final state.json
+.specs/features/phase-7b-acceptance-gate/threshold-tuning.md  # your tuning log
+```
+
+**DO NOT include in the return:**
+- API keys or authorization headers
+- Raw prompts, responses, or context blocks
+- Raw session IDs (snapshots only contain hashed session IDs)
+- Any secret-like values
+
+If a secret appears in a snapshot by accident, REMOVE that snapshot, ROTATE the credential, FIX the collector, and recapture.
+
+---
+
+## Operating Memory Studio locally — Quick Reference
+
+### Boot the augment server
+
+```bash
+cd "C:/Users/User/Desktop/AI-Project/Memory-Studio"
+
+# Required environment (DO NOT commit secrets):
+export MINIMAX_API_KEY=<your-real-key>
+export MEMORY_STUDIO_CATALOG_DB_PATH=$(pwd)/data/memory-studio.sqlite
+export MEMORY_STUDIO_STATE_PATH=$(pwd)/.memory-studio/state.json
+
+# Build catalog (one-time or after editing .memory-studio/catalog/*.yaml)
+npm run build-index
+
+# Boot the server (default port 42900-43000)
+npm run server:start
+# Server log should show:
+#   [boot] fast-agent MODE=real endpoint=https://api.minimax.io/anthropic model=MiniMax-M2.7-highspeed
+#   [boot] runtime MODE=production
+#   Memory Studio augment server: http://127.0.0.1:<port>/
+```
+
+### Available endpoints
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/health` | GET | Liveness probe (uptime, audit_buffer, catalog) |
+| `/metrics` | GET | 5 metrics: request_hit_rate, token_cache_coverage, p50/p99_latency_ms, working_set_mb |
+| `/augment` | POST | The augment pipeline (called by SDK or proxy) |
+| `/v1/messages` | POST | Transparent proxy (Anthropic Messages API + Memory Studio augmentation) |
+| `/audit` | GET | Audit log (redacted) |
+| `/audit/summary` | GET | Daily rollups |
+| `/catalog` | GET | Current catalog |
+| `/catalog/rebuild` | POST | FALLBACK no-op (deferred to v3.1+) |
+| `/state/toggle` | POST | Toggle Memory Studio on/off per session |
+
+### Wire Memory Studio to another repo (Coding Agent)
+
+**Option A — Claude Code:**
+```bash
+# In your other repo, set env:
+export ANTHROPIC_BASE_URL=http://127.0.0.1:42900  # augment server
+# Plus your real Anthropic key still works through:
+export ANTHROPIC_API_KEY=<your-real-key>
+# Inside Memory Studio, the proxy forwards to:
+#   https://api.minimax.io/anthropic (or whatever MEMORY_STUDIO_ANTHROPIC_BASE_URL says)
+```
+
+**Option B — Mavis / Cursor:**
+Same pattern — set the proxy base URL to the augment server. The augment server transparently forwards the request to Anthropic with augmented system prompt.
+
+**Option C — Direct SDK (any node.js app):**
+```bash
+npm install /path/to/Memory-Studio/packages/sdk
+# Use the SDK from packages/sdk — see packages/sdk/README.md
+```
+
+### Active catalog
+
+Edit `.memory-studio/state.json`:
 ```json
 {
-  "request_hit_rate": null,
-  "token_cache_coverage": null,
-  "p50_latency_ms": 0.071,
-  "p99_latency_ms": 2.575,
-  "working_set_mb": 80,
-  "window": { "request_count": 5, "proxy_request_count": 0, "window_age_ms": 273 },
-  "proxy_enabled": false,
-  "schema_version": 1,
-  "timestamp": 1785608539233
+  "schemaVersion": 3,
+  "activeCatalog": [
+    /* array of skill/rule/persona IDs from .memory-studio/catalog/*.yaml */
+  ],
+  "thresholds": {
+    "minCosineSimilarity": 0.6,
+    "minFtsHits": 2
+  },
+  "fastAgent": {
+    "model": "MiniMax-M2.7-highspeed",
+    "baseURL": "https://api.minimax.io/anthropic"
+  },
+  "integrationMode": "proxy",
+  "agentId": "claude-code"
 }
 ```
 
-### Implementer deviations worth flagging
-
-1. **Buffer `recordAugment` signature:** accepts `{ matched, outcome, latencyMs }` (with explicit `outcome` enum) rather than tasks.md's simpler `{ matched, latencyMs }`. The collector's `outcomeFromEmptyReason` translates from `AugmentResponse.emptyReason` to `AugmentOutcome`. Needed to honor spec.md R-1 denominator exclusion (social/no_active_items/timeout).
-2. **Low-confidence paths counted as `measured`:** `emptyReason: 'low_confidence'` is NOT in spec.md R-1's exclusion list — counted in denominator.
-3. **`readProxyEnabled()` reads env at recompute time**, NOT cached. Runtime env changes reflected immediately.
-4. **`window.request_count` = total augment requests (all paths)**, not just measured. By design (raw volume for dashboards).
-5. **Pre-existing test#366 flake** in `test/server/smoke.test.mjs:111` — port exhaustion `[42900, 43000]`. Not caused by Phase 7a. Phase 7a smoke uses distinct port range `[48300, 48399]`.
-
-### Next actions (when resuming)
-
-1. **Inspect working tree first:** `git status --short` — should be clean (Phase 7a closed at `9024006`).
-2. **Check if Phase 7b Planner artifacts landed** (`ls .specs/features/phase-7b-acceptance-gate/`).
-3. **If Planner returned:** commit artifacts, dispatch Implementer Phase 7b (single batch or sub-batch 1 of N).
-4. **If Verifier-Implementer pipeline running:** follow closure protocol (ROADMAP flip, STATE.md update, commit).
-5. **Phase 7b is the LAST phase.** Closure of 7b = Memory Studio in production.
-
-### Quick decision tree (when resuming)
-
-```
-Is there a Planner returned for Phase 7b?
-├── YES → commit artifacts + dispatch Implementer Phase 7b
-├── NO → check `.specs/features/phase-7b-acceptance-gate/` for spec.md/design.md/tasks.md
-
-Is there a Verifier pending for the current Phase 7b batch?
-├── YES → dispatch Verifier (use Phase 6b.4 validation report template)
-└── NO → read STATE.md ## Handoff for current phase pointer
-
-Is HEAD < 9024006?
-├── YES → run `git log -10 --oneline` to see current state, then catch up
-└── NO → proceed with current state pointer
-
-Do you have unanswered user messages?
-├── YES → ANSWER THEM FIRST before dispatching (user got frustrated when I ran long dispatches in foreground)
-└── NO → dispatch freely
-```
-
-### Concrete resume commands (copy-paste ready)
-
+Bootstrap the catalog from YAML samples:
 ```bash
-# 1. Get current state
-cd "C:/Users/User/Desktop/AI-Project/Memory-Studio"
-git checkout loop/phase-0
-git log -10 --oneline
-git status --short
-
-# 2. Read state pointer
-cat .specs/STATE.md | head -100
-
-# 3. Read this handoff for context
-cat handoff-orchestrator.md
-
-# 4. Check what Verifier dispatch template exists
-ls .specs/features/phase-6b-fast-agent-intel/validation-phase-6b.*.md
-
-# 5. Dispatch Verifier Phase 7a (after reading tasks.md and validation-phase-7a.md template)
-# Use Agent tool with subagent_type: "general-purpose"
-# Reference: .specs/features/phase-7a-metrics/{spec,design,tasks}.md
-# Write validation report to: .specs/features/phase-7a-metrics/validation-phase-7a.md
+npm run catalog:load            # loads .memory-studio/catalog/*.yaml into SQLite
 ```
 
-### Critical user-experience lesson (MUST follow)
-
-**DO NOT run long Implementer/Planner/Verifier dispatches in foreground without acknowledging the user first.** When the user asks "como estamos?" mid-dispatch, they WAIT — sometimes 30+ minutes. Solutions:
-- Run long dispatches in `run_in_background: true` so you can respond to status queries.
-- If you must run foreground, send a 1-line "Implementer started, will report back in ~30 min" message BEFORE calling the Agent tool.
-- After every long dispatch returns, respond IMMEDIATELY to any queued user messages.
-
-**User explicitly flagged this frustration on 2026-08-01:** "Eu te perguntei 3 vezes vc ficou meia hora sem me responder, fdp." Do not repeat this pattern.
-
-### Known issues to track (do NOT skip)
-
-1. **test#366 flake** — `test/server/smoke.test.mjs:366` (was line 111, line 237, line 285 across phases — line number shifts as tests are added). Port exhaustion in `[42900, 43000]`. Pre-existing across Phases 5a, 5b, 6a, 6b, 7a. **Recommendation:** widen port range in Phase 7b cleanup, or add SIGTERM + 500ms delay in smoke wrapper.
-2. **Proxy T-14 deviation** — `src/server/routes/messages-proxy.ts:230` uses `activeCatalog: []` which short-circuits BEFORE Stage 1b. Documented in AD-009. Pickup candidate for Phase 7b.
-3. **POST /catalog/rebuild no-op fallback** — `src/server/routes/catalog-rebuild.ts:55-65` uses FALLBACK_REBUILD that returns count without doing actual rebuild. Documented in file header lines 17-23. Pickup candidate for Phase 7b.
-4. **Token-weighted `token_cache_coverage`** — Phase 7a uses request-weighted (simpler). PRD §14.6 specifies token-weighted. v3.1+ if needed.
-
-### Phase 7a Verifier dispatch template (use when resuming)
-
-The Verifier for Phase 7a should:
-- Read `.specs/features/phase-7a-metrics/{spec,design,tasks}.md`
-- Audit `src/server/metrics/ring-buffer.ts` (366 lines) — counters, latency ring, refresh trigger
-- Audit `src/server/metrics/collector.ts` (98 lines) — write seam
-- Audit `src/server/routes/metrics.ts` (43 lines) — GET /metrics endpoint
-- Audit hook sites in `src/server/augment/pipeline.ts` and `src/server/routes/messages-proxy.ts`
-- Run `npm test -- test/server/metrics/` — 19 tests must PASS
-- Run `node scripts/smoke-metrics.mjs` — must exit 0
-- Run `node scripts/poc-6a-hot-path.mjs` — must show total overhead < 10ms (Phase 6b invariant)
-- Document PRD divergences in validation-phase-7a.md per spec.md §5
-- Write report to `.specs/features/phase-7a-metrics/validation-phase-7a.md`
-
-### Phase 7b scope preview (per ROADMAP)
-
-Phase 7b — Real API Measurement + Tuning. 2-3h estimate. Depends on Phase 5 + Phase 6b.
-
-Done criteria (per ROADMAP):
-- Real `MiniMax-M2.7-highspeed` API latency p95 measurement (vs POC stub 223ms)
-- Cache hit validation with real Anthropic API (vs POC stub `cache_read_input_tokens=42`)
-- Working set measurement at 1h mark vs PRD §10.2.3 budget (<1.5GB)
-- Tuned thresholds based on real data
-
-**Likely cleanup candidates picked up here:**
-- test#366 flake fix
-- Proxy T-14 deviation (AD-009)
-- POST /catalog/rebuild production wiring (Phase 5b.3 deferred gap)
-
-### Authoritative files for resume (READ IN ORDER)
-
-1. `handoff-orchestrator.md` (this file) — TL;DR + decision tree + recovery commands
-2. `.specs/STATE.md` — current phase pointer + decisions + handoff
-3. `.specs/ROADMAP.md` — phase ordering + done criteria
-4. `.specs/DISCOVERIES.md` — AD-001..AD-009 architectural decisions
-5. `.specs/features/phase-7a-metrics/{spec,design,tasks}.md` — Phase 7a contracts (T-01..T-07)
-6. `.specs/features/phase-7a-metrics/validation-phase-7a.md` — Verifier report (when written)
-7. `.claude/agents/` or `~/.claude/agents/` — if you need to dispatch sub-agents, use the same agent types as before (general-purpose for Implementer/Verifier/Planner)
+---
 
 ## Cumulative Phase Results Summary
 
@@ -243,7 +314,7 @@ Done criteria (per ROADMAP):
 
 ### Phase 5b (Audit + Endpoints + Security) — DONE
 11 atomic commits across 4 sub-phases. 391 root + 152 UI + 16 SDK = 559 tests.
-**Deferred gap documented:** POST /catalog/rebuild uses FALLBACK no-op (cannot recover from corrupted catalog). Real TEMP+rename swap deferred to Phase 5c/7a follow-up.
+**Deferred gap:** POST /catalog/rebuild uses FALLBACK no-op (rebuild via controlled server restart).
 
 ### Phase 6a (POC Validation) — DONE
 6 atomic commits. 19 POC tests added. POC verdict: PASS on all 3 targets.
@@ -256,63 +327,56 @@ Done criteria (per ROADMAP):
 17 atomic tasks across 4 sub-phases. 459 root + 152 UI + 16 SDK = 627 tests.
 **POC re-run at end-of-phase:** TOTAL overhead max=2.15ms ≪ 10ms budget (5× headroom).
 **R-15 cache hit invariant validated.**
-**Known scope gap:** proxy route at `src/server/routes/messages-proxy.ts:230` uses `activeCatalog: []` which short-circuits BEFORE Stage 1b — full proxy fast-agent scheduling deferred to Phase 7b per AD-009.
 
-### Phase 7a (Metrics Instrumentation) — Implementer PASS
+### Phase 7a (Metrics Instrumentation) — DONE
 7 atomic tasks (T-01..T-07). 478 root + 152 UI + 16 SDK = 646 tests.
-**POC re-run:** total overhead 0.10ms ≪ 10ms budget (Phase 6b invariant preserved).
+**POC re-run:** total overhead 0.10ms p95 (Phase 6b invariant preserved).
+**GET /metrics endpoint:** 5 metrics, refresh N=10 OR T=60s.
+**5 non-blocking gaps** carried to Phase 7b cleanup.
+
+### Phase 7b (Empirical Tuning + Acceptance Gate) — 7b.1 VERIFIED, T-07 PAUSES
+- 7b.1: T-01..T-06 committed. 533 root + 152 UI + 16 SDK = 701 tests.
+- All 5 L-006 critical findings RESOLVED.
+- Verifier PASS at `71a137d`.
+- **T-07 awaiting user-driven wall-clock (≥7 days).**
+- T-08 (autonomous hydration) deferred until T-07 completes.
 
 ## Working Tree at Handoff
 
 ```
- M handoff-orchestrator.md          (this file — being committed)
- M src/server/metrics/collector.ts  (Implementer's edit between commits — pending commit)
- ?? .specs/architecture/custom-farol.html.bak   (untracked, NOT loop work)
- ?? .specs/archive/architeture/                 (untracked, NOT loop work — note: typo "architeture")
- ?? .specs/archive/auto-grill-output/           (untracked)
- ?? UsersUserDesktopAI-ProjectMemory-Studio.claudeagents/   (untracked)
- ?? old_arquive-miscelanea/                    (untracked)
+M handoff-orchestrator.md          (this file — being committed)
+CLEAN — no other modifications
 ```
-
-**Note:** `src/server/metrics/collector.ts` is modified but uncommitted — likely a small adjustment the Implementer made between commits. Inspect + commit with Phase 7a closure.
 
 ## After session compaction (manual or auto), the next session must
 
 1. **Read `STATE.md ## Handoff`** to learn current phase pointer.
-2. **Read `.specs/DISCOVERIES.md` AD-001..AD-009** for accumulated architectural decisions.
-3. **Read `.specs/features/phase-7a-metrics/validation-phase-7a.md`** (when Verifier writes it) for Verifier report.
-4. **Read this handoff** (you're reading it now) for context.
-5. **`cd C:\Users\User\Desktop\AI-Project\Memory-Studio`** + `git checkout loop/phase-0`.
-6. **Check current state:**
+2. **Read `.specs/DISCOVERIES.md` AD-001..AD-010** for accumulated architectural decisions.
+3. **Read `.specs/features/phase-7b-acceptance-gate/validation-phase-7b.md`** for Verifier PASS report.
+4. **Read this handoff** (you're reading it now) for context + T-07 instructions.
+5. **Read `.specs/features/phase-7b-acceptance-gate/runbook.md`** for full T-07 operator runbook.
+6. **`cd C:\Users\User\Desktop\AI-Project\Memory-Studio`** + `git checkout loop/phase-0`.
+7. **Check current state:**
    - `git log -10 --oneline` — see commit chain.
-   - `git status --short` — see if uncommitted changes remain.
-   - `git diff src/server/metrics/collector.ts` — verify state.
-7. **Dispatch Verifier Phase 7a** (if not already done — see `git log` for validation-phase-7a.md commit).
-8. **If Verifier PASS:** step 8 PASS branch — flip Phase 7a `[ ]` → `[x]`, update `STATE.md ## Handoff`, commit, dispatch Implementer Phase 7b (or Planner first if Phase 7b needs new spec).
-9. **If Verifier FAIL** (iter 2 of cap = 2nd attempt): implement fix-tasks + re-verify.
+   - `git status --short` — verify clean.
+   - `git log -1 --oneline` — HEAD should be `dd987d8`.
+8. **Phase 7b status:** Verifier PASS at `71a137d`. ORCHESTRATOR PAUSES for T-07.
+9. **DO NOT dispatch Implementer/Verifier** until user provides T-07 snapshots.
 
-## L-007 candidate (already saved) — API 429 mid-task recovery
+## Lesson Log
 
-**Pattern:** Implementer/Verifier can die mid-task from API 429 token limit. Recovery: don't restart from scratch; inspect working tree, commit partial work, resume from where it stopped. **Recurrence=2** (Phase 4.4 + Phase 5a.2 — Phase 5a.2 Implementer iter 2 died after committing FT-01 + FT-02).
+- **L-001..L-008** (Phases 1-5b)
+- **L-009** (Phase 7b): Node 22 strip-types rejects TS parameter properties. Use explicit field + constructor-body assignment.
+- **L-010** (Phase 7b): Sub-agent context limits at ~6 atomic tasks. Split batches > 4 tasks in 1A+1B prophylactically. L-007 protocol + 3 casualties in 24h.
 
-## Lesson Log (`scripts/lessons.py add --feature <feat> --signal <type> --source <file:line> --text <one-line>`)
-
-- **L-001** (Phase 1.2): vec0 ≠ FTS5 trigger syntax
-- **L-002** (Phase 1.4): Windows EBUSY retry-with-backoff (50ms→1000ms, 25 attempts)
-- **L-003** (Phase 1.4): residue deletion must update `package.json` scripts in same task
-- **L-004** (Phase 1.4): D-001 §18.x grep needs 2-axis classification (stale section refs vs META documentation of rule itself)
-- **L-005** (Phase 3): Implementer "true observation, wrong reason" pattern
-- **L-006** (Phase 3, 4.4, 5a.1, 5a.2): dispatch assertions can be wrong. Read design.md / spec.md / code before claiming contracts.
-- **L-007** (Phase 5a.2): API 429 mid-task recovery pattern (recurrence=2).
-- **L-008** (Phase 5b.3): deferred-wiring pattern for contractually-correct no-op fallback (file header documents the gap).
-
-**Effective practice after Phase 6b:** when writing dispatch prompts for the loop, NEVER instruct "PASS test X looks like Y" — instead, say "verify X via reading `path/to/code`" or "read `design.md` §X for the contract".
+Effective practice after Phase 7b:
+- When writing dispatch prompts for the loop, NEVER instruct "PASS test X looks like Y" — instead say "verify X via reading `path/to/code`" or "read `design.md` §X for the contract".
+- Always include an explicit WIP checkpoint protocol in Implementer dispatch prompts when crossing ~5 tasks.
+- **Lean read-only Verifier** profile (~30-45 min) is more reliable than heavy custom-forgery Verifier when credits are tight.
 
 ## Subchapter Pattern (Phases 1, 4, 5a, 5b, 6a, 6b — all split)
 
 When Planner returns SUBCHAPTER_BREAKDOWN, orchestrator inserts sub-phase entries in `.specs/ROADMAP.md` between parent and next sibling, all `[ ]`, depending on parent. Then dispatches Implementer per sub-phase. Parent phase is annotated "Closed via subchapters X.Y, X.Z, ..." but never marked `[x]` directly — subchapter entries are the verification record.
-
-**Pattern:** when sub-phase > 4 tasks, batch Implementer dispatches across multiple sub-phases (Phase 5b: 6b.1+6b.2 in batch 1, 6b.3+6b.4 in batch 2; Phase 6b: 6b.1+6b.2 in batch 1, 6b.3 in batch 2, 6b.4 in batch 3).
 
 ## Fast Feedback (Waldemar #1) — Test Wall Time
 
@@ -325,16 +389,18 @@ When Planner returns SUBCHAPTER_BREAKDOWN, orchestrator inserts sub-phase entrie
 | `.specs/ROADMAP.md` | Phase ordering + done criteria (input to Planner) |
 | `.specs/STATE.md` | Phase pointer (`## Handoff`) + decisions (`## Decisions` append-only) — orchestrator's primary read |
 | `.specs/LESSONS.md` | Generated from `lessons.py` store |
-| `.specs/DISCOVERIES.md` | AD-NNN append-only (current: AD-001..AD-009) |
+| `.specs/DISCOVERIES.md` | AD-NNN append-only (AD-001..AD-010) |
+| `.specs/RETROSPECTIVE-PHASE-7b.md` | Phase 7b retrospective |
 | `.specs/features/<phase>/spec.md` | Per-phase spec |
 | `.specs/features/<phase>/design.md` | Per-phase design rationale |
-| `.specs/features/<phase>/tasks.md` | Per-phase atomic tasks with verification commands |
+| `.specs/features/<phase>/tasks.md` | Per-phase atomic tasks |
 | `.specs/features/<phase>/validation-phase-<X>.md` | Per-phase Verifier report |
-| `.specs/features/<phase>/fix-tasks-phase-<X>.md` | Per-phase Verifier-FAIL fix task list |
+| `.specs/features/<phase>/runbook.md` | Operator runbook (Phase 7b) |
 | `.specs/architecture/memory-studio.architecture.json` | Farol stable IDs |
 | `.scratch/memory-studio/spec.md` | SPEC v2 — 70+ user stories, 20+ impl decisions |
 | `PRD.md` | Product spec |
 | `CLAUDE.md` | Testing contract, authority boundaries, gates |
+| `handoff-orchestrator.md` | THIS FILE — resume state + T-07 instructions |
 
 ## Code Touch Surface Map (phases layered cleanly)
 
@@ -342,52 +408,58 @@ When Planner returns SUBCHAPTER_BREAKDOWN, orchestrator inserts sub-phase entrie
 |---|---|---|
 | `scripts/verify-env.mjs` | 0 | ✅ locked |
 | `config/catalog/` (YAML samples) | 1.1 | ✅ locked |
-| `src/catalog/**` | 1, 5b.1, 6b.1 | ✅ locked (REUSE-ONLY — except `index.ts` + new migrations) |
+| `.memory-studio/` | 1.1, 7b.1 | ✅ locked (state.json + setup.md) |
+| `src/catalog/**` | 1, 5b.1, 6b.1 | ✅ locked (REUSE-ONLY) |
 | `src/social-detector/**` | 2 | ✅ locked |
 | `src/fingerprint/**` | 2 | ✅ locked |
 | `packages/sdk/` | 3 | ✅ locked |
 | `packages/ui/` | 4 | ✅ locked |
-| `src/server/{boot,index,health}.ts` | 5a.1, 6b.1, 7a | in-flight (most recent: Phase 7a wiring) |
-| `src/server/augment/**` | 5a.2-5a.4, 6b.3-6b.4, 7a | in-flight (most recent: Phase 7a hook sites) |
+| `src/server/{boot,index,health,logger}.ts` | 5a.1, 6b.1, 7a, 7b.1 | ✅ locked |
+| `src/server/augment/**` | 5a.2-5a.4, 6b.3-6b.4, 7a, 7b.1 | ✅ locked |
 | `src/server/audit/**` | 5b.1 | ✅ locked |
 | `src/server/security/**` | 5b.1, 5b.4 | ✅ locked |
-| `src/server/routes/**` | 5b.2, 5b.3, 5b.4, 7a | in-flight (most recent: Phase 7a metrics route) |
+| `src/server/routes/**` | 5b.2, 5b.3, 5b.4, 7a, 7b.1 | ✅ locked |
 | `src/server/fast-agent/**` | 6b.1, 6b.2 | ✅ locked |
-| `src/server/metrics/**` | 7a | **NEW — in-flight (just shipped)** |
+| `src/server/metrics/**` | 7a | ✅ locked |
+| `src/server/config/**` | 7b.1 | ✅ locked (NEW in 7b.1) |
+| `src/server/proxy/**` | 7b.1 | ✅ locked (NEW in 7b.1) |
+| `src/server/acceptance/**` | 7b.1 | ✅ locked (NEW in 7b.1) |
+| `scripts/{acceptance-gate,snapshot-metrics,smoke-acceptance-gate}.mjs` | 7b.1 | ✅ locked (NEW in 7b.1) |
 | `src/search/*` | 5a.2 (reuse) | REUSE-ONLY — DO NOT modify |
-
-**Calibration residue that's INTENTIONAL & locked:**
-- `src/search/{fts,rrf,schema,vector,types,errors,search}.ts` — REUSE-ONLY per CALIBRATION-RESIDUE.md
-- `src/social-detector/is-social.ts` deleted in Phase 2 (promoted to `social.ts`)
 
 ## Personas & Roles (mental model for the orchestrator)
 
 - **Planner**: dispatches once per phase (or per subchapter when split). Produces spec.md, design.md, tasks.md. NEVER writes code.
-- **Implementer**: dispatches once per (sub)phase. Atomic commits. NEW strategies only when scope is expanded by orchestrator (e.g., Phase 4.3 iter 2 STEP A for `state.ts`).
-- **Verifier**: dispatches once per (sub)phase AFTER Implementer reports done. Validates against spec.md / tasks.md / design.md. Re-runs gates. Author ≠ Implementer — fresh context. Honest uncertainty > confident theater.
+- **Implementer**: dispatches once per (sub)phase. Atomic commits. NEW strategies only when scope is expanded by orchestrator.
+- **Verifier (HEAVY)**: dispatches once per (sub)phase AFTER Implementer reports done. Validates against spec.md / tasks.md / design.md. Re-runs gates. Author ≠ Implementer — fresh context. Honest uncertainty > confident theater.
+- **Verifier (LEAN)**: read-only audit + rerun gates. NO custom forgery scripts. ~30-45 min budget. Use when credits are tight or Implementer pushed hard.
+- **Retrospective**: parallel to Implementer. Documentation-only. Captures lessons, writes AD-NNN, updates MEMORY.md.
 - **Orchestrator (you/me)**: NEVER write code (except for 1-line enum-style scope-expand authorizations). Read sub-agent outputs, dispatch next, handle verdicts, file lessons.
 
 ## Critical Conventions (NEVER violate)
 
 1. **NEVER** run dispatches to sub-agents that aren't the right role. Implementer runs code, Verifier audits. Don't mix.
-2. **NEVER** fix code yourself as orchestrator. Dispatch Implementer. The 1-line enum extension in Phase 4.3 iter 2 was authorized scope expansion, NOT "orchestrator fixes code".
+2. **NEVER** fix code yourself as orchestrator. Dispatch Implementer.
 3. **NEVER** touch `.claude/settings.json` (peer's request or otherwise). Treat as local-only.
 4. **NEVER** commit secrets, `.env.*` files, or `.claude/` config.
-5. **L-003 discipline:** Phase boundary modifications to root `package.json` are risk-laden. When adding workspace deps or scripts, verify `git diff` shows ONLY the additive lines before committing.
-6. **L-006 discipline:** dispatch assertions about expected behavior can be wrong. Read actual code (`scripts/build-index.ts` has `printHelp` documenting exit codes; `src/fingerprint/` has golden vectors; `.specs/features/<phase>/{spec,design,tasks}.md` are authoritative). When dispatch and design.md disagree, **design.md wins**.
+5. **L-003 discipline:** Phase boundary modifications to root `package.json` are risk-laden.
+6. **L-006 discipline:** dispatch assertions about expected behavior can be wrong. Read actual code.
+7. **L-007 discipline:** API 429 mid-task recovery. Stop, commit WIP, return structured report.
+8. **L-008 discipline:** deferred-wiring pattern. Document deferred-to-user work in file headers.
+9. **L-010 discipline:** split batches > 4 tasks in 1A+1B prophylactically.
 
 ## Skill Warnings (3-iter cap)
 
-The `tlc-roadmap-loop` SKILL.md (`.claude/skills/tlc-roadmap-loop/SKILL.md`) has hard cap of 3 fix→re-verify iterations per phase. Phase 5a.2 used all 3 (iter 1 FAIL → iter 2 partial + API 429 → iter 3 PASS). Don't go beyond iter 3 — escalate to user.
+The `tlc-roadmap-loop` SKILL.md (`.claude/skills/tlc-roadmap-loop/SKILL.md`) has hard cap of 3 fix→re-verify iterations per phase. Phase 5a.2 used all 3. Don't go beyond iter 3 — escalate to user.
 
 ## End of Handoff
 
 When resuming:
-1. **State pointer:** "Phase 7a — Metrics Instrumentation" (Implementer iter 1 PASS, awaiting Verifier)
-2. **Next dispatch:** Verifier Phase 7a (T-01..T-07 audit + validation-phase-7a.md report)
+1. **State pointer:** "Phase 7b — T-07 user-driven wall-clock (ORCHESTRATOR PAUSES)"
+2. **T-07 instructions:** Section "T-07 — USER-DRIVEN WALL-CLOCK" above
 3. **Branch:** `loop/phase-0`
-4. **Tests baseline:** 646 (478 root + 152 UI + 16 SDK)
-5. **HEAD:** `03cee68` (Phase 7a T-07 — last Implementer commit)
-6. **Mission:** close Phase 7a entirely (after Verifier PASS), then dispatch Phase 7b (Real API Measurement + Tuning). Phase 7b is the FINAL phase.
+4. **Tests baseline:** 701 (533 root + 152 UI + 16 SDK)
+5. **HEAD:** `dd987d8`
+6. **Mission:** wait for T-07 snapshots from user, then dispatch T-08 (autonomous hydration + state freeze).
 
 If anything looks broken post-compaction (commits don't match, working tree dirty for unknown reasons), prefer "stop and ask the user" over guessing. The loop is autonomous but not sacred — the human decides if something looks wrong.
