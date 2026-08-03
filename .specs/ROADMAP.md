@@ -929,11 +929,13 @@ O gargalo real é o que inception adiciona ao hot path a cada Turn N+1 (síncron
 
 ---
 
-#### Phase 7a — Metrics Instrumentation [ ]
+#### Phase 7a — Metrics Instrumentation [x]
 
 **Done when:** dashboard emite `request_hit_rate` + `token_cache_coverage` + `p50_latency_ms` + `p99_latency_ms` + `working_set_mb`; atualizado a cada N=10 requests ou T=60s.
 
 **Phase 7a status 2026-08-01:** Planner artifacts at `.specs/features/phase-7a-metrics/{spec.md, design.md, tasks.md}` (commit `49183cc`). 7 atomic tasks single batch (no subchapters — smallest phase yet, 2-3h estimate). New `GET /metrics` endpoint (8th endpoint, schema_version=1) — NOT extension of `/health` (different concerns). PRD divergences documented: R-1 naming (Phase 7a = match-pipeline hit, PRD = provider cache hit); R-2 formula (request-weighted simplification, token-weighted is v3.1+). Verifier MUST document these in `validation-phase-7a.md`. Sub-agents NOT triggered (≤8 tasks = inline execution).
+
+**Phase 7a CLOSED 2026-08-02 (Verifier HEAD `ca3b22c`):** Verifier PASS at `.specs/features/phase-7a-metrics/validation-phase-7a.md`. 478 root + 152 UI + 16 SDK = 646 tests PASS twice. POC re-run 4/4 PASS at total overhead p95 0.14-0.21ms (≪ 0.30ms Phase 7a ceiling, ≪ 10ms Phase 6b invariant). 8/8 forge tests PASS. R-1 naming divergence (R-1 = match-pipeline hit, R-2 = provider cache hit) + R-2 formula simplification (request-weighted vs PRD token-weighted) explicitly documented. AC-1..AC-14 all PASS. Non-blocking follow-ups (NOT iter-2, NOT closing-the-loop): R-2 denominator on 200 response without `usage` field; sliding-window wording vs cumulative counters; fractional p50/p99 vs integer comments; missing pino info log on `/metrics`. Carry to Phase 7b cleanup.
 
 **Depends on:** Phase 5b
 
