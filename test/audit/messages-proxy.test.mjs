@@ -250,7 +250,7 @@ test('POST /v1/messages: augment_failed 502 when pipeline throws', async () => {
       assert.equal(res.status, 502);
       const body = await res.json();
       assert.equal(body.error, 'augment_failed');
-      assert.match(body.message, /pipeline blew up/);
+      assert.equal(body.message, 'Memory Studio augmentation failed');
     } finally {
       await app.close();
       db.close();

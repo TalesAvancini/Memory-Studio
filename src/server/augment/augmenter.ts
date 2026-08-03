@@ -69,6 +69,12 @@ export interface BuildOptions {
   /** Optional augmentation trace (e.g. warnings from top-K). */
   readonly warnings?: ReadonlyArray<string>;
   /**
+   * Optional stable system prefix used only by the transparent proxy. The
+   * bytes are placed before the persona in Block 1; when omitted, the
+   * historical `/augment` byte baseline is unchanged.
+   */
+  readonly stablePrefixText?: string;
+  /**
    * Phase 6b: Intel literal from the previous turn (set by the
    * pipeline via `getIntel(sessionId)`). When non-null AND non-empty
    * (D-005), the augmenter emits a `## Intel` section as the FIRST
@@ -97,10 +103,20 @@ export type { PruningDecisions };
 function buildPersonaText(
   matched: ReadonlyArray<RankedItem>,
   personaTextOverride: string | undefined,
+  stablePrefixText: string | undefined,
 ): string {
-  if (personaTextOverride !== undefined) return personaTextOverride;
-  const personas = matched.filter((m) => m.kind === 'persona');
-  return personas.map((p) => p.text).join('\n\n');
+  const personaText = personaTextOverride !== undefined
+    ? personaTextOverride
+    : matched
+        .filter((m) => m.kind === 'persona')
+        .map((p) => p.text)
+        .join('\n\n');
+
+  if (stablePrefixText === undefined || stablePrefixText.length === 0) {
+    return personaText;
+  }
+  if (personaText.length === 0) return stablePrefixText;
+  return `${stablePrefixText}\n\n${personaText}`;
 }
 
 /**
@@ -180,7 +196,11 @@ export function buildSystemMessage(
   options: BuildOptions,
 ): SystemMessageOutput {
   const effectiveContext = options.context !== undefined ? options.context : request.context;
-  const block1Text = buildPersonaText(options.matched, options.personaTextOverride);
+  const block1Text = buildPersonaText(
+    options.matched,
+    options.personaTextOverride,
+    options.stablePrefixText,
+  );
   const block2Text = buildVariableSuffix(
     options.matched,
     effectiveContext,

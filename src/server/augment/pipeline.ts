@@ -123,33 +123,58 @@ export interface PipelineContext {
     readonly minCosineSimilarity?: number;
     readonly minFtsHits?: number;
   };
+  /**
+   * Optional proxy-only stable original system text. It is incorporated into
+   * the detailed Block 1 so response.systemMessage hashes exactly what the
+   * proxy forwards. Undefined preserves the legacy /augment bytes.
+   */
+  readonly originalSystemText?: string;
 }
 
-/** Internal pipeline result. */
-interface PipelineRun {
+/** Internal detailed seam used by the transparent proxy. */
+export interface DetailedAugmentResult {
   readonly response: AugmentResponse;
+  /** Exact Memory Studio system blocks whose canonical SHA is in response. */
+  readonly system: ReturnType<typeof buildSystemMessage>['system'];
 }
 
 /**
- * The full /augment pipeline orchestrator. Single entry point used by
- * the route handler. Pure (no global state) — caller owns the db,
- * embedder, and config.
+ * Public backward-compatible `/augment` contract. The proxy uses the detailed
+ * sibling below so it never reconstructs (and accidentally empties) matches.
  */
 export async function runAugment(
   request: AugmentRequest,
   context: PipelineContext,
 ): Promise<AugmentResponse> {
+  return (await runAugmentDetailed(request, context)).response;
+}
+
+/**
+ * Full pipeline plus the exact two Memory Studio system blocks. Every early
+ * return uses this same seam, making response.systemMessage auditable against
+ * the blocks actually forwarded upstream.
+ */
+export async function runAugmentDetailed(
+  request: AugmentRequest,
+  context: PipelineContext,
+): Promise<DetailedAugmentResult> {
   const t0 = performance.now();
   const encode = context.encodeQuery ?? ((p: string) => context.embedder.encode(p));
 
   // --- Stage 1: Social gate ----------------------------------------------
   if (isSocial(request.prompt)) {
-    return personaOnlyResponse(request, t0, 'social');
+    return personaOnlyDetailed(request, t0, 'social', [], context.originalSystemText);
   }
 
   // --- Stage 2: activeCatalog vazio (D-008) -------------------------------
   if (request.activeCatalog.length === 0) {
-    return personaOnlyResponse(request, t0, 'no_active_items');
+    return personaOnlyDetailed(
+      request,
+      t0,
+      'no_active_items',
+      [],
+      context.originalSystemText,
+    );
   }
 
   // --- Stage 3: filesystem validation ------------------------------------
@@ -162,7 +187,13 @@ export async function runAugment(
     if (validActiveCatalog.length === 0) {
       // All active catalog entries are missing on disk — return
       // persona-only with `no_active_items` (consistent with D-008).
-      return personaOnlyResponse(request, t0, 'no_active_items', rejectedByFloor);
+      return personaOnlyDetailed(
+        request,
+        t0,
+        'no_active_items',
+        rejectedByFloor,
+        context.originalSystemText,
+      );
     }
   }
 
@@ -213,7 +244,7 @@ export async function runAugment(
     queryVec = await encode(request.prompt);
     embeddingMs = performance.now() - tEmbed;
   } catch (err) {
-    return failOpenResponse(request, t0, embeddingMs, err);
+    return failOpenDetailed(request, t0, embeddingMs, err, context.originalSystemText);
   }
 
   // --- Stage 5: Retrieval (FTS + vec + RRF + hydrate + active filter) ---
@@ -227,7 +258,7 @@ export async function runAugment(
     ftsTotalHits = out.ftsTotalHits;
     retrievalMs = out.retrievalMs;
   } catch (err) {
-    return failOpenResponse(request, t0, embeddingMs, err);
+    return failOpenDetailed(request, t0, embeddingMs, err, context.originalSystemText);
   }
 
   // --- Stage 6: Double threshold -----------------------------------------
@@ -260,10 +291,11 @@ export async function runAugment(
   });
 
   // --- Stage 8: Augmenter (2-block cache_control + SHA-256) --------------
-  const { sha256 } = buildSystemMessage(request, {
+  const systemOutput = buildSystemMessage(request, {
     matched,
     context: request.context,
     warnings: topKWarnings,
+    stablePrefixText: context.originalSystemText,
     intel, // NEW Phase 6b T-13 — flows into Block 2's `## Intel` section.
   });
 
@@ -286,7 +318,7 @@ export async function runAugment(
 
   const response = buildResponse({
     request,
-    systemMessage: sha256,
+    systemMessage: systemOutput.sha256,
     matched,
     rejectedByFloor,
     warnings: topKWarnings,
@@ -307,7 +339,10 @@ export async function runAugment(
     latencyMs: totalMs,
   });
 
-  return response;
+  return {
+    response,
+    system: systemOutput.system,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -362,23 +397,25 @@ function scheduleIntelTailWrite(
  * hex of a 2-block structure where block 2 is empty (D-006 still
  * produces a stable, deterministic hash).
  */
-function personaOnlyResponse(
+function personaOnlyDetailed(
   request: AugmentRequest,
   t0: number,
   reason: EmptyReason,
   rejectedByFloor: ReadonlyArray<RejectionEntry> = [],
-): AugmentResponse {
+  stablePrefixText?: string,
+): DetailedAugmentResult {
   const totalMs = performance.now() - t0;
   // Compute the persona-only 2-block SHA-256 so the response carries a
   // stable, deterministic hash (D-006 invariant: even the empty /
   // social / no-active paths produce a stable systemMessage).
-  const { sha256 } = buildSystemMessage(request, {
+  const systemOutput = buildSystemMessage(request, {
     matched: [],
     personaTextOverride: '',
+    stablePrefixText,
   });
   const response = buildResponse({
     request,
-    systemMessage: sha256,
+    systemMessage: systemOutput.sha256,
     matched: [],
     rejectedByFloor,
     warnings:
@@ -402,7 +439,7 @@ function personaOnlyResponse(
     emptyReason: reason,
     latencyMs: totalMs,
   });
-  return response;
+  return { response, system: systemOutput.system };
 }
 
 /**
@@ -410,21 +447,23 @@ function personaOnlyResponse(
  * message becomes persona-only, `emptyReason: 'timeout'`, and the
  * response is still 200 (per PRD §2 + SPEC §IMod-8).
  */
-function failOpenResponse(
+function failOpenDetailed(
   request: AugmentRequest,
   t0: number,
   embeddingMs: number,
   _err: unknown,
-): AugmentResponse {
+  stablePrefixText?: string,
+): DetailedAugmentResult {
   const totalMs = performance.now() - t0;
   // Compute the persona-only 2-block SHA-256 (D-006 invariant).
-  const { sha256 } = buildSystemMessage(request, {
+  const systemOutput = buildSystemMessage(request, {
     matched: [],
     personaTextOverride: '',
+    stablePrefixText,
   });
   const response = buildResponse({
     request,
-    systemMessage: sha256,
+    systemMessage: systemOutput.sha256,
     matched: [],
     rejectedByFloor: [],
     warnings: ['retrieval failed; serving persona-only fallback'],
@@ -444,5 +483,5 @@ function failOpenResponse(
     emptyReason: 'timeout',
     latencyMs: totalMs,
   });
-  return response;
+  return { response, system: systemOutput.system };
 }

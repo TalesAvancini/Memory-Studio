@@ -1,197 +1,204 @@
 /**
- * POST /v1/messages transparent proxy (Phase 5b T-13).
+ * Transparent Anthropic Messages proxy.
  *
- * Implements R-09 (PRD §3 + §14.3) — the server accepts Anthropic's
- * `POST /v1/messages` request shape, intercepts the `system` field,
- * builds an internal `/augment` request (in-process, no HTTP hop),
- * rewrites the `system` field to Memory Studio's 2-block structure,
- * forwards to the upstream provider, captures `cache_read_input_tokens`
- * from the upstream response, and feeds the cache metric into the
- * audit buffer.
- *
- * Failure semantics differ from `/augment` (which is fail-open per
- * PRD §2):
- *
- *   - 503 `proxy_disabled` — no upstream URL configured.
- *   - 502 `proxy_host_not_allowed` — upstream URL is not on the
- *     loopback allowlist (PRD §10.3.4). The proxy DOES NOT have a
- *     fail-open path here: a non-loopback upstream is a configuration
- *     error, not a transient failure.
- *   - 502 `augment_failed` — the in-process `/augment` pipeline threw.
- *     The proxy returns 502 to the caller (the LLM agent expects a
- *     clear failure signal). The audit row is still enqueued with the
- *     failure metadata.
- *
- * The audit event uses `event_type: 'messages_proxy'` and carries:
- *   - `systemMessageSha256` (the SHA-256 of the 2-block structure)
- *   - `cacheReadInputTokens` + `cacheCreationInputTokens`
- *   - `matchedIds` + `pruningReasons` (from the augment response)
- *   - `redactedPromptHash` (sha256 of the original Anthropic request's
- *     prompt text, NOT the redacted form — redaction is for storage)
- *   - `tenantId_hashed` from `hashTenantId('proxy-tenant')`
- *
- * Local-only enforcement (R-10) is provided by
- * `assertLoopback()` from `src/server/security/proxy-allowlist.ts`.
+ * Phase 7b T-02 keeps the provider-shaped body intact, derives a hashed
+ * per-session identity, loads one runtime-state snapshot, forwards the exact
+ * detailed pipeline system blocks, and preserves the caller's original system
+ * prefix. T-03 adds the streaming adapter on top of the same request seam.
  */
-
 import { createHash } from 'node:crypto';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { hashTenantId } from '../security/tenant-hash.ts';
 import { assertLoopback, ProxyHostNotAllowedError } from '../security/proxy-allowlist.ts';
 import { getAuditBuffer } from '../audit/lifecycle.ts';
 import type { AuditEvent } from '../audit/types.ts';
 import { AugmentRequestSchema, type AugmentRequest } from '../schema.ts';
-import { runAugment, type PipelineContext } from '../augment/pipeline.ts';
+import {
+  runAugmentDetailed,
+  type DetailedAugmentResult,
+  type PipelineContext,
+} from '../augment/pipeline.ts';
+import type { SystemBlock } from '../augment/augmenter.ts';
 import type { ProductionRequestContext } from '../config/production-context.ts';
-import { buildSystemMessage } from '../augment/augmenter.ts';
 import { recordProxySample } from '../metrics/collector.ts';
 
 const DEFAULT_UPSTREAM_TIMEOUT_MS = 30_000;
+const SESSION_HEADER = 'x-memory-studio-session-id';
 
-// --- Anthropic Messages API request validation ------------------------------
+export const FORWARDED_HEADER_ALLOWLIST = Object.freeze([
+  'x-api-key',
+  'authorization',
+  'anthropic-version',
+  'anthropic-beta',
+  'content-type',
+] as const);
 
 const AnthropicContentBlockSchema = z.object({
   type: z.string(),
   text: z.string().optional(),
-  // Allow other fields (tool_use, etc.) without enumerating.
-});
+}).passthrough();
 
 const AnthropicMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
   content: z.union([z.string(), z.array(AnthropicContentBlockSchema)]),
-});
+}).passthrough();
 
 const AnthropicSystemBlockSchema = z.object({
-  type: z.string().optional(),
+  type: z.string(),
   text: z.string().optional(),
-});
+}).passthrough();
 
-const AnthropicMessagesRequestSchema = z.object({
-  model: z.string(),
-  max_tokens: z.number().optional(),
+export const AnthropicMessagesRequestSchema = z.object({
+  model: z.string().min(1),
+  max_tokens: z.number().int().positive(),
   system: z.union([z.string(), z.array(AnthropicSystemBlockSchema)]).optional(),
   messages: z.array(AnthropicMessageSchema).min(1),
-});
+}).passthrough();
 
 export type AnthropicMessagesRequest = z.infer<typeof AnthropicMessagesRequestSchema>;
 
-// --- Helpers ----------------------------------------------------------------
+type IncomingHeaders = FastifyRequest['headers'];
 
-/**
- * Extract the joined text of the Anthropic `system` field. Accepts
- * either a string or an array of blocks (Anthropic supports both).
- * Returns an empty string when absent.
- */
-function extractSystemText(system: unknown): string {
+export interface SessionIdentity {
+  readonly hash: string;
+  readonly source: 'header' | 'fallback';
+}
+
+export function readUpstreamUrl(env: NodeJS.ProcessEnv = process.env): string | null {
+  const raw = env['MEMORY_STUDIO_ANTHROPIC_BASE_URL'];
+  if (raw === undefined || raw === null) return null;
+  const trimmed = String(raw).trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Text-only stable view used for the fallback session hash. */
+export function extractSystemText(system: unknown): string {
   if (typeof system === 'string') return system;
-  if (Array.isArray(system)) {
-    return system
-      .map((b) => (typeof b === 'object' && b !== null && 'text' in b ? String((b as { text: unknown }).text ?? '') : ''))
-      .filter((s) => s.length > 0)
+  if (!Array.isArray(system)) return '';
+  return system
+    .filter((block): block is Record<string, unknown> =>
+      block !== null && typeof block === 'object')
+    .filter((block) => block['type'] === 'text')
+    .map((block) => typeof block['text'] === 'string' ? block['text'] : '')
+    .join('\n\n');
+}
+
+export function extractFirstUserPrompt(
+  messages: ReadonlyArray<z.infer<typeof AnthropicMessageSchema>>,
+): string {
+  for (const message of messages) {
+    if (message.role !== 'user') continue;
+    if (typeof message.content === 'string') return message.content;
+    return message.content
+      .map((block) => typeof block.text === 'string' ? block.text : '')
       .join('\n\n');
   }
   return '';
 }
 
+export function deriveSessionIdentity(
+  headers: IncomingHeaders,
+  originalSystem: unknown,
+  firstUserPrompt: string,
+): SessionIdentity {
+  const explicit = headerValue(headers[SESSION_HEADER]);
+  if (explicit !== null && explicit.length > 0) {
+    return { hash: sha256Hex(explicit), source: 'header' };
+  }
+  const stableSystemText = extractSystemText(originalSystem);
+  return {
+    hash: sha256Hex(stableSystemText + String.fromCharCode(0) + firstUserPrompt),
+    source: 'fallback',
+  };
+}
+
 /**
- * Extract the first user-role message's text content from the Anthropic
- * messages array. Joins multiple text blocks with `\n\n`.
+ * The pipeline folds every original text block into its stable Block 1 so the
+ * detailed SHA includes those exact text bytes. Unsupported/non-text blocks
+ * cannot be represented by the two-block builder, so they remain verbatim
+ * ahead of the two Memory Studio blocks and are explicitly outside that SHA.
  */
-function extractFirstUserPrompt(
-  messages: ReadonlyArray<z.infer<typeof AnthropicMessageSchema>>,
-): string {
-  for (const m of messages) {
-    if (m.role !== 'user') continue;
-    if (typeof m.content === 'string') return m.content;
-    if (Array.isArray(m.content)) {
-      return m.content
-        .map((b) => (typeof b === 'object' && b !== null && 'text' in b ? String((b as { text: unknown }).text ?? '') : ''))
-        .filter((s) => s.length > 0)
-        .join('\n\n');
+export function composeForwardedSystem(
+  original: AnthropicMessagesRequest['system'],
+  memoryStudioBlocks: readonly SystemBlock[],
+): readonly Record<string, unknown>[] {
+  // The pipeline folds every original text block into its stable Block 1,
+  // so the detailed system already includes the original text bytes. We
+  // forward any non-text original block (e.g. tool_result / image) that
+  // the two-block builder cannot represent, so its presence is preserved
+  // for the upstream call. Only blocks that are neither type=``text`` nor
+  // a Memory Studio block need explicit preservation; text-type original
+  // blocks are already folded into the first Memory Studio block.
+  const preservedPrefix: Record<string, unknown>[] = [];
+  if (Array.isArray(original)) {
+    for (const block of original) {
+      if (block.type === 'text') continue;
+      preservedPrefix.push({ ...block });
     }
   }
-  return '';
+  return [
+    ...preservedPrefix,
+    ...memoryStudioBlocks.map((block) => ({ ...block })),
+  ];
 }
 
-/**
- * Read MEMORY_STUDIO_ANTHROPIC_BASE_URL. Returns null when unset or
- * empty. Whitespace-trimmed.
- */
-export function readUpstreamUrl(env: NodeJS.ProcessEnv = process.env): string | null {
-  const raw = env['MEMORY_STUDIO_ANTHROPIC_BASE_URL'];
-  if (raw === undefined || raw === null) return null;
-  const trimmed = String(raw).trim();
-  if (trimmed.length === 0) return null;
-  return trimmed;
+/** Safe allowlist only; the internal Memory Studio session header is omitted. */
+export function buildForwardHeaders(headers: IncomingHeaders): Headers {
+  const forwarded = new Headers();
+  for (const name of FORWARDED_HEADER_ALLOWLIST) {
+    if (name === 'content-type') continue;
+    const value = headerValue(headers[name]);
+    if (value !== null) forwarded.set(name, value);
+  }
+  // The proxy always serializes the upstream body as JSON.
+  forwarded.set('content-type', 'application/json');
+  if (!forwarded.has('anthropic-version')) {
+    forwarded.set('anthropic-version', '2023-06-01');
+  }
+  return forwarded;
 }
 
-/**
- * Compute SHA-256 hex of the concatenated `(systemText + messages JSON)`.
- * Used as the `redactedPromptHash` for the audit row — the hash is over
- * the original (pre-redaction) text per spec.md A-4.
- */
-function sha256Hex(s: string): string {
-  return createHash('sha256').update(s, 'utf8').digest('hex');
+function headerValue(value: string | string[] | undefined): string | null {
+  if (value === undefined) return null;
+  return Array.isArray(value) ? value.join(', ') : value;
+}
+
+function sha256Hex(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
 }
 
 function enqueueAuditSafe(event: AuditEvent): void {
   try {
-    const buf = getAuditBuffer();
-    buf?.enqueue(event);
+    getAuditBuffer()?.enqueue(event);
   } catch {
-    // Audit is best-effort.
+    // Audit is best-effort and never blocks the provider response.
   }
 }
 
-// --- Route options ----------------------------------------------------------
-
 export interface MessagesProxyRouteOptions {
-  /**
-   * Upstream provider base URL. When null, the route returns 503
-   * `proxy_disabled`. Source: `MEMORY_STUDIO_ANTHROPIC_BASE_URL` env
-   * var (read by the route or injected by the caller for tests).
-   */
   upstreamUrl: string | null;
-  /** Optional allowlist extension from `MEMORY_STUDIO_PROXY_ALLOWED_HOSTS`. */
   allowedHostsCsv?: string;
-  /** Provider of the in-process pipeline context (db + embedder). */
   pipelineProvider: () => PipelineContext;
-  /**
-   * Production-only atomic state/context seam. T-01 uses one snapshot for
-   * activeCatalog + thresholds; T-02 replaces the temporary session argument
-   * with the caller-derived hash.
-   */
   runtimeContextProvider?: (sessionId: string) => Promise<ProductionRequestContext>;
-  /** Upstream request timeout in ms (default 30s). */
   timeoutMs?: number;
-  /** Test-only fetch override (defaults to global `fetch`). */
   fetchImpl?: typeof fetch;
-  /** Test-only clock (defaults to Date.now). */
   now?: () => number;
 }
 
-// --- Route registration -----------------------------------------------------
-
 export async function registerMessagesProxyRoute(
   app: FastifyInstance,
-  opts: MessagesProxyRouteOptions,
+  options: MessagesProxyRouteOptions,
 ): Promise<void> {
-  const timeoutMs = opts.timeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS;
-  const doFetch = opts.fetchImpl ?? fetch;
-  const now = opts.now ?? Date.now;
+  const timeoutMs = options.timeoutMs ?? DEFAULT_UPSTREAM_TIMEOUT_MS;
+  const doFetch = options.fetchImpl ?? fetch;
+  const now = options.now ?? Date.now;
 
   app.post('/v1/messages', async (request, reply: FastifyReply) => {
-    const decisionTraceId = createHash('sha256').update(String(now())).digest('hex').slice(0, 16);
-    // --- Phase 7a T-06: metrics entry time --------------------------------
-    // Capture entry time at the top of the route handler so the
-    // `recordProxySample` latency measurement covers the FULL proxy
-    // path (validation + augment + upstream fetch + audit). Excludes
-    // nothing — `performance.now()` is monotonic per Node 22.
     const tProxyStart = performance.now();
+    const decisionTraceId = sha256Hex(String(now())).slice(0, 16);
 
-    // --- 1. Proxy enabled check --------------------------------------------
-    if (opts.upstreamUrl === null) {
+    if (options.upstreamUrl === null) {
       reply.code(503);
       return {
         error: 'proxy_disabled',
@@ -199,78 +206,79 @@ export async function registerMessagesProxyRoute(
       };
     }
 
-    // --- 2. Allowlist check ------------------------------------------------
     try {
-      assertLoopback(opts.upstreamUrl, opts.allowedHostsCsv);
-    } catch (err) {
-      if (err instanceof ProxyHostNotAllowedError) {
+      assertLoopback(options.upstreamUrl, options.allowedHostsCsv);
+    } catch (error) {
+      if (error instanceof ProxyHostNotAllowedError) {
         reply.code(502);
         return {
           error: 'proxy_host_not_allowed',
-          host: err.host,
-          hint: err.wildcardRejected
+          host: error.host,
+          hint: error.wildcardRejected
             ? 'Wildcard * is forbidden in MEMORY_STUDIO_PROXY_ALLOWED_HOSTS'
             : 'Add the host to MEMORY_STUDIO_PROXY_ALLOWED_HOSTS or use a loopback URL',
         };
       }
-      throw err;
+      throw error;
     }
 
-    // --- 3. Anthropic request validation ----------------------------------
     const parsed = AnthropicMessagesRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       reply.code(400);
-      return {
-        error: 'invalid_anthropic_request',
-        issues: parsed.error.issues,
-      };
+      return { error: 'invalid_anthropic_request', issues: parsed.error.issues };
     }
-    const anthropicReq = parsed.data;
-    const systemText = extractSystemText(anthropicReq.system);
-    const promptText = extractFirstUserPrompt(anthropicReq.messages);
-    const hashInput = systemText + JSON.stringify(anthropicReq.messages);
-    const redactedPromptHash = sha256Hex(hashInput);
 
-    // --- 4. Resolve one runtime state/context snapshot ----------------------
+    const anthropicRequest = parsed.data;
+    const originalSystem = anthropicRequest.system;
+    const promptText = extractFirstUserPrompt(anthropicRequest.messages);
+    const session = deriveSessionIdentity(request.headers, originalSystem, promptText);
+    const redactedPromptHash = sha256Hex(
+      extractSystemText(originalSystem) +
+        String.fromCharCode(0) +
+        JSON.stringify(anthropicRequest.messages),
+    );
+
     let runtimeContext: ProductionRequestContext | null = null;
+    let augmentResult: DetailedAugmentResult;
     try {
-      if (opts.runtimeContextProvider !== undefined) {
-        // T-02 replaces the temporary literal with the caller-derived hash.
-        runtimeContext = await opts.runtimeContextProvider('proxy');
+      if (options.runtimeContextProvider !== undefined) {
+        runtimeContext = await options.runtimeContextProvider(session.hash);
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      reply.code(502);
-      return { error: 'augment_failed', message };
-    }
-
-    // --- 5. Build internal /augment request -------------------------------
-    const augmentReq: AugmentRequest = AugmentRequestSchema.parse({
-      prompt: promptText,
-      context: null,
-      fingerprint: {
-        projectPath: '.',
-        agentId: 'claude-code',
-        sessionId: 'proxy',
-        gitBranch: 'main',
-      },
-      activeCatalog: runtimeContext === null
-        ? []
-        : [...runtimeContext.state.activeCatalog],
-      tenantId: 'proxy-tenant',
-      schemaVersion: 3,
-    });
-
-    // --- 6. Run pipeline (in-process) -------------------------------------
-    let augmentResponse;
-    try {
-      augmentResponse = await runAugment(
-        augmentReq,
-        runtimeContext?.pipeline ?? opts.pipelineProvider(),
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // 502 — proxy IS the failure signal for the LLM agent.
+      const augmentRequest: AugmentRequest = AugmentRequestSchema.parse({
+        prompt: promptText,
+        context: null,
+        fingerprint: {
+          projectPath: '.',
+          agentId: 'claude-code',
+          sessionId: session.hash,
+          gitBranch: 'main',
+        },
+        activeCatalog: runtimeContext === null
+          ? []
+          : [...runtimeContext.state.activeCatalog],
+        tenantId: 'proxy-tenant',
+        schemaVersion: 3,
+      });
+      const basePipeline = runtimeContext?.pipeline ?? options.pipelineProvider();
+      const stableOriginalSystemText = extractSystemText(originalSystem);
+      const hasOriginalText = stableOriginalSystemText.length > 0;
+      const pipeline = hasOriginalText
+        ? { ...basePipeline, originalSystemText: stableOriginalSystemText }
+        : basePipeline;
+      const detailed = await runAugmentDetailed(augmentRequest, pipeline);
+      if (hasOriginalText) {
+        // Pipeline already folded the original text into Block 1.
+        // The proxy forwards the pipeline's exact blocks; unsupported
+        // non-text blocks remain verbatim ahead of them.
+        augmentResult = {
+          response: detailed.response,
+          system: detailed.system,
+        };
+      } else {
+        augmentResult = detailed;
+      }
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
       enqueueAuditSafe({
         ts: now(),
         tenantIdHashed: hashTenantId('proxy-tenant') ?? '',
@@ -278,49 +286,39 @@ export async function registerMessagesProxyRoute(
         matchedIds: [],
         pruningReasons: [],
         latencyMs: 0,
-        fingerprint: { agentId: 'claude-code', source: 'proxy', decisionTraceId },
-        payload: {
-          model: anthropicReq.model,
-          error: 'augment_failed',
-          message,
+        fingerprint: {
+          agentId: 'claude-code',
+          source: 'proxy',
+          sessionId: session.hash,
+          decisionTraceId,
         },
+        payload: { model: anthropicRequest.model, error: 'augment_failed', errorClass },
         eventType: 'messages_proxy',
       });
       reply.code(502);
-      return {
-        error: 'augment_failed',
-        message,
-      };
+      return { error: 'augment_failed', message: 'Memory Studio augmentation failed' };
     }
 
-    // --- 6. Augment system field ------------------------------------------
-    const systemMessageOutput = buildSystemMessage(augmentReq, {
-      matched: [],
-    });
-    const augmentedSystem = systemMessageOutput.system;
-
-    // --- 7. Forward to upstream -------------------------------------------
-    const proxiedReq = {
-      ...anthropicReq,
-      system: augmentedSystem,
+    const proxiedRequest = {
+      ...anthropicRequest,
+      system: composeForwardedSystem(originalSystem, augmentResult.system),
     };
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let upstreamRes: Response;
+    let upstreamResponse: Response;
+    let upstreamText: string;
     try {
-      upstreamRes = await doFetch(`${opts.upstreamUrl}/v1/messages`, {
+      upstreamResponse = await doFetch(`${options.upstreamUrl}/v1/messages`, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(proxiedReq),
+        headers: buildForwardHeaders(request.headers),
+        body: JSON.stringify(proxiedRequest),
         signal: controller.signal,
       });
-    } catch (err) {
+      upstreamText = await upstreamResponse.text();
+    } catch (error) {
       clearTimeout(timer);
-      const message = err instanceof Error ? err.message : String(err);
+      const errorClass = error instanceof Error ? error.name : 'UnknownError';
       enqueueAuditSafe({
         ts: now(),
         tenantIdHashed: hashTenantId('proxy-tenant') ?? '',
@@ -328,95 +326,99 @@ export async function registerMessagesProxyRoute(
         matchedIds: [],
         pruningReasons: [],
         latencyMs: 0,
-        fingerprint: { agentId: 'claude-code', source: 'proxy', decisionTraceId },
-        payload: {
-          model: anthropicReq.model,
-          error: 'upstream_fetch_failed',
-          message,
+        fingerprint: {
+          agentId: 'claude-code',
+          source: 'proxy',
+          sessionId: session.hash,
+          decisionTraceId,
         },
+        payload: { model: anthropicRequest.model, error: 'upstream_fetch_failed', errorClass },
         eventType: 'messages_proxy',
       });
       reply.code(502);
-      return {
-        error: 'upstream_fetch_failed',
-        message,
-      };
+      return { error: 'upstream_fetch_failed', message: 'Upstream provider request failed' };
     }
     clearTimeout(timer);
 
-    // --- 8. Capture cache metrics -----------------------------------------
-    let upstreamBody: Record<string, unknown> = {};
-    try {
-      upstreamBody = (await upstreamRes.json()) as Record<string, unknown>;
-    } catch {
-      // Upstream returned non-JSON — surface upstream status + empty cache metrics.
-    }
-    const usageRaw = upstreamBody['usage'];
-    const usage = (usageRaw !== null && typeof usageRaw === 'object'
-      ? (usageRaw as Record<string, unknown>)
-      : {}) as Record<string, unknown>;
-    const cacheReadInputTokens = typeof usage['cache_read_input_tokens'] === 'number'
-      ? (usage['cache_read_input_tokens'] as number)
-      : null;
-    const cacheCreationInputTokens = typeof usage['cache_creation_input_tokens'] === 'number'
-      ? (usage['cache_creation_input_tokens'] as number)
-      : null;
-    const inputTokens = typeof usage['input_tokens'] === 'number'
-      ? (usage['input_tokens'] as number)
-      : null;
-    const outputTokens = typeof usage['output_tokens'] === 'number'
-      ? (usage['output_tokens'] as number)
-      : null;
+    const upstreamContentType = upstreamResponse.headers.get('content-type');
+    const upstreamBody = parseJsonObject(upstreamText);
+    const usage = objectValue(upstreamBody?.['usage']);
+    const cacheReadInputTokens = nonNegativeNumber(usage?.['cache_read_input_tokens']);
+    const cacheCreationInputTokens = nonNegativeNumber(usage?.['cache_creation_input_tokens']);
+    const inputTokens = nonNegativeNumber(usage?.['input_tokens']);
+    const outputTokens = nonNegativeNumber(usage?.['output_tokens']);
 
+    const response = augmentResult.response;
     const matchedIds = [
-      ...augmentResponse.matchedSkills.map((m) => m.id),
-      ...augmentResponse.matchedRules.map((m) => m.id),
-      ...augmentResponse.matchedPersonas.map((m) => m.id),
+      ...response.matchedSkills.map((item) => item.id),
+      ...response.matchedRules.map((item) => item.id),
+      ...response.matchedPersonas.map((item) => item.id),
     ];
-    const pruningReasons: string[] = [
-      ...augmentResponse.pruningDecisions.rejectedByFloor.map((r) => r.reason),
-      ...augmentResponse.pruningDecisions.rejectedByBudget.map((r) => r.reason),
-      ...augmentResponse.pruningDecisions.rejectedByAttentionTier.map((r) => r.reason),
-      ...augmentResponse.pruningDecisions.rejectedByNegativeFeedback.map((r) => r.reason),
-      ...augmentResponse.pruningDecisions.rejectedByCriticalDropped.map((r) => r.reason),
+    const pruningReasons = [
+      ...response.pruningDecisions.rejectedByFloor.map((item) => item.reason),
+      ...response.pruningDecisions.rejectedByBudget.map((item) => item.reason),
+      ...response.pruningDecisions.rejectedByAttentionTier.map((item) => item.reason),
+      ...response.pruningDecisions.rejectedByNegativeFeedback.map((item) => item.reason),
+      ...response.pruningDecisions.rejectedByCriticalDropped.map((item) => item.reason),
     ];
 
-    // --- 9. Audit row -----------------------------------------------------
     enqueueAuditSafe({
       ts: now(),
       tenantIdHashed: hashTenantId('proxy-tenant') ?? '',
       redactedPromptHash,
       matchedIds,
       pruningReasons,
-      latencyMs: augmentResponse.latencyMs.total,
-      fingerprint: { agentId: 'claude-code', source: 'proxy', decisionTraceId },
+      latencyMs: response.latencyMs.total,
+      fingerprint: {
+        agentId: 'claude-code',
+        source: 'proxy',
+        sessionId: session.hash,
+        sessionSource: session.source,
+        decisionTraceId,
+      },
       payload: {
-        model: anthropicReq.model,
-        systemMessageSha256: augmentResponse.systemMessage,
+        model: anthropicRequest.model,
+        systemMessageSha256: response.systemMessage,
         cacheReadInputTokens,
         cacheCreationInputTokens,
         inputTokens,
         outputTokens,
-        upstreamStatus: upstreamRes.status,
+        upstreamStatus: upstreamResponse.status,
+        responseComplete: true,
+        stream: false,
       },
       eventType: 'messages_proxy',
     });
 
-    // --- 10. Phase 7a T-06: metrics sample (proxy path) -------------------
-    // Only record on 200 responses (NOT 503 proxy_disabled, NOT 502
-    // augment_failed/upstream_fetch_failed/proxy_host_notallowed — those
-    // failures don't count as proxy_requests per R-2 denominator).
-    // The collector translates `cacheReadInputTokens === null` to a
-    // no-op (defensive guard against partial upstream responses).
-    if (upstreamRes.status === 200) {
+    if (upstreamResponse.status === 200) {
       recordProxySample({
         cacheReadTokens: cacheReadInputTokens,
         latencyMs: performance.now() - tProxyStart,
       });
     }
 
-    // --- 11. Return response ----------------------------------------------
-    reply.code(upstreamRes.status);
-    return upstreamBody;
+    reply.code(upstreamResponse.status);
+    if (upstreamContentType !== null) reply.header('content-type', upstreamContentType);
+    return reply.send(upstreamText);
   });
+}
+
+function parseJsonObject(text: string): Record<string, unknown> | null {
+  try {
+    const value: unknown = JSON.parse(text);
+    return objectValue(value);
+  } catch {
+    return null;
+  }
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function nonNegativeNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
 }
