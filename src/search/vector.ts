@@ -1,5 +1,5 @@
 /**
- * Cosine k-NN retrieval over the sqlite-vec `skill_embeddings` table.
+ * Cosine k-NN retrieval over the sqlite-vec `catalog_vec` table.
  *
  * Design constraints:
  *   - Validate the query embedding (length === SEARCH_EMBEDDING_DIMENSIONS,
@@ -22,7 +22,7 @@ import { SEARCH_TABLES } from './schema.ts';
 const VEC_TABLE = SEARCH_TABLES.vec;
 
 interface VecRow {
-  skill_id: number;
+  rowid: number;
   distance: number;
 }
 
@@ -56,7 +56,7 @@ export function validateEmbedding(embedding: unknown): asserts embedding is Floa
 
 /**
  * Run the vector channel: validate the embedding, then issue a k-NN query
- * against `skill_embeddings` capped at `limit` candidates.
+ * against `catalog_vec` capped at `limit` candidates.
  *
  * Empty table returns `{ candidates: [] }` (no error). SQL failure becomes
  * `SearchError(QUERY_ERROR)` with the original cause attached.
@@ -71,28 +71,28 @@ export function queryVector(
   try {
     // sqlite-vec 0.1.9 rejects any ORDER BY other than `ORDER BY distance`
     // on KNN queries, so the SQL side guarantees only distance ASC. We
-    // apply a JavaScript-side tie-break on `skill_id` ASC so two rows
-    // whose embeddings sit at exactly the same cosine distance come out
-    // in a deterministic id order across repeated calls.
+    // apply a JavaScript-side tie-break on `rowid` ASC so two rows whose
+    // embeddings sit at exactly the same cosine distance come out in a
+    // deterministic id order across repeated calls.
     const rows = db
       .prepare<[Float32Array, number], VecRow>(
-        `SELECT skill_id, distance
+        `SELECT rowid, distance
          FROM ${VEC_TABLE}
          WHERE embedding MATCH ? AND k = ?
          ORDER BY distance ASC`,
       )
       .all(embedding, limit);
 
-    // Stable sort: distance ASC first, then skill_id ASC as a deterministic
+    // Stable sort: distance ASC first, then rowid ASC as a deterministic
     // tie-break. Sort returns a fresh array; we then assign 1-based
     // ranks in this stable order.
     const sorted = [...rows].sort((a, b) => {
       if (a.distance !== b.distance) return a.distance - b.distance;
-      return a.skill_id - b.skill_id;
+      return a.rowid - b.rowid;
     });
 
     return sorted.map((row, idx) => ({
-      id: row.skill_id,
+      id: row.rowid,
       distance: row.distance,
       cosineSimilarity: 1 - row.distance,
       rank: idx + 1,

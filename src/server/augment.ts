@@ -148,31 +148,40 @@ function defaultPipelineContext(): PipelineContext {
 }
 
 /**
- * Build an in-memory DB with the legacy `skills` table shape + a stub
+ * Build an in-memory DB with the production `catalog` table shape + a stub
  * embedder that always returns a zero vector. Used by the default
  * pipeline provider so the route works without any external state.
- * Real wiring (on-disk catalog + ONNX embedder) is a future phase.
+ * Real wiring (on-disk catalog + ONNX embedder) is the production path.
  *
- * The `skills` table shape matches the calibration residue (test
- * fixture parity). Production wiring opens the on-disk catalog DB.
+ * The `catalog` table shape mirrors the migration DDL in
+ * `src/catalog/migrations/001_init.sql` so the in-memory default exercises
+ * the same schema the on-disk DB uses.
  *
  * The search storage (FTS5 + sqlite-vec virtual tables + sync
  * triggers) is also initialized so the FTS channel query doesn't
- * fail on "no such table: content_fts" when the route receives a
+ * fail on "no such table: catalog_fts" when the route receives a
  * request against an empty corpus.
  */
 function createInMemoryPipelineContext(): PipelineContext {
   const db = new Database(':memory:');
   db.exec(`
-    CREATE TABLE IF NOT EXISTS skills (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      slug TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      content_yaml TEXT NOT NULL,
-      embedding BLOB NOT NULL,
-      hash TEXT NOT NULL,
+    CREATE TABLE IF NOT EXISTS catalog (
+      id TEXT PRIMARY KEY,
+      type TEXT NOT NULL,
+      title TEXT,
+      text TEXT NOT NULL,
+      category TEXT,
+      critical INTEGER,
+      is_default INTEGER,
+      content_hash TEXT NOT NULL,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS embeddings (
+      catalog_id TEXT PRIMARY KEY,
+      vector BLOB NOT NULL,
+      model_version TEXT NOT NULL,
+      embedded_at INTEGER NOT NULL
     );
   `);
 

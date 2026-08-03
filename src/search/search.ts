@@ -140,39 +140,39 @@ function validateK(rawK: unknown): number {
   return rawK;
 }
 
-interface SkillRow {
-  id: number;
-  slug: string;
-  kind: 'skill' | 'rule' | 'persona';
-  content_yaml: string;
-  hash: string;
+interface CatalogRowMeta {
+  rowid: number;
+  id: string;
+  type: 'skill' | 'rule' | 'persona';
+  text: string;
+  content_hash: string;
 }
 
 /**
  * Hydrate the top-N fused candidates with source metadata in one bounded
  * query. Embedding bytes are intentionally NOT returned.
  *
- * If a candidate's id is missing from `skills` (stale), it is excluded and
- * the remaining order is preserved.
+ * If a candidate's rowid is missing from `catalog` (stale), it is excluded
+ * and the remaining order is preserved.
  */
 function hydrateTopSkills(
   db: Database,
   fused: ReadonlyArray<{ readonly id: number }>,
-): readonly SkillRow[] {
+): readonly CatalogRowMeta[] {
   if (fused.length === 0) return [];
   const placeholders = fused.map(() => '?').join(',');
   const ids = fused.map((c) => c.id);
   const rows = db
-    .prepare<[...number[]], SkillRow>(
-      `SELECT id, slug, kind, content_yaml, hash
-       FROM skills
-       WHERE id IN (${placeholders})`,
+    .prepare<[...number[]], CatalogRowMeta>(
+      `SELECT rowid, id, type, text, content_hash
+       FROM catalog
+       WHERE rowid IN (${placeholders})`,
     )
     .all(...ids);
-  const byId = new Map(rows.map((r) => [r.id, r]));
+  const byId = new Map(rows.map((r) => [r.rowid, r]));
   // Preserve fused order, drop any IDs whose row vanished.
   return fused.map((c) => byId.get(c.id)).filter(
-    (r): r is SkillRow => r !== undefined,
+    (r): r is CatalogRowMeta => r !== undefined,
   );
 }
 
@@ -264,14 +264,14 @@ export function createSearch(options: SearchOptions): SearchFunction {
     const out: RankedSkill[] = [];
     for (let i = 0; i < top.length; i += 1) {
       const f = top[i]!;
-      const meta = hydrated.find((r) => r.id === f.id);
+      const meta = hydrated.find((r) => r.rowid === f.id);
       if (!meta) continue; // stale id — skip, preserve remaining order
       out.push({
-        id: meta.id,
-        slug: meta.slug,
-        kind: meta.kind,
-        contentYaml: meta.content_yaml,
-        hash: meta.hash,
+        id: meta.rowid,
+        slug: meta.id,
+        kind: meta.type,
+        contentYaml: meta.text,
+        hash: meta.content_hash,
         rrfScore: f.rrfScore,
         ftsRank: f.ftsRank,
         vectorRank: f.vectorRank,

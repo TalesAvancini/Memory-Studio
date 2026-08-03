@@ -10,8 +10,8 @@
  *   1. `queryFts(db, prompt, depth)`  — BM25 lexical channel
  *   2. `queryVector(db, queryVec, depth)` — cosine k-NN vector channel
  *   3. `fuseRrf(ftsList, vecList)` — Reciprocal Rank Fusion
- *   4. `hydrateRankedSkills(db, fused)` — join `skills` metadata in
- *      fused order, dropping any id whose row vanished (stale).
+ *   4. `hydrateRankedSkills(db, fused)` — join `catalog` metadata in
+ *      fused order, dropping any rowid whose row vanished (stale).
  *   5. `filterActiveCatalog(ranked, activeCatalog)` — keep only items
  *      whose slug is in the request's activeCatalog.
  *
@@ -43,13 +43,13 @@ const CANDIDATE_DEPTH = 20;
 
 /** A hydrated retrieval result: post-RRF + post-hydration + post-active filter. */
 export interface RankedItem {
-  /** Numeric rowid from the `skills` table. Preserved for logging / tests. */
+  /** Numeric rowid from the `catalog` table. Preserved for logging / tests. */
   readonly id: number;
-  /** String slug. The DETERMINISTIC identifier used for tiebreak and the byte-string. */
+  /** String slug (catalog.id). The DETERMINISTIC identifier used for tiebreak and the byte-string. */
   readonly slug: string;
   /** Catalog kind. */
   readonly kind: 'skill' | 'rule' | 'persona';
-  /** Original YAML content (verbatim). Used as the text in the byte-string. */
+  /** Catalog text (verbatim). Used as the text in the byte-string. */
   readonly text: string;
   /** RRF score after fusion. NOT included in the byte-string (D-006). */
   readonly rrfScore: number;
@@ -72,19 +72,19 @@ export interface RetrievalOutput {
   readonly retrievalMs: number;
 }
 
-interface SkillRow {
-  id: number;
-  slug: string;
-  kind: 'skill' | 'rule' | 'persona';
-  content_yaml: string;
-  hash: string;
+interface CatalogRowMeta {
+  rowid: number;
+  id: string;
+  type: 'skill' | 'rule' | 'persona';
+  text: string;
+  content_hash: string;
 }
 
 /**
  * Hydrate the top-N fused candidates with source metadata in one bounded
  * query, preserving fused order. Embedding bytes are intentionally NOT
- * returned. Stale ids (whose row vanished) are dropped while the rest of
- * the order is preserved.
+ * returned. Stale rowids (whose catalog row vanished) are dropped while
+ * the rest of the order is preserved.
  */
 function hydrateRankedSkills(
   db: Database,
@@ -92,25 +92,25 @@ function hydrateRankedSkills(
 ): ReadonlyArray<RankedItem> {
   if (fused.length === 0) return [];
   const placeholders = fused.map(() => '?').join(',');
-  const ids = fused.map((c) => c.id);
+  const rowids = fused.map((c) => c.id);
   const rows = db
-    .prepare<[...number[]], SkillRow>(
-      `SELECT id, slug, kind, content_yaml, hash
-       FROM skills
-       WHERE id IN (${placeholders})`,
+    .prepare<[...number[]], CatalogRowMeta>(
+      `SELECT rowid, id, type, text, content_hash
+       FROM catalog
+       WHERE rowid IN (${placeholders})`,
     )
-    .all(...ids);
-  const byId = new Map(rows.map((r) => [r.id, r] as const));
+    .all(...rowids);
+  const byId = new Map(rows.map((r) => [r.rowid, r] as const));
 
   const out: RankedItem[] = [];
   for (const f of fused) {
     const meta = byId.get(f.id);
-    if (!meta) continue; // stale id — skip, preserve remaining order
+    if (!meta) continue; // stale rowid — skip, preserve remaining order
     out.push({
-      id: meta.id,
-      slug: meta.slug,
-      kind: meta.kind,
-      text: meta.content_yaml,
+      id: meta.rowid,
+      slug: meta.id,
+      kind: meta.type,
+      text: meta.text,
       rrfScore: f.rrfScore,
       ftsRank: f.ftsRank,
       vectorRank: f.vectorRank,
@@ -142,7 +142,7 @@ function filterActiveCatalog(
  * caller-owned db, no global state.
  *
  * @param db        caller-owned better-sqlite3 connection (must already
- *                  have `skills` table + search storage initialized).
+ *                  have `catalog` table + search storage initialized).
  * @param prompt    raw user prompt (raw, NOT pre-normalized — the search
  *                  adapter normalizes internally).
  * @param queryVec  Float32Array of SEARCH_EMBEDDING_DIMENSIONS (384) from

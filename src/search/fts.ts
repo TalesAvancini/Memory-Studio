@@ -1,5 +1,5 @@
 /**
- * Safe BM25 lexical retrieval over the FTS5 `content_fts` table.
+ * Safe BM25 lexical retrieval over the FTS5 `catalog_fts` table.
  *
  * Design constraints:
  *   - The user-supplied query is treated as text, never as FTS5 syntax.
@@ -11,7 +11,7 @@
  *     to "no lexical matches" without producing an empty MATCH expression.
  *
  * Ranking:
- *   - bm25(content_fts) is ASC by default in FTS5 (lower = more relevant).
+ *   - bm25(catalog_fts) is ASC by default in FTS5 (lower = more relevant).
  *   - We order by bm25 ASC, then by rowid ASC for a stable ID fallback.
  *   - Total distinct hits is counted BEFORE the candidate limit so the
  *     channel gate can compare against minFtsHits even when the limit is

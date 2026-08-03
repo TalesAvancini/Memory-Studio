@@ -3,9 +3,9 @@
  *
  * Owns:
  *   - Loading the sqlite-vec extension and capability-checking it.
- *   - Creating `content_fts` (FTS5, external-content over `skills.content_yaml`).
- *   - Creating `skill_embeddings` (vec0, float[384] cosine, keyed by skills.id).
- *   - Creating sync triggers so future INSERT/UPDATE/DELETE on `skills`
+ *   - Creating `catalog_fts` (FTS5, external-content over `catalog.text`).
+ *   - Creating `catalog_vec` (vec0, float[384] cosine, keyed by catalog.rowid).
+ *   - Creating sync triggers so future INSERT/UPDATE/DELETE on `catalog`
  *     keep both indexes consistent without modifying `src/catalog/**`.
  *   - Idempotently backfilling existing rows on each invocation.
  *
@@ -20,12 +20,11 @@
  *   - JS Number binding for the vec0 PK column is rejected with the
  *     "Only integers are allows for primary key values" error. We bind
  *     BigInt() during the JavaScript backfill loop and from JS-prepared
- *     INSERT statements. Triggers reading `new.id` pass INTEGER through
+ *     INSERT statements. Triggers reading `new.rowid` pass INTEGER through
  *     SQLite's own column-reference path so they accept regular SQL
  *     values directly.
- *   - With an explicit `skill_id INTEGER PRIMARY KEY`, sqlite-vec no
- *     longer exposes the implicit `rowid` column. All adapter SQL must
- *     reference `skill_id` explicitly.
+ *   - Without an explicit INTEGER PRIMARY KEY, sqlite-vec exposes the
+ *     implicit `rowid` column. All adapter SQL uses `rowid` directly.
  */
 
 import type { Database } from 'better-sqlite3';
@@ -33,13 +32,12 @@ import { load as loadSqliteVec } from 'sqlite-vec';
 import { asSearchError, SearchError } from './errors.ts';
 import { SEARCH_EMBEDDING_DIMENSIONS } from './types.ts';
 
-const FTS_TABLE = 'content_fts';
-const VEC_TABLE = 'skill_embeddings';
+const FTS_TABLE = 'catalog_fts';
+const VEC_TABLE = 'catalog_vec';
 
-interface SkillsRowMeta {
-  id: number;
-  content_yaml: string;
-  embedding: Buffer;
+interface EmbeddingsRowMeta {
+  rowid: number;
+  vector: Buffer;
 }
 
 interface ExtractedFtsRow {
@@ -47,44 +45,44 @@ interface ExtractedFtsRow {
 }
 
 /**
- * Validate that `skills` exists with the expected columns. Throws a typed
+ * Validate that `catalog` exists with the expected columns. Throws a typed
  * `SearchError(SCHEMA_ERROR)` if the catalog is missing or has a different
  * shape; the schema initializer must not run on top of an unknown table.
  *
  * Any raw driver failure (e.g. a closed connection) is also wrapped as
  * `SearchError(SCHEMA_ERROR)` so callers always see a typed boundary.
  */
-function verifySkillsTable(db: Database): void {
+function verifyCatalogTable(db: Database): void {
   let row: { name: string } | undefined;
   try {
     row = db
       .prepare<[], { name: string }>(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='skills'",
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='catalog'",
       )
       .get();
   } catch (err) {
     if (err instanceof SearchError) throw err;
-    throw asSearchError(err, 'SCHEMA_ERROR', 'skills table verification failed');
+    throw asSearchError(err, 'SCHEMA_ERROR', 'catalog table verification failed');
   }
   if (!row) {
     throw new SearchError(
-      'skills table is required before search schema initialization',
+      'catalog table is required before search schema initialization',
       'SCHEMA_ERROR',
     );
   }
   let cols: Array<{ name: string }>;
   try {
-    cols = db.prepare<[], { name: string }>('PRAGMA table_info(skills)').all();
+    cols = db.prepare<[], { name: string }>('PRAGMA table_info(catalog)').all();
   } catch (err) {
     if (err instanceof SearchError) throw err;
-    throw asSearchError(err, 'SCHEMA_ERROR', 'skills column verification failed');
+    throw asSearchError(err, 'SCHEMA_ERROR', 'catalog column verification failed');
   }
   const names = new Set(cols.map((c) => c.name));
-  const required = ['id', 'slug', 'kind', 'content_yaml', 'embedding', 'hash'];
+  const required = ['id', 'type', 'text'];
   const missing = required.filter((n) => !names.has(n));
   if (missing.length > 0) {
     throw new SearchError(
-      `skills table missing required columns: ${missing.join(',')}`,
+      `catalog table missing required columns: ${missing.join(',')}`,
       'SCHEMA_ERROR',
     );
   }
@@ -124,116 +122,131 @@ function loadAndVerifyVectorExtension(db: Database): void {
 function createVirtualTablesAndTriggers(db: Database): void {
   const createFts = db.prepare(
     `CREATE VIRTUAL TABLE IF NOT EXISTS ${FTS_TABLE} USING fts5(
-       content_yaml,
-       content='skills',
-       content_rowid='id',
+       text,
+       content='catalog',
+       content_rowid='rowid',
        tokenize='unicode61 remove_diacritics 2'
      )`,
   );
   createFts.run();
 
-  // vec0 declared with an explicit `skill_id INTEGER PRIMARY KEY` so
-  // PRAGMA table_info() exposes the contract the design demands (an
-  // INTEGER-PK linked to skills.id). The implicit rowid is no longer
-  // accessible; downstream SQL must reference `skill_id` directly.
-  // The JS-side backfill binds BigInt() for this column because the
-  // sqlite-vec 0.1.9 binding path rejects plain Number PK values;
-  // trigger-side references to new.id / old.id continue to work because
+  // vec0 declared WITHOUT an explicit INTEGER PRIMARY KEY so the
+  // implicit `rowid` column is exposed — production wires embeddings via
+  // embeddings_ai/ad triggers that bind new.rowid / old.rowid. The
+  // JS-side backfill binds BigInt() because sqlite-vec 0.1.9's binding
+  // path rejects plain Number values for the implicit rowid; trigger-
+  // side references to new.rowid / old.rowid continue to work because
   // SQLite passes the column reference as a true INTEGER.
   const createVec = db.prepare(
     `CREATE VIRTUAL TABLE IF NOT EXISTS ${VEC_TABLE} USING vec0(
-       skill_id INTEGER PRIMARY KEY,
        embedding float[${SEARCH_EMBEDDING_DIMENSIONS}] distance_metric=cosine
      )`,
   );
   createVec.run();
 
-  // FTS sync triggers — FTS5 external-content protocol.
+  // FTS sync triggers — FTS5 external-content protocol. catalog.id is
+  // TEXT and the FTS rowid is the catalog rowid (INTEGER). The
+  // (catalog_fts, rowid, ...) delete-command syntax is FTS5-standard
+  // and only valid on FTS5 tables.
   db.exec(`
-    CREATE TRIGGER IF NOT EXISTS skills_ai_fts
-    AFTER INSERT ON skills BEGIN
-      INSERT INTO ${FTS_TABLE}(rowid, content_yaml) VALUES (new.id, new.content_yaml);
+    CREATE TRIGGER IF NOT EXISTS catalog_ai_fts
+    AFTER INSERT ON catalog BEGIN
+      INSERT INTO ${FTS_TABLE}(rowid, text) VALUES (new.rowid, new.text);
     END;
 
-    CREATE TRIGGER IF NOT EXISTS skills_au_content_fts
-    AFTER UPDATE OF content_yaml ON skills BEGIN
-      INSERT INTO ${FTS_TABLE}(${FTS_TABLE}, rowid, content_yaml)
-        VALUES ('delete', old.id, old.content_yaml);
-      INSERT INTO ${FTS_TABLE}(rowid, content_yaml) VALUES (new.id, new.content_yaml);
+    CREATE TRIGGER IF NOT EXISTS catalog_au_fts
+    AFTER UPDATE OF text ON catalog BEGIN
+      INSERT INTO ${FTS_TABLE}(${FTS_TABLE}, rowid, text)
+        VALUES ('delete', old.rowid, old.text);
+      INSERT INTO ${FTS_TABLE}(rowid, text) VALUES (new.rowid, new.text);
     END;
 
-    CREATE TRIGGER IF NOT EXISTS skills_ad_fts
-    AFTER DELETE ON skills BEGIN
-      INSERT INTO ${FTS_TABLE}(${FTS_TABLE}, rowid, content_yaml)
-        VALUES ('delete', old.id, old.content_yaml);
+    CREATE TRIGGER IF NOT EXISTS catalog_ad_fts
+    AFTER DELETE ON catalog BEGIN
+      INSERT INTO ${FTS_TABLE}(${FTS_TABLE}, rowid, text)
+        VALUES ('delete', old.rowid, old.text);
     END;
   `);
 
-  // Vec sync triggers — new.id / old.id are SQLite column references
-  // (true INTEGERs), which sqlite-vec accepts even though the JS binding
-  // path requires BigInt() for the same column.
+  // Vec sync triggers — embed rows are added/removed via the embeddings
+  // table; their rowid is the catalog rowid by referential cascade, so
+  // we bind new.rowid / old.rowid to the vec table's implicit rowid.
+  // vec0 uses regular SQL DELETE (NOT the FTS5 ('delete', ...) command).
   db.exec(`
-    CREATE TRIGGER IF NOT EXISTS skills_ai_vec
-    AFTER INSERT ON skills BEGIN
-      INSERT INTO ${VEC_TABLE}(skill_id, embedding) VALUES (new.id, new.embedding);
+    CREATE TRIGGER IF NOT EXISTS embeddings_ai_vec
+    AFTER INSERT ON embeddings BEGIN
+      INSERT INTO ${VEC_TABLE}(rowid, embedding) VALUES (new.rowid, new.vector);
     END;
 
-    CREATE TRIGGER IF NOT EXISTS skills_au_embedding_vec
-    AFTER UPDATE OF embedding ON skills BEGIN
-      DELETE FROM ${VEC_TABLE} WHERE skill_id = old.id;
-      INSERT INTO ${VEC_TABLE}(skill_id, embedding) VALUES (new.id, new.embedding);
+    CREATE TRIGGER IF NOT EXISTS embeddings_au_vec
+    AFTER UPDATE OF vector ON embeddings BEGIN
+      DELETE FROM ${VEC_TABLE} WHERE rowid = old.rowid;
+      INSERT INTO ${VEC_TABLE}(rowid, embedding) VALUES (new.rowid, new.vector);
     END;
 
-    CREATE TRIGGER IF NOT EXISTS skills_ad_vec
-    AFTER DELETE ON skills BEGIN
-      DELETE FROM ${VEC_TABLE} WHERE skill_id = old.id;
+    CREATE TRIGGER IF NOT EXISTS embeddings_ad_vec
+    AFTER DELETE ON embeddings BEGIN
+      DELETE FROM ${VEC_TABLE} WHERE rowid = old.rowid;
     END;
   `);
 }
 
 /**
- * Reconcile both indexes to current `skills` rows. Called once per
+ * Reconcile both indexes to current `catalog` rows. Called once per
  * initialization. Removes stale FTS rows and rebuilds the vec table from
- * scratch so a second call leaves exactly one row per skill in each index.
+ * scratch so a second call leaves exactly one row per catalog entry in
+ * each index.
  *
  * Uses BigInt for the vec PK bind because sqlite-vec's vec0 0.1.9 binding
  * path rejects plain Number primary keys when called from JS. The FTS
  * rowid column is unrelated to this quirk and uses plain Number.
  */
 function reconcileIndexes(db: Database): void {
-  // 1. Drop FTS rows whose underlying skill no longer exists.
+  // 1. Drop FTS rows whose underlying catalog entry no longer exists.
   const ftsRows = db.prepare<[], ExtractedFtsRow>(`SELECT rowid FROM ${FTS_TABLE}`).all();
-  const skillRows = db.prepare<[], { id: number }>('SELECT id FROM skills').all();
-  const skillIds = new Set(skillRows.map((r) => r.id));
+  const catalogRows = db
+    .prepare<[], { rowid: number }>('SELECT rowid FROM catalog')
+    .all();
+  const catalogRowids = new Set(catalogRows.map((r) => r.rowid));
 
   if (ftsRows.length > 0) {
     const deleteFts = db.prepare(`DELETE FROM ${FTS_TABLE} WHERE rowid = ?`);
     for (const fts of ftsRows) {
-      if (!skillIds.has(fts.rowid)) {
+      if (!catalogRowids.has(fts.rowid)) {
         deleteFts.run(fts.rowid);
       }
     }
   }
 
-  // 2. Rebuild vec table from scratch — it only mirrors skills.id +
-  //    skills.embedding and is cheap at expected catalog scale.
+  // 2. Rebuild vec table from scratch — it only mirrors embeddings.vector
+  //    (which is keyed by catalog.rowid via FK cascade) and is cheap at
+  //    expected catalog scale.
   db.exec(`DELETE FROM ${VEC_TABLE}`);
 
-  const allSkills = db
-    .prepare<[], SkillsRowMeta>('SELECT id, content_yaml, embedding FROM skills')
+  const allEmbeddings = db
+    .prepare<[], EmbeddingsRowMeta>(
+      `SELECT e.rowid AS rowid, e.vector AS vector
+       FROM embeddings e
+       INNER JOIN catalog c ON c.rowid = e.rowid`,
+    )
     .all();
   const insertFts = db.prepare(
-    `INSERT INTO ${FTS_TABLE}(rowid, content_yaml) VALUES (?, ?)`,
+    `INSERT INTO ${FTS_TABLE}(rowid, text) VALUES (?, ?)`,
   );
-  // skill_id is INTEGER PRIMARY KEY in vec0; sqlite-vec 0.1.9's JS binding
-  // path requires BigInt() for this column, while trigger-side references
-  // (new.id) work without the conversion.
+  const catalogTextStmt = db.prepare<[number], { text: string }>(
+    'SELECT text FROM catalog WHERE rowid = ?',
+  );
+  // vec0 implicit rowid: sqlite-vec 0.1.9's JS binding path requires
+  // BigInt() for this column, while trigger-side references (new.rowid)
+  // work without the conversion.
   const insertVec = db.prepare(
-    `INSERT INTO ${VEC_TABLE}(skill_id, embedding) VALUES (?, ?)`,
+    `INSERT INTO ${VEC_TABLE}(rowid, embedding) VALUES (?, ?)`,
   );
-  for (const row of allSkills) {
-    insertFts.run(row.id, row.content_yaml);
-    insertVec.run(BigInt(row.id), row.embedding);
+  for (const row of allEmbeddings) {
+    const textRow = catalogTextStmt.get(row.rowid);
+    if (textRow === undefined) continue; // orphan embedding — skip
+    insertFts.run(row.rowid, textRow.text);
+    insertVec.run(BigInt(row.rowid), row.vector);
   }
 }
 
@@ -251,7 +264,7 @@ function reconcileIndexes(db: Database): void {
  */
 export function initializeSearchStorage(db: Database): void {
   // 1. Pre-conditions — these checks throw before we mutate anything.
-  verifySkillsTable(db);
+  verifyCatalogTable(db);
   loadAndVerifyVectorExtension(db);
 
   // 2. All DDL + backfill in a single transaction.
