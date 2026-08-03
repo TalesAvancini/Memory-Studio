@@ -10,14 +10,20 @@ audience: "orchestrator agent (post-compaction) + the human user"
 ## TL;DR
 
 - **Branch:** `loop/phase-0` (only branch in use; do NOT work on `main`)
-- **Mission:** Phase 7b Batch 1 — Empirical Tuning + Acceptance Gate (T-01..T-06) — *Implementer #2 running after respawn*
-- **Tests baseline:** 478 root + 152 UI + 16 SDK = 646 total (currently 17 FAIL — Implementer #1 introduced TS parameter property bug; WIP committed at `3331660`)
-- **HEAD:** `3331660` (WIP+T-01 partial)
+- **Mission:** Phase 7b.1B — T-03..T-06 (streaming + metrics v2 + acceptance evaluator + snapshot tool) — *Implementer 7b.1B running*
+- **Tests baseline:** 478 root + 152 UI + 16 SDK = 646 total (T-01 + T-02 PARTIAL: 22/22 PASS in target areas, full suite needs re-verification after 7b.1B)
+- **HEAD:** `fa399c2` (T-02 commit)
 - **10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
 
 > **Phase 7a CLOSED 2026-08-02.** Verifier PASS at `.specs/features/phase-7a-metrics/validation-phase-7a.md`. Final HEAD `ca3b22c + 9024006` (closure).
 >
-> **Phase 7b IMPLEMENTER #1 DIED (agent `a68b42aac9239a8db`).** Partial T-01 work committed at `3331660` with TS parameter property bug. Fresh Implementer #2 dispatched (agent `a5ab666311b294249`).
+> **Phase 7b T-01 + T-02 DONE 2026-08-03** (commits `8449251`, `aac824b`, `fa399c2`).
+> - `runtime-state.ts` loads OK (TS parameter property bug fixed)
+> - 22/22 target tests PASS (runtime-state, production-context, proxy-production-request, messages-proxy, endpoints)
+> - `.memory-studio/state.json` now consumed by `runAugment`
+> - Proxy forwards real active catalog + per-session identity + exact matched system
+>
+> **Phase 7b.1B (T-03..T-06) dispatched** (agent `aa39d491263d166cf`). Streaming work partially uncommitted (sse-tee.ts + messages-proxy.ts pending).
 
 ## Phase Status (snapshot at handoff)
 
@@ -50,7 +56,7 @@ audience: "orchestrator agent (post-compaction) + the human user"
 | **6b.3** BuildOptions.intel | ✅ `[x]` | `2a692ac` | 1 |
 | **6b.4** Pipeline + Cache Hit | ✅ `[x]` | `bc95558` | 1 |
 | **7a** Metrics Instrumentation | ✅ `[x]` | `9024006` (closure) | 1 |
-| **7b** Real API Measurement + Tuning | ⏳ **Implementer #2 dispatched** (T-01..T-06) | `3331660` (HEAD, WIP) | respawn |
+| **7b** Real API Measurement + Tuning | ⏳ 7b.1A done (T-01+T-02), 7b.1B running (T-03..T-06) | `fa399c2` (HEAD) | 7b.1A iter 1 + 7b.1B in-flight |
 
 **10 of 11 main phases DONE.** Last phase: **7b** (acceptance gate — needs user-driven wall-clock validation).
 
