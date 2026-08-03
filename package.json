@@ -20,7 +20,7 @@
     "build-index": "node --experimental-strip-types --no-warnings scripts/build-index.ts",
     "catalog:load": "node --experimental-strip-types --no-warnings scripts/build-index.ts",
     "verify-env": "node scripts/verify-env.mjs",
-    "server:start": "node --experimental-strip-types --no-warnings src/server/boot.ts",
+    "server:start": "node --env-file=.env --experimental-strip-types --no-warnings src/server/boot.ts",
     "smoke:augment-server": "node scripts/smoke-augment-server.mjs"
   },
   "dependencies": {
