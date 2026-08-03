@@ -1,0 +1,39 @@
+id: skill-pattern-fail-open
+type: skill
+title: Fail-Open vs Fail-Closed
+category: pattern
+text: |
+  Choose fail-open vs fail-closed based on what you're protecting.
+
+  Fail-OPEN (continue with reduced service):
+    - Telemetry, audit, metrics, logging.
+    - Cache lookups (return miss, not error).
+    - Enrichment / augmentation (return bare request, not error).
+    - Soft rate limits.
+
+  Fail-CLOSED (reject the request):
+    - Auth, authorization, identity verification.
+    - Data integrity checks (foreign key, unique constraint).
+    - Payment validation.
+    - Hard rate limits (security: brute force protection).
+
+  Rule of thumb:
+    - If your failure leaves the system INCORRECT → fail-closed.
+    - If your failure leaves the system LESS HELPFUL → fail-open.
+
+  Pattern (fail-open):
+    ```ts
+    try {
+      const enriched = await enrich(request);
+      return enriched;
+    } catch (err) {
+      logger.warn({ err }, 'enrich failed; returning bare');
+      return request;  // fallback to the bare thing
+    }
+    ```
+
+  Pattern (fail-closed):
+    ```ts
+    const user = await db.users.findById(req.userId);
+    if (!user) throw httpErrors.notFound('user not found');
+    ```

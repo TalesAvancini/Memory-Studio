@@ -1,0 +1,38 @@
+id: skill-pattern-dep-injection
+type: skill
+title: Dependency Injection Pattern
+category: pattern
+text: |
+  Pass dependencies into a module's constructor or factory, never
+  `require`/`import` them at module scope for things that need
+  configuration or testing.
+
+  Pattern (constructor injection):
+    ```ts
+    class Service {
+      constructor(
+        private readonly db: Database,
+        private readonly logger: Logger,
+      ) {}
+      async run() { ... }
+    }
+    const svc = new Service(db, logger);
+    ```
+
+  Pattern (factory function):
+    ```ts
+    export function makeService({ db, logger }) {
+      return { run: async () => {...} };
+    }
+    const svc = makeService({ db, logger });
+    ```
+
+  Why:
+    - Tests inject mocks/stubs without monkey-patching.
+    - Production wiring is explicit and grep-able.
+    - Multiple instances with different config are easy.
+
+  Anti-pattern (DON'T):
+    - `const db = require('./db')` at module scope.
+    - Global singletons that hold mutable state.
+    - Reading env vars deep inside business logic.

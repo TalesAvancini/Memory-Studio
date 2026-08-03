@@ -1,9 +1,24 @@
 {
   "schemaVersion": 3,
-  "activeCatalog": [],
+  "activeCatalog": [
+    "persona-default-concise",
+    "persona-verbose-explainer",
+    "persona-pt-br-friendly",
+    "skill-typescript-strict",
+    "skill-git-rebase",
+    "skill-debug-typescript",
+    "skill-debug-network",
+    "skill-fastify-reference",
+    "skill-zod-reference",
+    "skill-pattern-dep-injection",
+    "skill-pattern-fail-open",
+    "rule-no-secrets-in-prompts",
+    "rule-no-double-negative",
+    "rule-prefer-yes-no"
+  ],
   "thresholds": {
-    "minCosineSimilarity": 0.6,
-    "minFtsHits": 2
+    "minCosineSimilarity": 0.3,
+    "minFtsHits": 1
   },
   "fastAgent": {
     "model": "MiniMax-M2.7-highspeed",

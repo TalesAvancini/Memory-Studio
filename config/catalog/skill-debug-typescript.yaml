@@ -1,0 +1,30 @@
+id: skill-debug-typescript
+type: skill
+title: TypeScript Error Triage
+category: diagnostic
+text: |
+  Diagnose TypeScript compile errors systematically. Most errors fall
+  into a small set of categories; recognizing the category cuts
+  investigation time dramatically.
+
+  Categories:
+    - **TS2304 / TS2305 / TS2307** — Cannot find name / module.
+      Usually a missing import, a typo, or a missing `types` field
+      in `package.json`. Run `tsc --traceResolution` to see the
+      resolution path.
+    - **TS2322 / TS2345** — Type mismatch. The actual type is
+      on the right side of the colon; the expected type is on the
+      left. Often a `null`/`undefined` leak through an optional chain.
+    - **TS2531 / TS2532** — Object possibly null. Add a guard or
+      assertion. Prefer guards over `!`.
+    - **TS2741** — Missing property. Check structural typing —
+      the source type lacks a required key.
+    - **TS2769** — No overload matches. Function has multiple
+      signatures; pick the right one by inspecting argument types.
+
+  Diagnostic flow:
+    1. Read the error code (TS####) and the location (file:line:col).
+    2. Identify the category.
+    3. Inspect the actual types with a `console.log(typeof x)` or
+       a type-only debug `.d.ts` file.
+    4. Fix at the source, not at the consumer.

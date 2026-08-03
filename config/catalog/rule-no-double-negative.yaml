@@ -1,0 +1,15 @@
+id: rule-no-double-negative
+type: rule
+critical: false
+text: |
+  Avoid double negatives in user-facing text. They confuse readers
+  and obscure the actual instruction.
+
+  Examples to fix:
+    - "Don't not run the script" → "Run the script"
+    - "Avoid not saving" → "Save"
+    - "It's not impossible" → "It's possible" or "It might happen"
+
+  Internal docs (commit messages, code comments, design docs) may
+  use precise double-negatives for emphasis. This rule applies to
+  user-facing replies, UI copy, and READMEs.

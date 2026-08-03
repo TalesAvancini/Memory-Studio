@@ -1,0 +1,32 @@
+id: skill-fastify-reference
+type: skill
+title: Fastify v5 Reference Patterns
+category: reference
+text: |
+  Fastify v5 patterns used in this codebase.
+
+  Route registration:
+    - Sync: `app.get('/path', async (req, reply) => {...})`
+    - With schema validation: pass `schema: { body: ..., response: ... }`
+      and Fastify validates + serializes automatically.
+
+  Plugins:
+    - Use `fastify-plugin` to make decorators visible to the parent.
+    - Each plugin must `await app.register(plugin, opts)` to ensure
+      ordering.
+
+  Decorators:
+    - `app.decorate('db', dbInstance)` to share across routes.
+    - Access via `app.db` or `request.server.db`.
+
+  Lifecycle hooks:
+    - `onRequest`, `preParsing`, `preValidation`, `preHandler`,
+      `handler`, `preSerialization`, `onSend`, `onResponse`.
+    - Use the EARLIEST hook that has the info you need (cheaper).
+
+  Error handling:
+    - Throw `app.httpErrors.notFound()` or
+      `app.httpErrors.badRequest('reason')` — Fastify sets status +
+      serializes consistently.
+    - Custom error handler: `app.setErrorHandler(...)` — returns
+      JSON `{statusCode, error, message}`.

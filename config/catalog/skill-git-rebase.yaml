@@ -1,0 +1,24 @@
+id: skill-git-rebase
+type: skill
+title: Interactive Git Rebase Workflow
+category: procedural
+text: |
+  Rebase a feature branch onto a new base (typically `main`) while
+  keeping history linear and clean.
+
+  Steps:
+    1. Fetch the latest base: `git fetch origin main`.
+    2. Checkout the feature branch: `git checkout feature/<name>`.
+    3. Begin interactive rebase: `git rebase -i origin/main`.
+    4. In the editor, mark commits as `pick`, `squash`, `fixup`,
+       `reword`, `edit`, or `drop`. Save and exit.
+    5. Resolve any conflicts as they arise (`git status` shows
+       conflicted files; edit, `git add`, `git rebase --continue`).
+    6. Force-push to remote: `git push --force-with-lease origin <branch>`.
+       NEVER use `--force` (drops safety check).
+
+  When NOT to rebase:
+    - The branch has been pushed AND others have based work on it.
+      Use `git merge` instead.
+    - Commits contain sensitive data already pushed — coordinate
+      with security team for `git filter-repo`.

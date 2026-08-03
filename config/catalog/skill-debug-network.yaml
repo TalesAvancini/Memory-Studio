@@ -1,0 +1,30 @@
+id: skill-debug-network
+type: skill
+title: Network/HTTP Error Triage
+category: diagnostic
+text: |
+  Diagnose HTTP and network errors in dev / prod environments.
+
+  HTTP status codes:
+    - **4xx** — Client error. The request was malformed or
+      unauthorized. Inspect the body for the server's reason.
+    - **5xx** — Server error. The server failed to fulfill a valid
+      request. Check server logs; the client should retry with
+      exponential backoff.
+    - **408 / 504** — Timeout. Server-side or upstream. Reduce
+      payload, increase timeout, or check upstream health.
+    - **429** — Rate limit. Respect `Retry-After` header. Back off
+      exponentially. Consider a request queue.
+    - **502 / 503 / 504** — Upstream / proxy failure. Check the
+      upstream service's health, not your code.
+
+  Diagnostic flow:
+    1. Capture the full request/response (headers + body) with
+       `curl -v` or the browser dev tools Network tab.
+    2. Check the timing: `time curl -v ...` to see where time is
+       spent (DNS, connect, TLS, request, response).
+    3. Reproduce locally with the exact same headers + body.
+    4. If reproducible, isolate: comment out parts until the failure
+       stops. The last commented-out part is the cause.
+    5. If not reproducible, check async timing, race conditions,
+       and external state (DB, cache, downstream services).

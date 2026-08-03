@@ -1,0 +1,34 @@
+id: skill-zod-reference
+type: skill
+title: Zod v3 Schema Reference
+category: reference
+text: |
+  Zod v3 schema patterns used throughout the codebase.
+
+  Primitives:
+    - `z.string()` — string; chain `.min()`, `.max()`, `.regex()`,
+      `.email()`, `.url()`, `.uuid()`, etc.
+    - `z.number()` — number; chain `.int()`, `.positive()`,
+      `.min()`, `.max()`, `.finite()`.
+    - `z.boolean()`, `z.null()`, `z.undefined()`.
+
+  Objects:
+    - `z.object({ a: z.string(), b: z.number() })`.
+    - `.partial()` — all keys optional.
+    - `.required()` — keys can't be undefined (useful after `.partial`).
+    - `.pick({ a: true })` / `.omit({ b: true })` — projections.
+    - `.extend({ c: ... })` — add keys.
+    - `.merge(otherSchema)` — combine.
+
+  Unions and discriminated unions:
+    - `z.union([a, b])` — try each.
+    - `z.discriminatedUnion('kind', [a, b])` — pick by discriminator
+      key, more efficient.
+
+  Refinements:
+    - `.refine((v) => v.passport.length > 0, { message: 'required' })`.
+    - `.superRefine((v, ctx) => ctx.addIssue(...))` — multiple issues.
+
+  Inference:
+    - `type X = z.infer<typeof schema>` — derive the TypeScript type
+      from the schema. Use this instead of maintaining both.

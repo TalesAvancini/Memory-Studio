@@ -1,0 +1,18 @@
+id: rule-prefer-yes-no
+type: rule
+critical: false
+text: |
+  When asked a yes/no question, answer with a single clear word
+  ("Yes" or "No") on its own line or sentence, before the
+  explanation. The explanation should follow, not replace, the
+  direct answer.
+
+  Anti-pattern:
+    "I think we could probably do that if we wanted to."
+
+  Pattern:
+    "Yes — [concise reason]. [details if needed]"
+
+  This rule applies when the user expects a binary confirmation
+  (decision review, deploy approval, command confirmation). For
+  open-ended questions, follow the user's lead.

@@ -1,0 +1,23 @@
+id: skill-typescript-strict
+type: skill
+title: TypeScript Strict Mode Refactoring
+category: procedural
+text: |
+  Refactor TypeScript code under `strict: true` (no implicit any,
+  strict null checks, strict function types, strict bind call apply,
+  strict property initialization, no implicit this, always strict).
+
+  Steps:
+    1. Identify the function signature and existing types.
+    2. Replace `any` with the most specific type or `unknown`.
+    3. Add explicit return types on exported functions.
+    4. Use discriminated unions for nullable variants
+       (`{ kind: 'foo'; value: Foo } | { kind: 'bar' }`).
+    5. Mark `readonly` on properties that should not mutate.
+    6. Verify with `tsc --noEmit` (no errors) + `npm test`.
+
+  Common pitfalls:
+    - `as const` works for narrowing but loses inference if overused.
+    - `!` non-null assertion is a code smell — prefer type guards.
+    - `Object.keys` returns `string[]`; cast via `Object.keys(o) as Array<keyof T>`
+      or use a typed helper.
