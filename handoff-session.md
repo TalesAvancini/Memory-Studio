@@ -397,7 +397,7 @@ Análise crítica: gargalo real é o que inception adiciona ao hot path a cada T
 - **`.env.example`** criado com template bloated (commit `2d81254`) → simplificado (commit `cafadea`) → deletado (commit `e2a8646`). Nenhum commit continha secret real (valores vazios).
 - **`.env`** local criado pelo usuário com MEMORY_STUDIO_FAST_AGENT_API_KEY (gitignored)
 - **`.gitignore` hardening** (commit `7142ef6`): adicionado `.env.*` glob — defesa em profundidade, blinda contra commits acidentais de qualquer `.env*` futuro (incluindo .env.example)
-- **Validação final:** `git log --all -p | grep -c "sk-cp-6ijLAa"` = **0 hits** — key NUNCA commitada em nenhum momento. Alarme falso inicial foi corrigido.
+- **Validação final:** `git log --all -p | grep -c "sk-cp-XXXXX"` = **0 hits** — key NUNCA commitada em nenhum momento. Alarme falso inicial foi corrigido. (Prefixo real redacted 2026-08-04 pra não vazar identificador no GitHub público.)
 
 Tu precisa (se ainda não fez): copiar MiniMax API key do Claude Code pra `.env` local (mesma key, mesma base URL `https://api.minimax.io/anthropic`).
 
