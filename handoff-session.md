@@ -988,7 +988,7 @@ Branch `fix/ui-server-bootstrap` (a partir de `loop/phase-0 @ 4164ca7`). 3 commi
 |---|---|---|---|
 | `5350187` | feat(scripts): add ui:start npm script | `package.json` | +1 |
 | `60ab985` | docs(ui): add Section 4 covering UI server bootstrap | `docs/guides/claude-code-baseurl.md` | +77 |
-| (pending) | docs(handoff): Marco 48 — T-07 resolved | `handoff-session.md` | +30 |
+| `9da438e` | docs(handoff): Marco 48 — T-07 resolved | `handoff-session.md` | +75/-7 |
 
 **Validação E2E executada:**
 
@@ -1022,7 +1022,7 @@ curl -I http://127.0.0.1:42900/health        # 200 application/json
 | | Status |
 |---|---|
 | Branch | `fix/ui-server-bootstrap` |
-| HEAD | `60ab985` + Marco 48 commit (pending) |
+| HEAD | `9da438e` (Marco 48) |
 | API server | 🟢 http://127.0.0.1:42900 (Node Fastify) |
 | UI server | 🟢 http://127.0.0.1:41823 (Node http — `scripts/ui-server.mjs`) |
 | Smoke E2E | ✅ `node scripts/smoke-e2e-with-db.mjs` → 6/6 PASS |
