@@ -92,3 +92,80 @@ Phase 5a's `systemMessage` SHA-256 IS the byte-string key. If `/augment` returns
 ### `MEMORY_STUDIO_AUGMENT_PORT_RANGE` env var
 
 This env var is **documented but not currently read** by `src/server/boot.ts` (the server uses `DEFAULT_AUGMENT_PORT_RANGE` directly). Set the port programmatically via `createServer({ portRange: [a, b] })` for non-default ranges.
+
+## Section 4 — UI server (Phase 4 shipped)
+
+The UI server is a separate process from the augment API server. It serves the local dashboard for browsing the catalog, toggling active items, and editing settings. It binds to `127.0.0.1` only and does not require a `.env` — it reads YAML from `config/catalog/` and project state from `.memory-studio/state.json` directly off the filesystem relative to CWD.
+
+### 4.1 — `npm run ui:start`
+
+```bash
+npm run ui:start
+# Memory Studio UI: http://127.0.0.1:41823
+```
+
+The server picks the first free port in `[41823, 42823]` (declared in `packages/ui/src/port.ts:5`) and binds to `127.0.0.1`. Override the range with `MEMORY_STUDIO_UI_PORT_RANGE` using the same `START-END` format as the API server:
+
+```bash
+MEMORY_STUDIO_UI_PORT_RANGE="42800-42822" npm run ui:start
+```
+
+### 4.2 — What the UI serves
+
+| Path | Method | Purpose |
+|---|---|---|
+| `/` | GET | `index.html` (dashboard shell) |
+| `/assets/*` | GET | Static files (CSS, JS — htmx, alpine, app.js) |
+| `/ui/{tab}` | GET | Partial HTML for a tab (`skills`, `rules`, `personas`, `audit`, `settings`) |
+| `/state` | GET | Current project state as JSON |
+| `/state/toggle` | POST | Toggle a catalog item on/off |
+| `/state/settings` | POST | Apply a settings patch |
+
+Tab partials are routed server-side (declared in `packages/ui/src/server.ts:47`); the server maps `/ui/skills`, `/ui/rules`, `/ui/personas`, `/ui/audit`, `/ui/settings` to their respective renderers. POST endpoints expect `Content-Type: application/json` and reject bodies larger than 64 KiB with HTTP 413.
+
+### 4.3 — Running API + UI together
+
+Both servers are independent processes. Run each in its own terminal:
+
+```bash
+# Terminal 1 — API
+npm run server:start
+# Memory Studio augment server: http://127.0.0.1:42900
+
+# Terminal 2 — UI
+npm run ui:start
+# Memory Studio UI: http://127.0.0.1:41823
+```
+
+Then open `http://127.0.0.1:41823` in a browser. All 5 tabs (Skills, Rules, Personas, Audit, Settings) load partials via `/ui/{tab}` and write back through the JSON endpoints. Read-only browsing works without the API server — only the augment path requires it.
+
+### 4.4 — UI troubleshooting
+
+#### Port conflict (`EADDRINUSE`)
+
+Same pattern as Section 3.1. The UI server scans `[41823, 42823]` and binds the first free port. If the boot log shows a different port than 41823, the previous instance was still bound. Either wait ~200ms after killing the prior process, or pin a different range:
+
+```bash
+MEMORY_STUDIO_UI_PORT_RANGE="42800-42822" npm run ui:start
+```
+
+#### State doesn't persist (toggle reverts on reload)
+
+Two UI instances are racing on the same `.memory-studio/state.json`. The state store uses atomic `rename` for per-process writes (see `packages/ui/src/state.ts:239`), but a read-modify-write across two processes is a last-writer-wins race — the older change is silently overwritten. Kill the extra instance; only one `npm run ui:start` should be running against a given `projectRoot`.
+
+#### Audit tab shows "No audit events yet"
+
+This is the **default** state. The UI's `auditReader` is wired to `createEmptyAuditReader()` (see `packages/ui/src/audit.ts:25`), which always returns `[]`. Real audit data is not yet injected into the UI — it remains an API-only concern. The empty state is not a bug, but the gap is known.
+
+#### Catalog doesn't appear (`CatalogUnavailableError`)
+
+The UI resolves the catalog relative to CWD: `join(process.cwd(), 'config', 'catalog')`. If `npm run ui:start` was launched from a directory without a `config/catalog/*.yaml` tree, the reader throws `CatalogUnavailableError` (see `packages/ui/src/catalog.ts:41`) and every tab renders an empty catalog. Fix: run the command from the project root, or pass an absolute path programmatically via `createUiServer({ projectRoot: '/abs/path' })`.
+
+### 4.5 — Port range separation (UI vs API)
+
+| Server | Default range | Env var |
+|---|---|---|
+| API | `[42900, 43000]` | `MEMORY_STUDIO_AUGMENT_PORT_RANGE` |
+| UI  | `[41823, 42823]` | `MEMORY_STUDIO_UI_PORT_RANGE` |
+
+The ranges are **disjoint by design** so a runaway API process can never collide with a UI process and vice versa. See `.specs/ROADMAP.md` and `.specs/features/phase-4-ui-panel/validation-phase-4.1.md` for the rationale.
