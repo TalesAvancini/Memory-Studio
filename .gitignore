@@ -26,3 +26,12 @@ models/
 /.claude/settings.local.json
 /.claude/settings.json
 /CLAUDE.local.md
+
+# Captura_projeto outputs (AI-context bundles — gerados localmente, não versionar)
+/repo-raw.md
+/repo-map.md
+/repo-raw-*.md
+/repo-map-*.md
+
+# Captura_projeto (ferramenta externa — repo embedded, customizado pra rodar aqui)
+/captura_projeto/
