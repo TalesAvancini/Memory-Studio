@@ -243,6 +243,32 @@ export async function createServer(
     ...options.fastifyOptions,
   });
 
+  // --- Phase 7b CORS shim (dev only) ----------------------------------------
+  // The augment server is JSON-only by default. When the Memory Studio UI
+  // (packages/ui/) is served from a different port (e.g. python http.server
+  // on 42823), the browser blocks fetch() calls due to same-origin policy.
+  // This hook adds permissive CORS headers for loopback dev origins. NOT for
+  // production — wire @fastify/cors properly when the UI is co-hosted.
+  app.addHook('onRequest', async (req, reply) => {
+    const origin = req.headers.origin;
+    if (typeof origin === 'string' && /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(origin)) {
+      reply.header('Access-Control-Allow-Origin', origin);
+      reply.header('Access-Control-Allow-Credentials', 'true');
+      reply.header('Vary', 'Origin');
+      reply.header(
+        'Access-Control-Allow-Methods',
+        'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+      );
+      reply.header(
+        'Access-Control-Allow-Headers',
+        'content-type, x-memory-studio-session-id, anthropic-version, x-api-key, authorization',
+      );
+    }
+    if (req.method === 'OPTIONS') {
+      reply.code(204).send();
+    }
+  });
+
   // Reset metadata so each createServer() call gets a clean start timestamp.
   serverStartTimeMs = Date.now();
   lastRequestTimestampMs = 0;
