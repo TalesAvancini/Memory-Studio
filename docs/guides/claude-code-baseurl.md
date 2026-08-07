@@ -169,3 +169,74 @@ The UI resolves the catalog relative to CWD: `join(process.cwd(), 'config', 'cat
 | UI  | `[41823, 42823]` | `MEMORY_STUDIO_UI_PORT_RANGE` |
 
 The ranges are **disjoint by design** so a runaway API process can never collide with a UI process and vice versa. See `.specs/ROADMAP.md` and `.specs/features/phase-4-ui-panel/validation-phase-4.1.md` for the rationale.
+
+## Section 5 — Inception (1-command proxy toggle for Claude Code)
+
+Section 4 explains how to run the API and UI servers. This section explains how to make Claude Code actually use the API as its `baseURL` — without editing JSON by hand, setting shell env vars, or running `claude` from a sibling directory.
+
+The `inception` script (`scripts/inception.mjs`) patches `<repo>/.claude/settings.json` so that `env.ANTHROPIC_BASE_URL` points at the local proxy (`http://127.0.0.1:42900`). It does a JSON merge — `ANTHROPIC_AUTH_TOKEN`, `permissions`, and every other key in the file are preserved byte-for-byte. A `.bak` is written on the first `enable` and used by `disable` to roll back.
+
+### 5.1 — Onboarding (1 command, then run)
+
+```bash
+# Once per repo: patch Claude Code to route through the proxy
+npm run inception:enable
+
+# Daily use (3 terminals)
+npm run server:start    # terminal 1 — API on 42900
+npm run ui:start        # terminal 2 — UI on 41823
+claude                  # terminal 3 — routes through the proxy
+```
+
+After `inception:enable`, the script prints the diff and a one-liner:
+
+```
+✓ patched .claude/settings.json:
+    ANTHROPIC_BASE_URL: https://api.minimax.io/anthropic → http://127.0.0.1:42900
+    other keys preserved (auth token, permissions, etc.)
+
+⚠  kill any running `claude` and reopen it. Claude Code reads
+   env vars at spawn time, not on every request.
+```
+
+**The reopen step is mandatory.** A `claude` session started before `inception:enable` will keep its old `ANTHROPIC_BASE_URL` until you quit and reopen it. This is the #1 cause of "I ran inception:enable and the proxy still isn't being used" reports.
+
+### 5.2 — `inception:status` (sanity check)
+
+```bash
+npm run inception:status
+# or: node scripts/inception.mjs status
+
+inception status:
+  ANTHROPIC_BASE_URL = http://127.0.0.1:42900
+  inception enabled  = true
+  proxy expected at  = http://127.0.0.1:42900
+  proxy health      = OK (uptime 12s, catalog count 17)
+
+✓ ready. Open (or reopen) Claude Code in this repo to use the proxy.
+```
+
+The `proxy health` line pings the API's `/health` endpoint with a 1.5s timeout. If you see `unreachable`, the API isn't running — start it with `npm run server:start` first.
+
+### 5.3 — Disable (back to direct upstream)
+
+```bash
+npm run inception:disable
+```
+
+Restores `ANTHROPIC_BASE_URL` from `.claude/settings.json.bak` (the pre-inception snapshot). Other keys are preserved. If no `.bak` exists (someone deleted it, or `enable` was never run), this is a no-op.
+
+### 5.4 — Subcommand reference
+
+| Subcommand | What it does |
+|---|---|
+| `inception:enable` | Merge-patch `ANTHROPIC_BASE_URL` into `.claude/settings.json`, write `.bak` if missing. |
+| `inception:disable` | Restore `.claude/settings.json` from `.bak`. No-op if no `.bak`. |
+| `inception:status` | Print current `ANTHROPIC_BASE_URL` + ping `/health`. |
+
+### 5.5 — Limitations (YAGNI)
+
+- **Claude Code only.** Other agents (Cursor, Windsurf, Cline, Aider, OpenCode, Continue) each use their own config file. The script does not touch them. Add a per-agent variant when needed.
+- **Per-repo, not global.** The patch is applied to `<repo>/.claude/settings.json`, not `~/.claude/settings.json`. If you `cd` out of the repo and run `claude` from a sibling directory, Claude Code reads a different settings file (or the user-global one) and won't see the proxy URL.
+- **No auto-revert on disable.** `inception:disable` only restores from the FIRST `enable`'s backup. If you ran `enable` → manually edited the file → `enable` again → `disable`, the disable restores to your pre-inception original, not your manual edit. This is intentional (the script never overwrites a `.bak` it didn't create).
+
