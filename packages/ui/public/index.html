@@ -5,11 +5,67 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Memory Studio</title>
     <link rel="stylesheet" href="/assets/styles.css">
+    <script>
+      // Live proxy-status indicator. Pings the API /health every 2s
+      // and surfaces: (a) whether the proxy is reachable, (b) whether
+      // a real request has been intercepted recently (<60s = green,
+      // <5min = yellow, older or never = gray), (c) last error if any.
+      // The banner element exists in the DOM above; this script
+      // updates its label + detail + class on every tick.
+      (function () {
+        const banner = document.getElementById('proxy-banner');
+        const label = banner.querySelector('[data-proxy-label]');
+        const detail = banner.querySelector('[data-proxy-detail]');
+        const API_BASE = (location.protocol === 'file:' || location.hostname === '')
+          ? 'http://127.0.0.1:42900'
+          : `${location.protocol}//${location.hostname}:42900`;
+
+        function classify(lastReq, lastErr) {
+          if (lastErr) return { text: 'error: ' + lastErr, kind: 'err' };
+          if (!lastReq || lastReq === 0) return { text: 'idle (no requests yet)', kind: 'idle' };
+          const ageSec = Math.round((Date.now() - lastReq) / 1000);
+          if (ageSec < 60) return { text: 'intercepting (last request ' + ageSec + 's ago)', kind: 'ok' };
+          if (ageSec < 300) return { text: 'idle ' + Math.round(ageSec / 60) + 'min since last request', kind: 'warn' };
+          return { text: 'idle ' + Math.round(ageSec / 60) + 'min since last request', kind: 'warn' };
+        }
+
+        function apply(state) {
+          const c = classify(state.last_request_ts, state.last_error);
+          label.textContent = c.text;
+          detail.textContent = state.uptime_ms
+            ? `uptime ${Math.round(state.uptime_ms / 1000)}s · catalog ${state.catalog?.count ?? '?'}`
+            : '';
+          banner.dataset.proxyStatus = c.kind;
+          banner.style.background = c.kind === 'ok' ? '#1d3a1d' : c.kind === 'err' ? '#3a1d1d' : c.kind === 'warn' ? '#3a341d' : '#222';
+          banner.style.color = c.kind === 'ok' ? '#7fe07f' : c.kind === 'err' ? '#ff9090' : c.kind === 'warn' ? '#ffe07f' : '#aaa';
+        }
+
+        async function tick() {
+          try {
+            const ctrl = new AbortController();
+            const t = setTimeout(() => ctrl.abort(), 1500);
+            const r = await fetch(API_BASE + '/health', { signal: ctrl.signal });
+            clearTimeout(t);
+            if (!r.ok) { apply({ last_error: 'HTTP ' + r.status }); return; }
+            apply(await r.json());
+          } catch (e) {
+            apply({ last_error: e.name === 'AbortError' ? 'timeout' : (e.message || 'unreachable') });
+          }
+        }
+        tick();
+        setInterval(tick, 2000);
+      })();
+    </script>
     <script defer src="/assets/htmx.min.js"></script>
     <script defer src="/assets/app.js"></script>
     <script defer src="/assets/alpine.min.js"></script>
   </head>
   <body x-data="uiPanel" @hashchange.window="route()">
+    <div id="proxy-banner" data-proxy-status="unknown" data-proxy-banner
+         style="padding:8px 16px;font-family:monospace;font-size:12px;border-bottom:1px solid currentColor;display:flex;gap:12px;align-items:center;background:#222;color:#aaa">
+      <span><strong>proxy:</strong> <span data-proxy-label>checking…</span></span>
+      <span data-proxy-detail style="opacity:0.7"></span>
+    </div>
     <header>
       <h1>Memory Studio</h1>
       <nav aria-label="Memory Studio sections" role="tablist">
