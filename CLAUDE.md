@@ -148,4 +148,20 @@ npm run catalog:load  # tsx src/catalog/cli.ts (cold-path ingest)
 
 **Pre-flight Phase 0:** `scripts/verify-env.mjs` valida ambiente (Node 22 + onnxruntime-node + FTS5 + sqlite-vec + ONNX 384d + state.json write). Roda **1 vez** antes de Phase 1; cache local do modelo persiste nas phases seguintes.
 
+---
+
+## Out of scope (YAGNI decisions — Marco 48/49)
+
+Decisões explícitas de escopo, registradas pra futuro operador não re-abrir o debate.
+
+| Tema | Decisão | Por que |
+|---|---|---|
+| **Outros agents (Cursor, Windsurf, Cline, Aider, OpenCode, Continue)** | Só Claude Code é suportado via `npm run inception:enable`. Cada agent tem config próprio; suportar todos agora é over-engineering. | Claude Code é o agent que o operador usa. Quando aparecer demanda real pelos outros, criar variantes — não antes. |
+| **Patch no `~/.claude/settings.json` (global)** | Fica per-repo, em `<repo>/.claude/settings.json`. Nunca global. | Patch global afeta TODOS os projetos do user, com risco de leak do token e de side-effects em outros dirs. Per-repo isola blast radius. |
+| **Auto-revert se o server cair** | Sem auto-revert. Claude Code já trata server-down com timeout natural. | Adicionar retry/healthcheck próprio é duplicar o que o client HTTP já faz. Se o user sentir falta, adiciona. |
+| **Fast-agent env var name** | É `MEMORY_STUDIO_FAST_AGENT_API_KEY` e `MEMORY_STUDIO_FAST_AGENT_BASE_URL` (NÃO `MINIMAX_API_KEY` hardcoded, NÃO `ANTHROPIC_*` confundido com agent-side). | Histórico: commit `4e7a57c` corrigiu mismatch onde o client lia `MINIMAX_API_KEY` mas o `.env` tinha `MEMORY_STUDIO_FAST_AGENT_API_KEY`. Renomear pra trás quebra o MODE=real silenciosamente. Se for refatorar, manter os 2 nomes. |
+| **`inception:disable` semantics** | Restaura do PRIMEIRO `.bak` escrito pelo `enable`, não do último. Intencional. | O script nunca sobrescreve um `.bak` que não criou. Comportamento é "roll back to pre-inception original", não "undo last edit". |
+
+Quando alguém propor "também devia funcionar com Cursor" ou "vamos patchar o global settings.json", aponta pra esta tabela. Se a proposta for forte, **commita** uma nova entrada aqui em vez de só fazer — pra deixar a decisão rastreável.
+
 **Authority dentro de phases:** Implementer commita sem confirmação (auto-commit inside loop). Verifier valida via spec-anchored check + discrimination sensor. Ver `.specs/ARCHITECTURE.md` (farol textual com stable IDs).
