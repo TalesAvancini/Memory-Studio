@@ -5,9 +5,10 @@
  *
  * Two execution paths:
  *
- *   1. **Real path** (when `MINIMAX_API_KEY` is set AND
+ *   1. **Real path** (when `MEMORY_STUDIO_FAST_AGENT_API_KEY` is set AND
  *      `@anthropic-ai/sdk` is installed AND the SDK is loadable):
- *      - POST to `https://api.minimax.io/anthropic` (the MiniMax
+ *      - POST to `MEMORY_STUDIO_FAST_AGENT_BASE_URL` (default
+ *        `https://api.minimax.io/anthropic` — the MiniMax
  *        Anthropic-compatible endpoint, verified Phase 5b.4).
  *      - `model = process.env.MEMORY_STUDIO_FAST_AGENT_MODEL ?? 'MiniMax-M2.7-highspeed'`.
  *      - Uses `zodResponseFormat(IntelSchema, 'intel')` for structured
@@ -41,9 +42,9 @@ import { EMPTY_INTEL, IntelSchema, type Intel } from './intel-schema.ts';
 // the runtime cost is a single `fs.stat` against `node_modules`.
 const _require = createRequire(import.meta.url);
 
-const API_KEY = process.env['MINIMAX_API_KEY'] ?? '';
+const API_KEY = process.env['MEMORY_STUDIO_FAST_AGENT_API_KEY'] ?? '';
 const MODEL = process.env['MEMORY_STUDIO_FAST_AGENT_MODEL'] ?? 'MiniMax-M2.7-highspeed';
-const ENDPOINT = 'https://api.minimax.io/anthropic';
+const ENDPOINT = process.env['MEMORY_STUDIO_FAST_AGENT_BASE_URL'] ?? 'https://api.minimax.io/anthropic';
 
 export type Mode = 'real' | 'stub';
 
