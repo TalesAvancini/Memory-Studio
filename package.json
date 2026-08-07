@@ -22,6 +22,9 @@
     "verify-env": "node scripts/verify-env.mjs",
     "server:start": "node --env-file=.env --experimental-strip-types --no-warnings src/server/boot.ts",
     "ui:start": "node --experimental-strip-types --no-warnings scripts/ui-server.mjs",
+    "inception:enable": "node scripts/inception.mjs enable",
+    "inception:disable": "node scripts/inception.mjs disable",
+    "inception:status": "node scripts/inception.mjs status",
     "smoke:augment-server": "node scripts/smoke-augment-server.mjs"
   },
   "dependencies": {

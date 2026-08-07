@@ -35,3 +35,7 @@ models/
 
 # Captura_projeto (ferramenta externa — repo embedded, customizado pra rodar aqui)
 /captura_projeto/
+
+# Inception script artifacts (settings backup + test copies, local-only)
+/.claude/settings.json.bak
+/.claude/settings.json.test
