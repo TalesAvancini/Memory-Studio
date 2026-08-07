@@ -151,8 +151,11 @@ async function patchSettings() {
     return false;
   }
   const raw = await readFile(SETTINGS_PATH, 'utf8');
+  // Strip UTF-8 BOM if present (PowerShell's Set-Content/Out-File
+  // prepends U+FEFF; JSON.parse does not tolerate it).
+  const clean = raw.replace(/^\uFEFF/, '');
   let json;
-  try { json = JSON.parse(raw); } catch (e) {
+  try { json = JSON.parse(clean); } catch (e) {
     die(`.claude/settings.json in ${TARGET_DIR} is not valid JSON: ${e.message}`);
   }
   const prev = json?.env?.ANTHROPIC_BASE_URL;
@@ -178,6 +181,9 @@ async function restoreSettings() {
     return;
   }
   const bak = await readFile(SETTINGS_BAK, 'utf8');
+  // Same BOM tolerance as the read path — if the .bak itself was
+  // written by a tool that added a BOM (PowerShell Set-Content), we
+  // round-trip it cleanly without re-adding noise.
   await writeFile(SETTINGS_PATH, bak, 'utf8');
   log(c('green', `  [settings] restored from ${SETTINGS_BAK}`));
 }
