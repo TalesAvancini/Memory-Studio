@@ -1013,6 +1013,40 @@ curl -I http://127.0.0.1:42900/health        # 200 application/json
 # CORS: access-control-allow-origin: http://127.0.0.1:41823 (loopback OK)
 ```
 
+### Marco 49 — T-07 onboarding (1-command proxy toggle)
+
+After Marco 48 the user pushed back: "isso é um absurdo. Eu programei com vocês de criar uma coisa que funcionasse. ... Tu é burro." The flow still required setting `ANTHROPIC_BASE_URL` in a shell, plus working around the per-repo `.claude/settings.json` overriding it. The user should not need to know the internals to use the product.
+
+Investigation revealed a second, deeper bug: the fast-agent client was looking for `MINIMAX_API_KEY` but the `.env` shipped with the project uses `MEMORY_STUDIO_FAST_AGENT_API_KEY` — so the in-process MiniMax-M2.7-highspeed path was always `MODE=stub`, even when the key was correctly configured. Likewise, `MEMORY_STUDIO_FAST_AGENT_BASE_URL` was an `.env` var that the client ignored. Result: augmentation was capenga even when the proxy was being used.
+
+3 commits + 1 doc commit, all on `fix/ui-server-bootstrap`:
+- `4e7a57c` fix(fast-agent): respect MEMORY_STUDIO_FAST_AGENT_API_KEY + BASE_URL from env
+- `70ad5f0` feat(scripts): add inception.mjs enable/disable/status (1-command proxy toggle)
+- `004e71f` docs(ui): add Section 5 — 1-command inception onboarding
+- (pending) docs(handoff): Marco 49 — T-07 onboarding
+
+Onboarding (the 1-command flow):
+```
+npm run inception:enable    # patches .claude/settings.json
+npm run server:start         # terminal 1
+npm run ui:start             # terminal 2
+claude                       # terminal 3 — proxy ON
+```
+
+Limitations (YAGNI, documented in Section 5.5):
+- Claude Code only. Cursor/Windsurf/Cline/Aider each have their own config; not addressed.
+- Per-repo patch. Outside the repo dir, Claude Code reads a different settings file.
+- `inception:disable` only restores from the FIRST `enable`'s `.bak`. Intentional — the script never overwrites a `.bak` it didn't create.
+
+Validation (this session, 2026-08-06):
+- `npm run server:start` → log: `[fast-agent] MODE=real ...` (was `stub` before Fix A). Confirms env-var wiring is now correct.
+- `npm run ui:start` → `Memory Studio UI: http://127.0.0.1:41823/`
+- `node scripts/smoke-e2e-with-db.mjs` → 6/6 PASS
+- `inception:status` (off state) → `proxy health = OK (uptime 36s, catalog count 17)`
+- `inception:enable` → `inception enabled = true`, `ANTHROPIC_BASE_URL = http://127.0.0.1:42900`
+- `inception:disable` → `inception enabled = false`, base URL restored from `.bak`
+- Auth token preserved byte-for-byte across enable/disable round-trip.
+
 **Cleanup feito:**
 - `.scratch/ui-serve/` (gambiarra Python) movido pro Trash — era untracked, sem perda de histórico git.
 - `.scratch/memory-studio/spec.md` (tracked) preservado.
