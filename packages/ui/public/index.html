@@ -10,10 +10,12 @@
       // and surfaces: (a) whether the proxy is reachable, (b) whether
       // a real request has been intercepted recently (<60s = green,
       // <5min = yellow, older or never = gray), (c) last error if any.
-      // The banner element exists in the DOM above; this script
-      // updates its label + detail + class on every tick.
-      (function () {
+      // Deferred until DOMContentLoaded — inline scripts without
+      // `defer` execute before the body is parsed, so the banner
+      // element would be null at this point.
+      function startProxyBanner() {
         const banner = document.getElementById('proxy-banner');
+        if (!banner) return; // safety: banner removed by the user
         const label = banner.querySelector('[data-proxy-label]');
         const detail = banner.querySelector('[data-proxy-detail]');
         const API_BASE = (location.protocol === 'file:' || location.hostname === '')
@@ -25,7 +27,6 @@
           if (!lastReq || lastReq === 0) return { text: 'idle (no requests yet)', kind: 'idle' };
           const ageSec = Math.round((Date.now() - lastReq) / 1000);
           if (ageSec < 60) return { text: 'intercepting (last request ' + ageSec + 's ago)', kind: 'ok' };
-          if (ageSec < 300) return { text: 'idle ' + Math.round(ageSec / 60) + 'min since last request', kind: 'warn' };
           return { text: 'idle ' + Math.round(ageSec / 60) + 'min since last request', kind: 'warn' };
         }
 
@@ -54,7 +55,12 @@
         }
         tick();
         setInterval(tick, 2000);
-      })();
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startProxyBanner);
+      } else {
+        startProxyBanner();
+      }
     </script>
     <script defer src="/assets/htmx.min.js"></script>
     <script defer src="/assets/app.js"></script>
