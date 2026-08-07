@@ -25,6 +25,9 @@
     "inception:enable": "node scripts/inception.mjs enable",
     "inception:disable": "node scripts/inception.mjs disable",
     "inception:status": "node scripts/inception.mjs status",
+    "wrap": "node scripts/wrap.mjs",
+    "wrap:restore": "node scripts/wrap.mjs --restore",
+    "wrap:servers": "node scripts/wrap.mjs --servers",
     "smoke:augment-server": "node scripts/smoke-augment-server.mjs"
   },
   "dependencies": {
